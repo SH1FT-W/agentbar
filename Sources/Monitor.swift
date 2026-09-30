@@ -480,6 +480,36 @@ private final class MonitorCore: @unchecked Sendable {
     /// Läuft der Claude-Prozess noch? (Sitzungen ohne SessionEnd, z. B. Terminal hart geschlossen)
     private func alive(_ pid: pid_t) -> Bool { pid <= 1 || kill(pid, 0) == 0 || errno != ESRCH }
 
+    /// Claude Code (ab ~2.1) meldet jeden laufenden Terminal-Prozess in ~/.claude/sessions/<pid>.json an und
+    /// löscht die Datei beim Beenden. `complete` nur, wenn jede Datei lesbar ist und kein lokaler claude-Prozess
+    /// ohne Anmeldung läuft (ältere Version) – sonst lässt sich „beendet“ nicht sicher ableiten.
+    private func sessionRegistry() -> (ids: Set<String>, complete: Bool) {
+        let fm = FileManager.default
+        var ids = Set<String>(), pids = Set<pid_t>(), complete = true
+        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: nil) else { return ([], false) }
+        for f in items where f.pathExtension == "json" {
+            if let pid = pid_t(f.deletingPathExtension().lastPathComponent) { pids.insert(pid) }
+            guard isLocal(f), let d = try? Data(contentsOf: f),
+                  let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                  let sid = j["sessionId"] as? String else { complete = false; continue }
+            ids.insert(sid)
+        }
+        if complete { complete = !claudePids().contains { !pids.contains($0) } }
+        return (ids, complete)
+    }
+
+    private func claudePids() -> [pid_t] {
+        var buf = [pid_t](repeating: 0, count: 4096)
+        let n = Int(proc_listallpids(&buf, Int32(buf.count * MemoryLayout<pid_t>.size)))
+        var path = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        // Native Installation: …/claude/versions/<version>; sonst heißt das Programm selbst „claude“
+        return buf.prefix(max(0, n)).filter { pid in
+            guard pid > 1, proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return false }
+            let p = String(cString: path)
+            return p.contains("/claude/versions/") || (p as NSString).lastPathComponent == "claude"
+        }
+    }
+
     private func childCount(_ pid: pid_t) -> Int {
         guard pid > 1 else { return 0 }
         var buf = [pid_t](repeating: 0, count: 256)
@@ -528,10 +558,13 @@ private final class MonitorCore: @unchecked Sendable {
             else { mains[st.sessionId] = st }
         }
         var out: [AgentSession] = []
+        let registry = sessionRegistry()
         for (sid, st) in mains {
             let h = hooks[sid]
             if h?.ended == true { continue }
             if let pid = h?.pid, !alive(pid) { continue }
+            // Terminal-Sitzung ohne Anmeldung → Prozess beendet (kurze Schonfrist für den Start)
+            if st.source == .cli, registry.complete, !registry.ids.contains(sid), now.timeIntervalSince(st.lastEvent) > 30 { continue }
             let hooksActive = h != nil
             var status = heuristicStatus(st, now: now, hooksActive: hooksActive)
             var activity = st.thinking ? L("Denkt nach …", "Thinking …") : (st.toolPending ? st.toolActivity : "")

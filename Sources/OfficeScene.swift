@@ -875,9 +875,10 @@ struct OfficeScene {
             // Tasse in beiden Händen
             let cupY = shoulderY + (sleep ? 32 : 22) * s
             for side in [-1.0, 1.0] as [CGFloat] {
-                var arm = Path(); arm.move(to: P(x + side * 19 * s, shoulderY + 10 * s))
-                arm.addQuadCurve(to: P(x + side * 8 * s, cupY + 6 * s), control: P(x + side * 24 * s, cupY))
-                ctx.stroke(arm, with: .color(T.shirt), style: StrokeStyle(lineWidth: 10 * s, lineCap: .round))
+                var arm = Path(); arm.move(to: P(x + side * 19 * s, shoulderY + 8 * s))
+                arm.addLine(to: P(x + side * 26 * s, cupY + 12 * s))
+                arm.addLine(to: P(x + side * 8 * s, cupY + 7 * s))
+                sleeve(&ctx, arm, T, s)
             }
             let cup = CGRect(x: x - 7 * s, y: cupY - 2 * s, width: 14 * s, height: 14 * s)
             ctx.fill(Path(roundedRect: cup, cornerRadius: 3.5 * s, style: .continuous), with: .linearGradient(Gradient(colors: [.white, rgb(0xD8D8DC)]), startPoint: P(cup.minX, 0), endPoint: P(cup.maxX, 0)))
@@ -937,6 +938,12 @@ struct OfficeScene {
         }
     }
 
+    /// Arm vor dem Oberkörper: dunkle Kontur, sonst verschwindet der Ärmel im gleichfarbigen Pullover.
+    private func sleeve(_ ctx: inout GraphicsContext, _ arm: Path, _ T: Tones, _ s: CGFloat) {
+        ctx.stroke(arm, with: .color(darker(T.shirt, 0.3)), style: StrokeStyle(lineWidth: 11.5 * s, lineCap: .round, lineJoin: .round))
+        ctx.stroke(arm, with: .color(T.shirtLight), style: StrokeStyle(lineWidth: 8.5 * s, lineCap: .round, lineJoin: .round))
+    }
+
     /// Stehende/laufende Figur: a.point = Füße.
     private func drawStanding(_ ctx: inout GraphicsContext, _ a: Actor, walk t: Double) {
         let s = a.scale, x = a.point.x, feet = a.point.y
@@ -962,9 +969,10 @@ struct OfficeScene {
         if idle {
             // Tasse vor der Brust, leichter Dampf
             let cup = P(x + 9 * s, shoulderY + 22 * s)
-            var front = Path(); front.move(to: P(x + 19 * s, shoulderY + 10 * s))
-            front.addQuadCurve(to: P(cup.x + 4 * s, cup.y + 8 * s), control: P(x + 26 * s, shoulderY + 34 * s))
-            ctx.stroke(front, with: .color(T.shirt), style: StrokeStyle(lineWidth: 10 * s, lineCap: .round))
+            var front = Path(); front.move(to: P(x + 19 * s, shoulderY + 8 * s))
+            front.addLine(to: P(x + 27 * s, shoulderY + 34 * s))
+            front.addLine(to: P(cup.x + 5 * s, cup.y + 7 * s))
+            sleeve(&ctx, front, T, s)
             let r = CGRect(x: cup.x - 7 * s, y: cup.y - 4 * s, width: 14 * s, height: 14 * s)
             ctx.fill(Path(roundedRect: r, cornerRadius: 3.5 * s, style: .continuous), with: .linearGradient(Gradient(colors: [.white, rgb(0xD8D8DC)]), startPoint: P(r.minX, 0), endPoint: P(r.maxX, 0)))
             ctx.fill(circle(P(cup.x + 5 * s, cup.y + 6 * s), 4.4 * s), with: .color(T.skin))

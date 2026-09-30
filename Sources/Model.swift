@@ -204,6 +204,7 @@ enum Paths {
     static let home = URL(fileURLWithPath: NSHomeDirectory())
     /// ~/.claude kann ein Symlink sein (z. B. nach iCloud Drive) – FSEvents braucht den echten Pfad.
     static var claudeProjects: URL { home.appendingPathComponent(".claude/projects").resolvingSymlinksInPath() }
+    static var claudeSessions: URL { home.appendingPathComponent(".claude/sessions").resolvingSymlinksInPath() }
     static var claudeSettings: URL { home.appendingPathComponent(".claude/settings.json").resolvingSymlinksInPath() }
     static let xcodeProjects = home.appendingPathComponent("Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/projects")
     static let desktopMeta = home.appendingPathComponent("Library/Application Support/Claude/claude-code-sessions")
