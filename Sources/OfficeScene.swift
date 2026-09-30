@@ -938,10 +938,13 @@ struct OfficeScene {
         }
     }
 
-    /// Arm vor dem Oberkörper: dunkle Kontur, sonst verschwindet der Ärmel im gleichfarbigen Pullover.
+    /// Arm vor dem Oberkörper: weicher Schatten darunter + etwas dunklerer Ärmel, sonst verschwindet er im gleichfarbigen Pullover.
     private func sleeve(_ ctx: inout GraphicsContext, _ arm: Path, _ T: Tones, _ s: CGFloat) {
-        ctx.stroke(arm, with: .color(darker(T.shirt, 0.3)), style: StrokeStyle(lineWidth: 11.5 * s, lineCap: .round, lineJoin: .round))
-        ctx.stroke(arm, with: .color(T.shirtLight), style: StrokeStyle(lineWidth: 8.5 * s, lineCap: .round, lineJoin: .round))
+        let style = StrokeStyle(lineWidth: 10 * s, lineCap: .round, lineJoin: .round)
+        var shade = ctx
+        shade.addFilter(.blur(radius: 2.2 * s))
+        shade.stroke(arm.applying(CGAffineTransform(translationX: 0, y: 1.5 * s)), with: .color(darker(T.shirt, 0.45).opacity(0.35)), style: style)
+        ctx.stroke(arm, with: .color(darker(T.shirt, 0.07)), style: style)
     }
 
     /// Stehende/laufende Figur: a.point = Füße.

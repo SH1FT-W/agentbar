@@ -481,12 +481,12 @@ private final class MonitorCore: @unchecked Sendable {
     private func alive(_ pid: pid_t) -> Bool { pid <= 1 || kill(pid, 0) == 0 || errno != ESRCH }
 
     /// Claude Code (ab ~2.1) meldet jeden laufenden Terminal-Prozess in ~/.claude/sessions/<pid>.json an und
-    /// löscht die Datei beim Beenden. `complete` nur, wenn jede Datei lesbar ist und kein lokaler claude-Prozess
-    /// ohne Anmeldung läuft (ältere Version) – sonst lässt sich „beendet“ nicht sicher ableiten.
-    private func sessionRegistry() -> (ids: Set<String>, complete: Bool) {
+    /// löscht die Datei beim Beenden. `complete` nur, wenn jede Datei lesbar ist; `unregistered` = Startzeiten
+    /// lokaler claude-Prozesse ohne Anmeldung (ältere Versionen).
+    private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date]) {
         let fm = FileManager.default
         var ids = Set<String>(), pids = Set<pid_t>(), complete = true
-        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: nil) else { return ([], false) }
+        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: nil) else { return ([], false, []) }
         for f in items where f.pathExtension == "json" {
             if let pid = pid_t(f.deletingPathExtension().lastPathComponent) { pids.insert(pid) }
             guard isLocal(f), let d = try? Data(contentsOf: f),
@@ -494,8 +494,30 @@ private final class MonitorCore: @unchecked Sendable {
                   let sid = j["sessionId"] as? String else { complete = false; continue }
             ids.insert(sid)
         }
-        if complete { complete = !claudePids().contains { !pids.contains($0) } }
-        return (ids, complete)
+        let unregistered = claudePids().filter { !pids.contains($0) }.compactMap(processStart)
+        return (ids, complete, unregistered)
+    }
+
+    /// Nicht angemeldete Sitzungen, die noch laufen dürften: je alter Prozess die eine Sitzung, deren Datei kurz nach
+    /// dem Prozessstart angelegt wurde. Passt das nicht eindeutig (z. B. --resume, /clear) → nil = alle behalten.
+    private func unregisteredOwners(_ starts: [Date], _ candidates: [String: Date]) -> Set<String>? {
+        var keep = Set<String>()
+        for start in starts {
+            let hits = candidates.filter { $0.value >= start.addingTimeInterval(-10) && $0.value <= start.addingTimeInterval(600) }
+            guard hits.count == 1, let sid = hits.first?.key else { return nil }
+            keep.insert(sid)
+        }
+        return keep
+    }
+
+    private func processStart(_ pid: pid_t) -> Date? {
+        var info = proc_bsdinfo()
+        guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(info.pbi_start_tvsec))
+    }
+
+    private func created(_ path: String) -> Date {
+        (try? FileManager.default.attributesOfItem(atPath: path)[.creationDate] as? Date) ?? .distantPast
     }
 
     private func claudePids() -> [pid_t] {
@@ -552,19 +574,27 @@ private final class MonitorCore: @unchecked Sendable {
     private func emit() {
         let now = Date()
         var mains: [String: FileState] = [:]
+        var mainPaths: [String: String] = [:]
         var subs: [String: [FileState]] = [:]
-        for st in files.values {
+        for (path, st) in files {
             if st.isSubagent { if let p = st.parentId { subs[p, default: []].append(st) } }
-            else { mains[st.sessionId] = st }
+            else { mains[st.sessionId] = st; mainPaths[st.sessionId] = path }
         }
         var out: [AgentSession] = []
         let registry = sessionRegistry()
+        // Terminal-Sitzung ohne Anmeldung → Prozess beendet, außer ein alter (nicht anmeldender) Prozess gehört dazu
+        var unregisteredKeep: Set<String>? = []
+        if registry.complete, !registry.unregistered.isEmpty {
+            var candidates: [String: Date] = [:]
+            for (sid, st) in mains where st.source == .cli && !registry.ids.contains(sid) { candidates[sid] = created(mainPaths[sid] ?? "") }
+            unregisteredKeep = unregisteredOwners(registry.unregistered, candidates)
+        }
         for (sid, st) in mains {
             let h = hooks[sid]
             if h?.ended == true { continue }
             if let pid = h?.pid, !alive(pid) { continue }
-            // Terminal-Sitzung ohne Anmeldung → Prozess beendet (kurze Schonfrist für den Start)
-            if st.source == .cli, registry.complete, !registry.ids.contains(sid), now.timeIntervalSince(st.lastEvent) > 30 { continue }
+            if st.source == .cli, registry.complete, let keep = unregisteredKeep, !registry.ids.contains(sid), !keep.contains(sid),
+               now.timeIntervalSince(st.lastEvent) > 30 { continue }   // kurze Schonfrist für den Start
             let hooksActive = h != nil
             var status = heuristicStatus(st, now: now, hooksActive: hooksActive)
             var activity = st.thinking ? L("Denkt nach …", "Thinking …") : (st.toolPending ? st.toolActivity : "")
