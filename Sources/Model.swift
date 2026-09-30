@@ -198,6 +198,7 @@ enum Prefs {
     static let notifyDone = "notifyDone"
     static let notifyError = "notifyError"
     static let notifyQuota = "notifyQuota"
+    static let notifyUpdate = "notifyUpdate"
     static let quotaThreshold = "quotaThreshold"
     static let notifyWhenFrontmost = "notifyWhenFrontmost"
     static let showCount = "menuShowCount"
@@ -211,7 +212,7 @@ enum Prefs {
 
     static func register() {
         UserDefaults.standard.register(defaults: [
-            notifyWaiting: true, notifyDone: true, notifyError: true, notifyQuota: true,
+            notifyWaiting: true, notifyDone: true, notifyError: true, notifyQuota: true, notifyUpdate: true,
             quotaThreshold: 80.0, notifyWhenFrontmost: false,
             showCount: true, showQuota: false, visibleHours: 2.0,
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,

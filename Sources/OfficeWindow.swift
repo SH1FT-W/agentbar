@@ -73,12 +73,35 @@ final class SystemLoad: ObservableObject {
     }
     func stop() { timer?.invalidate(); timer = nil }
 
-    /// Gefahrene Strecke des Saugroboters – aufsummiert, damit ein Lastwechsel nur das Tempo ändert, statt ihn springen zu lassen.
-    private var odometer: (t: Double, d: Double)?
-    func vacuumDistance(at now: Double) -> Double {
-        let d = odometer.map { $0.d + min(max(now - $0.t, 0), 0.5) * (20 + cpu * 140) } ?? 0
-        odometer = (now, d)
-        return d
+    /// Stand des Saugroboters – aufsummiert, damit ein Lastwechsel nur das Tempo ändert, statt ihn springen zu lassen.
+    /// Brennt das Licht (dock), biegt er beim nächsten Vorbeikommen in die Ladestation ab; wird es hell, fährt er wieder los.
+    private var odometer: (t: Double, v: VacuumState)?
+    func vacuum(at now: Double, dock: Bool) -> VacuumState {
+        guard let o = odometer else {
+            let v = dock ? VacuumState.docked : VacuumState(loop: 0, spur: 0)   // nachts gestartet: steht schon in der Station
+            odometer = (now, v)
+            return v
+        }
+        var v = o.v
+        var step = min(max(now - o.t, 0), 0.5) * (20 + cpu * 140)
+        let spurLen = OfficeScene.vacuumSpurLength, loopLen = OfficeScene.vacuumLoopLength
+        if dock {
+            if v.spur == 0 {
+                var ahead = OfficeScene.vacuumJunctionDistance - v.loop.truncatingRemainder(dividingBy: loopLen)
+                if ahead < 0 { ahead += loopLen }
+                if ahead > loopLen - 1 { ahead = 0 }            // Rundungsrest: steht schon am Abzweig
+                let m = min(step, ahead)
+                v.loop += m
+                step -= m
+            }
+            v.spur = min(spurLen, v.spur + step)
+        } else {
+            let back = min(v.spur, step)
+            v.spur -= back
+            v.loop += step - back
+        }
+        odometer = (now, v)
+        return v
     }
 
     private func sample() {

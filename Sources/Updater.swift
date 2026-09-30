@@ -21,6 +21,8 @@ final class Updater: ObservableObject {
     static let publicKey = "TBkvdyuhlknBwhMjJ0a6/oQVPp6ZOATnqaHcHm62P8M="
     private var release: Release?
     private var timer: Timer?
+    /// Meldet eine neu gefundene Version (je Version nur einmal, auch über Neustarts hinweg).
+    var onFound: ((String) -> Void)?
 
     struct Release { let version: String; let zip: URL; let signature: URL }
 
@@ -63,6 +65,10 @@ final class Updater: ObservableObject {
             if Self.isNewer(tag, than: AppInfo.version) {
                 release = Release(version: tag, zip: zip, signature: sig)
                 state = .available(version: tag, notes: (json["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+                if UserDefaults.standard.string(forKey: "updateNotified") != tag {
+                    UserDefaults.standard.set(tag, forKey: "updateNotified")
+                    onFound?(tag)
+                }
             } else {
                 release = nil
                 state = .upToDate

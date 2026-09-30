@@ -267,7 +267,7 @@ struct OfficeView: View {
                 let scene = OfficeScene(time: now, date: tl.date, dark: scheme == .dark, daylight: daylight,
                                         actors: actors, overflow: overflow, hovered: hovered,
                                         session: quota.session?.percent, weekly: quota.weekly?.percent,
-                                        plan: quota.plan, cpu: load.cpu, vacuum: load.vacuumDistance(at: now),
+                                        plan: quota.plan, cpu: load.cpu, vacuum: load.vacuum(at: now, dock: OfficeScene.lightsOn(date: tl.date, dark: scheme == .dark, daylight: daylight)),
                                         working: monitor.workingCount, waiting: monitor.waitingCount)
                 ZStack(alignment: .topLeading) {
                     Canvas { ctx, size in

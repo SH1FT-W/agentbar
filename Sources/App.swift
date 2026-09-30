@@ -78,6 +78,11 @@ final class AppStore: ObservableObject {
                                 body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.") + " \(resetText(self?.quota.session?.resetsAt)).",
                                 sessionId: nil)
         }
+        updater.onFound = { [weak self] version in
+            guard UserDefaults.standard.bool(forKey: Prefs.notifyUpdate) else { return }
+            self?.notifier.post(title: L("AgentBar \(version) ist da", "AgentBar \(version) is available"),
+                                body: L("Installieren über das AgentBar-Menü.", "Install it from the AgentBar menu."), sessionId: nil)
+        }
     }
 
     func launched() {

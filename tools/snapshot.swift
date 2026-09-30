@@ -35,7 +35,8 @@ struct Snap {
         func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
-                                    hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3, vacuum: t * 40, working: 3, waiting: 1)
+                                    hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
+                                    vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1)
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {

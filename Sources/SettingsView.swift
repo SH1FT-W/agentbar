@@ -28,6 +28,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.notifyDone) private var notifyDone = true
     @AppStorage(Prefs.notifyError) private var notifyError = true
     @AppStorage(Prefs.notifyQuota) private var notifyQuota = true
+    @AppStorage(Prefs.notifyUpdate) private var notifyUpdate = true
     @AppStorage(Prefs.quotaThreshold) private var threshold = 80.0
     @AppStorage(Prefs.notifyWhenFrontmost) private var whenFront = false
     @AppStorage(Prefs.showCount) private var showCount = true
@@ -74,6 +75,7 @@ struct SettingsView: View {
                         SettingLabel(L("Warnen ab", "Warn at"), nil, .clear)
                     }
                 }
+                Toggle(isOn: $notifyUpdate) { SettingLabel(L("Neue AgentBar-Version", "New AgentBar version"), "arrow.down.app.fill", .blue) }
                 Toggle(isOn: $whenFront) {
                     SettingLabel(L("Auch im Vordergrund", "Even when in front"), "macwindow", .gray,
                                  note: L("Auch melden, wenn die Sitzung gerade sichtbar ist.", "Also notify when the session is visible."))

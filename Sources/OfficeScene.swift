@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// Stand des Saugroboters: Strecke auf dem Rundkurs und wie weit er auf dem Stichweg zur Ladestation ist (0 = auf dem Rundkurs).
+struct VacuumState {
+    var loop: Double
+    var spur: Double
+    static let docked = VacuumState(loop: OfficeScene.vacuumJunctionDistance, spur: OfficeScene.vacuumSpurLength)
+}
+
 /// Zeichnet das Büro in einem festen 1000×600-Koordinatensystem (wird aufs Fenster skaliert).
 /// Stil: helle Apple-Büros – Glasfassade, Eichenparkett, weiße Tische, Aluminium, sanftes Licht.
 /// Alles ist aus einfachen Formen mit Verläufen gebaut; keine Filter über große Flächen (30 fps).
@@ -21,7 +28,7 @@ struct OfficeScene {
     let weekly: Double?
     let plan: String?
     let cpu: Double
-    let vacuum: Double          // gefahrene Strecke in Punkten
+    let vacuum: VacuumState
     let working: Int
     let waiting: Int
 
@@ -43,20 +50,25 @@ struct OfficeScene {
     private let aluDark = rgb(0x9A9FA6)
 
     /// Stunde als Kommazahl; ohne Tageszeit-Himmel: hell = Mittag, dunkel = Nacht.
-    private var hour: Double {
+    static func hour(date: Date, dark: Bool, daylight: Bool) -> Double {
         guard daylight else { return dark ? 23 : 12 }
         let c = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
         return Double(c.hour ?? 12) + Double(c.minute ?? 0) / 60 + Double(c.second ?? 0) / 3600
     }
+    private var hour: Double { Self.hour(date: date, dark: dark, daylight: daylight) }
 
     /// 0 = Nacht, 1 = Tag
-    private var dayness: Double {
-        let h = hour
+    static func dayness(date: Date, dark: Bool, daylight: Bool) -> Double {
+        let h = hour(date: date, dark: dark, daylight: daylight)
         if h < 5 || h > 21 { return 0 }
         if h < 7.5 { return (h - 5) / 2.5 }
         if h > 18.5 { return 1 - (h - 18.5) / 2.5 }
         return 1
     }
+    private var dayness: Double { Self.dayness(date: date, dark: dark, daylight: daylight) }
+
+    /// Deckenlicht brennt (gleiche Schwelle wie in drawWall) – dann gehört der Saugroboter in die Ladestation.
+    static func lightsOn(date: Date, dark: Bool, daylight: Bool) -> Bool { dayness(date: date, dark: dark, daylight: daylight) < 0.7 }
 
     /// 0 = Mittag, 1 = tief stehende Sonne (Morgen-/Abendröte)
     private var golden: Double {
@@ -95,6 +107,7 @@ struct OfficeScene {
         items.append((566, { c in drawCoffeeTable(&c) }))
         for a in seated["stand"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
         for a in actors { if case .walking(let t) = a.pose { items.append((a.depth, { c in drawStanding(&c, a, walk: t) })) } }
+        items.append((Self.vacuumDock.y - 8, { c in drawDock(&c) }))
         let bot = vacuumPose()
         items.append((bot.p.y, { c in drawVacuum(&c, bot) }))
         for (_, f) in items.sorted(by: { $0.0 < $1.0 }) { f(&ctx) }
@@ -779,12 +792,38 @@ struct OfficeScene {
     /// Saugroboter-Rundkurs über freie Flächen: Mittelgang, rechts an den vorderen Tischen vorbei, vor der Lounge
     /// entlang, zwischen Sofa und Couchtisch zurück. Nie unter oder durch Tische.
     static let vacuumLoop: [CGPoint] = [(30, 494), (700, 494), (672, 597), (975, 597), (975, 521), (742, 521), (700, 494)].map { CGPoint(x: $0.0, y: $0.1) }
+    private static let vacuumLengths: [CGFloat] = {
+        let pts = vacuumLoop + [vacuumLoop[0]]
+        return (1..<pts.count).map { hypot(pts[$0].x - pts[$0 - 1].x, pts[$0].y - pts[$0 - 1].y) }
+    }()
+    static let vacuumLoopLength = Double(vacuumLengths.reduce(0, +))
+    /// Ladestation an der rechten Wand hinter dem Sofa (zwischen zwei Sitzplätzen). Stichweg wie der Weg von der Tür:
+    /// vom Mittelgang durch die Lücke der hinteren Tische hinauf, hinter den Stühlen an der Glasfront entlang nach rechts.
+    static let vacuumDock = CGPoint(x: 820, y: 380)          // Robotermitte, angedockt
+    static let vacuumSpur: [CGPoint] = [(560, 494), (560, 392), (820, 392), (820, 380)].map { CGPoint(x: $0.0, y: $0.1) }
+    private static let vacuumSpurLengths: [CGFloat] = (1..<vacuumSpur.count).map {
+        hypot(vacuumSpur[$0].x - vacuumSpur[$0 - 1].x, vacuumSpur[$0].y - vacuumSpur[$0 - 1].y)
+    }
+    static let vacuumJunctionDistance = Double(vacuumSpur[0].x - vacuumLoop[0].x)   // Abzweig liegt auf dem ersten Rundkurs-Abschnitt
+    static let vacuumSpurLength = Double(vacuumSpurLengths.reduce(0, +))
+
+    private var docked: Bool { vacuum.spur >= Self.vacuumSpurLength }
 
     private func vacuumPose() -> (p: CGPoint, dx: CGFloat) {
+        if vacuum.spur > 0 {
+            var d = CGFloat(min(vacuum.spur, Self.vacuumSpurLength))
+            for i in 0..<Self.vacuumSpurLengths.count {
+                let a = Self.vacuumSpur[i], b = Self.vacuumSpur[i + 1], len = Self.vacuumSpurLengths[i]
+                if d <= len || i == Self.vacuumSpurLengths.count - 1 {
+                    let t = min(d / max(len, 1), 1)
+                    return (P(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t), b.x - a.x)
+                }
+                d -= len
+            }
+        }
         let pts = Self.vacuumLoop + [Self.vacuumLoop[0]]
-        var lens: [CGFloat] = []
-        for i in 1..<pts.count { lens.append(hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)) }
-        var d = CGFloat(vacuum.truncatingRemainder(dividingBy: Double(lens.reduce(0, +))))
+        let lens = Self.vacuumLengths
+        var d = CGFloat(vacuum.loop.truncatingRemainder(dividingBy: Self.vacuumLoopLength))
         for i in 0..<lens.count {
             if d <= lens[i] {
                 let a = pts[i], b = pts[i + 1], t = d / max(lens[i], 1)
@@ -804,8 +843,21 @@ struct OfficeScene {
         ctx.fill(oval(x - 20, y - 13, 40, 13), with: .linearGradient(Gradient(colors: [rgb(0xF4F4F6), rgb(0xCFD1D5)]), startPoint: P(0, y - 13), endPoint: P(0, y)))
         ctx.fill(oval(x - 6.5, y - 13, 13, 6), with: .color(rgb(0xB9BCC1)))
         ctx.fill(oval(x - 5.5, y - 14.2, 11, 4.6), with: .color(rgb(0xE8E9EC)))
-        let led = cpu > 0.6 ? rgb(0xFF9F0A) : rgb(0x30D158)
-        ctx.fill(circle(P(x + front * 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * 4))))
+        let led = cpu > 0.6 && !docked ? rgb(0xFF9F0A) : rgb(0x30D158)
+        ctx.fill(circle(P(x + front * 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * (docked ? 1.2 : 4)))))
+    }
+
+    /// Ladestation an der Wand: weißer Turm mit dunklem Deckel, zwei Wassertanks und Rampe.
+    private func drawDock(_ ctx: inout GraphicsContext) {
+        let x = Self.vacuumDock.x, base = Self.vacuumDock.y - 8
+        shadow(&ctx, CGRect(x: x - 30, y: base - 4, width: 60, height: 10), 0.22)
+        ctx.fill(rounded(x - 26, base - 6, 52, 8, 3), with: vgrad([rgb(0x3A3B3F), rgb(0x26272A)], base - 6, base + 2))
+        ctx.fill(rounded(x - 20, base - 46, 40, 42, 7), with: .linearGradient(Gradient(colors: [rgb(0xF6F6F8), rgb(0xD3D5D9)]), startPoint: P(x - 20, 0), endPoint: P(x + 20, 0)))
+        ctx.fill(rounded(x - 20, base - 46, 40, 9, 5), with: vgrad([rgb(0x3A3B3F), rgb(0x2A2B2E)], base - 46, base - 37))
+        ctx.fill(rounded(x - 15, base - 34, 13, 18, 3), with: .color(rgb(0x8FC3EA, 0.55)))
+        ctx.fill(rounded(x + 2, base - 34, 13, 18, 3), with: .color(rgb(0x9A9CA1, 0.45)))
+        let led = docked ? rgb(0x30D158).opacity(0.55 + 0.45 * sin(time * 1.2)) : Color.white.opacity(0.85)
+        ctx.fill(rounded(x - 5, base - 11, 10, 2, 1), with: .color(led))
     }
 
     // MARK: Figuren
