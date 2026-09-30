@@ -381,22 +381,22 @@ struct OfficeScene {
         let clock = DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .short)
         ctx.draw(Text(clock).font(.system(size: 27, weight: .semibold, design: .rounded)).foregroundColor(.white),
                  at: P(tx, screen.minY + 26), anchor: .leading)
-        let day = date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
+        let day = date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Lang.locale))
         ctx.draw(Text(day).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
                  at: P(tx + 1, screen.minY + 47), anchor: .leading)
-        ctx.draw(Text("5 Std.  \(session.map { "\(Int($0.rounded())) %" } ?? "–")").font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xFF4F7E)),
+        ctx.draw(Text(L("5 Std.", "5 h") + "  " + (session.map { percentText(Int($0.rounded())) } ?? "–")).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xFF4F7E)),
                  at: P(tx, screen.minY + 70), anchor: .leading)
-        ctx.draw(Text("Woche  \(weekly.map { "\(Int($0.rounded())) %" } ?? "–")").font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xB6F53A)),
+        ctx.draw(Text(L("Woche", "Week") + "  " + (weekly.map { percentText(Int($0.rounded())) } ?? "–")).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xB6F53A)),
                  at: P(tx, screen.minY + 86), anchor: .leading)
         let team: String
-        if actors.isEmpty { team = "Alle im Feierabend" }
-        else if waiting > 0 { team = waiting == 1 ? "1 braucht dich" : "\(waiting) brauchen dich" }
-        else if working > 0 { team = working == 1 ? "1 arbeitet" : "\(working) arbeiten" }
-        else { team = "Alle haben Pause" }
+        if actors.isEmpty { team = L("Alle im Feierabend", "Everyone’s off") }
+        else if waiting > 0 { team = waiting == 1 ? L("1 braucht dich", "1 needs you") : L("\(waiting) brauchen dich", "\(waiting) need you") }
+        else if working > 0 { team = working == 1 ? L("1 arbeitet", "1 working") : L("\(working) arbeiten", "\(working) working") }
+        else { team = L("Alle haben Pause", "Everyone’s on break") }
         ctx.draw(Text(team).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(waiting > 0 ? rgb(0xFFAA33) : .white.opacity(0.8)),
                  at: P(tx, screen.maxY - (overflow > 0 ? 28 : 16)), anchor: .leading)
         if overflow > 0 {
-            ctx.draw(Text("+\(overflow) im Nebenraum").font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
+            ctx.draw(Text(L("+\(overflow) im Nebenraum", "+\(overflow) next door")).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
                      at: P(tx, screen.maxY - 13), anchor: .leading)
         }
         // Glanz auf dem Glas
@@ -560,15 +560,15 @@ struct OfficeScene {
         shadow(&ctx, CGRect(x: b.x - 9 * s, y: b.y - 2 * s, width: 18 * s, height: 4 * s), 0.18)
         let sway = CGFloat(sin(time * 1.1 + Double(b.x))) * 0.6 * s
         let leaves: [(CGFloat, CGFloat, CGFloat)] = [(-9, -22, 4.2), (8, -24, 4.6), (-2, -30, 4.8), (11, -15, 3.6), (-11, -14, 3.4), (3, -19, 4)]
+        let pot = CGRect(x: b.x - 7 * s, y: b.y - 10 * s, width: 14 * s, height: 10 * s)
+        potBack(&ctx, pot, s, rim: 3 * s)
         for (i, l) in leaves.enumerated() {
             let c = P(b.x + l.0 * s + sway, b.y + l.1 * s)
-            var stem = Path(); stem.move(to: P(b.x, b.y - 9 * s)); stem.addLine(to: c)
+            var stem = Path(); stem.move(to: P(b.x + CGFloat(i % 3 - 1) * 2 * s, b.y - 10 * s)); stem.addLine(to: c)
             ctx.stroke(stem, with: .color(rgb(0x6E9E5C)), lineWidth: 0.8 * s)
             ctx.fill(circle(c, l.2 * s), with: .color(i % 2 == 0 ? rgb(0x4F9A55) : rgb(0x6DB566)))
         }
-        let pot = CGRect(x: b.x - 7 * s, y: b.y - 10 * s, width: 14 * s, height: 10 * s)
-        ctx.fill(Path(roundedRect: pot, cornerRadius: 3 * s, style: .continuous),
-                 with: .linearGradient(Gradient(colors: [.white, rgb(0xDCDCE0)]), startPoint: P(pot.minX, 0), endPoint: P(pot.maxX, 0)))
+        potFront(&ctx, pot, s, rim: 3 * s, corner: 3 * s)
     }
 
     private func lamp(_ ctx: inout GraphicsContext, _ b: CGPoint, _ s: CGFloat) {
@@ -686,7 +686,9 @@ struct OfficeScene {
     /// Geigenfeige im weißen Keramiktopf.
     private func drawFig(_ ctx: inout GraphicsContext, at b: CGPoint, scale s: CGFloat) {
         shadow(&ctx, CGRect(x: b.x - 34 * s, y: b.y - 7 * s, width: 68 * s, height: 14 * s), dark ? 0.3 : 0.18)
-        var stem = Path(); stem.move(to: P(b.x, b.y - 40 * s)); stem.addQuadCurve(to: P(b.x - 4 * s, b.y - 150 * s), control: P(b.x + 6 * s, b.y - 100 * s))
+        let pot = CGRect(x: b.x - 22 * s, y: b.y - 42 * s, width: 44 * s, height: 42 * s)
+        potBack(&ctx, pot, s, rim: 8 * s)
+        var stem = Path(); stem.move(to: P(b.x, b.y - 42 * s)); stem.addQuadCurve(to: P(b.x - 4 * s, b.y - 150 * s), control: P(b.x + 6 * s, b.y - 100 * s))
         ctx.stroke(stem, with: .color(rgb(0x6B5238)), lineWidth: 2.6 * s)
         let sway = sin(time * 0.8 + Double(b.x)) * 0.035
         let leaves: [(CGFloat, CGFloat, CGFloat, Double)] = [(-16, -64, 1.0, -1.1), (14, -76, 1.05, 1.0), (-14, -96, 1.0, -0.8), (16, -108, 0.95, 0.9),
@@ -704,16 +706,18 @@ struct OfficeScene {
             var vein = Path(); vein.move(to: P(0, -2 * ls)); vein.addLine(to: P(0, -30 * ls))
             ctx.stroke(vein.applying(t), with: .color(.white.opacity(0.18)), lineWidth: 0.7 * s)
         }
-        potWhite(&ctx, CGRect(x: b.x - 22 * s, y: b.y - 42 * s, width: 44 * s, height: 42 * s), s)
+        potFront(&ctx, pot, s, rim: 8 * s, corner: 10 * s)
     }
 
     /// Bogenhanf im Topf – wenige, große, aufrechte Blätter (ruhige Silhouette).
     private func drawSnakePlant(_ ctx: inout GraphicsContext, at b: CGPoint, scale s: CGFloat) {
         shadow(&ctx, CGRect(x: b.x - 34 * s, y: b.y - 7 * s, width: 68 * s, height: 14 * s), dark ? 0.3 : 0.18)
         let sway = sin(time * 0.7 + Double(b.x)) * 0.012
-        // (Versatz am Fuß, Höhe, Breite, Neigung)
-        let blades: [(CGFloat, CGFloat, CGFloat, Double)] = [(-12, 118, 12, -0.22), (12, 126, 12, 0.2), (-5, 150, 13, -0.07), (6, 138, 12, 0.08),
-                                                             (-16, 92, 11, -0.38), (17, 100, 11, 0.36), (0, 110, 12, 0.0)]
+        let pot = CGRect(x: b.x - 22 * s, y: b.y - 42 * s, width: 44 * s, height: 42 * s)
+        potBack(&ctx, pot, s, rim: 8 * s)
+        // (Versatz am Fuß – innerhalb der Topföffnung, Höhe, Breite, Neigung); äußere Blätter zuerst, damit die mittleren davor stehen
+        let blades: [(CGFloat, CGFloat, CGFloat, Double)] = [(-12, 92, 11, -0.34), (12, 100, 11, 0.32), (-8, 118, 12, -0.2), (8, 126, 12, 0.18),
+                                                             (-3, 150, 13, -0.06), (4, 138, 12, 0.07), (0, 110, 12, 0.0)]
         for (i, l) in blades.enumerated() {
             var leaf = Path()
             let w = l.2 * s, h = l.1 * s
@@ -721,21 +725,42 @@ struct OfficeScene {
             leaf.addCurve(to: P(0, -h), control1: P(-w * 0.75, -h * 0.45), control2: P(-w * 0.35, -h * 0.85))
             leaf.addCurve(to: P(w / 2, 0), control1: P(w * 0.35, -h * 0.85), control2: P(w * 0.75, -h * 0.45))
             leaf.closeSubpath()
-            let t = CGAffineTransform(translationX: b.x + l.0 * s, y: b.y - 36 * s).rotated(by: CGFloat(l.3 + sway * Double(i % 3 + 1)))
+            let t = CGAffineTransform(translationX: b.x + l.0 * s, y: b.y - 40 * s).rotated(by: CGFloat(l.3 + sway * Double(i % 3 + 1)))
             let base: Color = i % 2 == 0 ? rgb(0x3F7A4C) : rgb(0x4E8A58)
             ctx.fill(leaf.applying(t), with: .linearGradient(Gradient(colors: [darker(base, 0.1), base, lighter(base, 0.2)]),
                                                              startPoint: P(-w / 2, 0).applying(t), endPoint: P(w / 2, 0).applying(t)))
             ctx.stroke(leaf.applying(t), with: .color(rgb(0xC9D38A, 0.55)), lineWidth: 0.8 * s)
         }
-        potWhite(&ctx, CGRect(x: b.x - 22 * s, y: b.y - 42 * s, width: 44 * s, height: 42 * s), s)
+        potFront(&ctx, pot, s, rim: 8 * s, corner: 10 * s)
     }
 
-    private func potWhite(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat) {
+    /// Hinterer Teil des Topfs: Innenwand und Erde – wird VOR den Blättern gezeichnet, damit sie aus der Erde wachsen.
+    private func potBack(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat) {
         let light = dark ? rgb(0xD9D9DE) : .white
-        ctx.fill(Path(roundedRect: r, cornerRadius: 10 * s, style: .continuous),
-                 with: .linearGradient(Gradient(colors: [light, darker(light, 0.12)]), startPoint: P(r.minX, 0), endPoint: P(r.maxX, 0)))
-        ctx.fill(oval(r.minX + 2 * s, r.minY - 2 * s, r.width - 4 * s, 6 * s), with: .color(rgb(0x5A4636)))
-        ctx.stroke(oval(r.minX + 2 * s, r.minY - 2 * s, r.width - 4 * s, 6 * s), with: .color(light), lineWidth: 1.4 * s)
+        let top = oval(r.minX, r.minY - rim / 2, r.width, rim)
+        ctx.fill(top, with: .color(darker(light, 0.18)))                                   // Innenwand hinten
+        ctx.fill(oval(r.minX + 2.5 * s, r.minY - rim / 2 + 1.2 * s, r.width - 5 * s, rim - 1.6 * s),
+                 with: .linearGradient(Gradient(colors: [rgb(0x4A3A2C), rgb(0x6A5340)]), startPoint: P(0, r.minY - rim / 2), endPoint: P(0, r.minY + rim / 2)))
+    }
+
+    /// Vorderer Teil: Topfkörper ab der Randmitte plus helle Vorderkante – verdeckt die Blattansätze.
+    private func potFront(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat, corner: CGFloat) {
+        let light = dark ? rgb(0xD9D9DE) : .white
+        var body = Path()
+        body.move(to: P(r.minX, r.minY))
+        body.addArc(center: P(r.midX, r.minY), radius: r.width / 2, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true,
+                    transform: CGAffineTransform(translationX: r.midX, y: r.minY).scaledBy(x: 1, y: rim / r.width).translatedBy(x: -r.midX, y: -r.minY))
+        body.addLine(to: P(r.maxX, r.maxY - corner))
+        body.addQuadCurve(to: P(r.maxX - corner, r.maxY), control: P(r.maxX, r.maxY))
+        body.addLine(to: P(r.minX + corner, r.maxY))
+        body.addQuadCurve(to: P(r.minX, r.maxY - corner), control: P(r.minX, r.maxY))
+        body.closeSubpath()
+        ctx.fill(body, with: .linearGradient(Gradient(colors: [light, darker(light, 0.12)]), startPoint: P(r.minX, 0), endPoint: P(r.maxX, 0)))
+        // Vorderkante des Rands
+        var lip = Path()
+        lip.addArc(center: P(r.midX, r.minY), radius: r.width / 2, startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true,
+                   transform: CGAffineTransform(translationX: r.midX, y: r.minY).scaledBy(x: 1, y: rim / r.width).translatedBy(x: -r.midX, y: -r.minY))
+        ctx.stroke(lip, with: .color(lighter(light, 0.3)), lineWidth: 1.6 * s)
     }
 
     /// Saugroboter: fährt über das Parkett, je höher die CPU-Last, desto schneller.

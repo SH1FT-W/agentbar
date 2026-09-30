@@ -8,22 +8,25 @@ struct Snap {
         NSApp.setActivationPolicy(.prohibited)
         Prefs.register()
         let now = Date()
-        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ act: String, _ ago: Double, helpers: Int = 0) -> AgentSession {
+        // Aktivität kommt wie in der App aus describeTool – Werkzeugname explizit, damit nichts an der Sprache hängt
+        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0) -> AgentSession {
             AgentSession(id: id, source: .cli, cwd: "/Users/x/\(cwd)", title: title, model: "claude-opus-5-5", permissionMode: "auto",
-                         status: st, activity: act, tool: act.hasPrefix("Terminal") ? "Bash" : act.hasPrefix("Bearbeitet") ? "Edit" : act.hasPrefix("Recherchiert") ? "WebSearch" : "", lastText: "Build ist grün, alle 42 Tests bestanden.", lastActivity: now.addingTimeInterval(-ago),
+                         status: st, activity: tool.isEmpty ? "" : describeTool(tool, input), tool: tool,
+                         lastText: L("Build ist grün, alle 42 Tests bestanden.", "Build is green, all 42 tests passed."), lastActivity: now.addingTimeInterval(-ago),
                          tokens: ["claude-sonnet-4-5": TokenTally(input: 1200, cacheWrite: 50000, cacheRead: 900000, output: 30000)],
-                         subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: "Explore", description: "Sucht Dateien", working: true, activity: "Liest App.swift", lastActivity: now) },
+                         subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: "Explore", description: L("Sucht Dateien", "Finding files"), working: true,
+                                                                activity: describeTool("Read", ["file_path": "/x/App.swift"]), lastActivity: now) },
                          hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true)
         }
         let demo = [
-            s("1", "weather-app", "Radar-Ansicht bauen", .working, "Bearbeitet RadarView.swift", 5, helpers: 3),
-            s("2", "api-server", nil, .waiting, "Terminal: git push", 20),
-            s("3", "portfolio", "Dunkelmodus", .done, "", 30),
-            s("4", "photo-sorter", nil, .working, "Terminal: swift build", 3),
-            s("5", "recipes", nil, .idle, "", 2000),
-            s("6", "home-lab", nil, .error, "", 40),
-            s("7", "blog", nil, .idle, "", 400),
-            s("8", "chess-engine", nil, .working, "Recherchiert im Web", 50),
+            s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),
+            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20),
+            s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 30),
+            s("4", "photo-sorter", nil, .working, "Bash", ["command": "swift build"], 3),
+            s("5", "recipes", nil, .idle, "", [:], 2000),
+            s("6", "home-lab", nil, .error, "", [:], 40),
+            s("7", "blog", nil, .idle, "", [:], 400),
+            s("8", "chess-engine", nil, .working, "WebSearch", [:], 50),
         ]
         let model = OfficeModel()
         let cal = Calendar.current

@@ -29,23 +29,25 @@ struct SnapMenu {
                              QuotaWindow(percent: 18, resetsAt: now.addingTimeInterval(4 * 86400)),
                              "Max 20×", nil)
 
-        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ act: String, _ ago: Double, helpers: Int = 0) -> AgentSession {
+        // Aktivität kommt wie in der App aus describeTool, damit die Texte der Sprache folgen
+        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0) -> AgentSession {
             AgentSession(id: id, source: .cli, cwd: "\(NSHomeDirectory())/\(cwd)", title: title, model: "claude-opus-5-5", permissionMode: "auto",
-                         status: st, activity: act, tool: "", lastText: "Build ist grün, alle 42 Tests bestanden.",
+                         status: st, activity: tool.isEmpty ? "" : describeTool(tool, input), tool: "",
+                         lastText: L("Build ist grün, alle 42 Tests bestanden.", "Build is green, all 42 tests passed."),
                          lastActivity: now.addingTimeInterval(-ago),
                          tokens: ["claude-opus-5-5": TokenTally(input: 1200, cacheWrite: 50000, cacheRead: 900000, output: 30000)],
                          subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: ["Explore", "Plan", "general-purpose"][$0 % 3],
-                                                                   description: "Sucht Dateien", working: $0 < 2,
-                                                                   activity: ["Liest App.swift", "Sucht nach „inject“", ""][$0 % 3], lastActivity: now) },
+                                                                   description: L("Sucht Dateien", "Finding files"), working: $0 < 2,
+                                                                   activity: [describeTool("Read", ["file_path": "/x/App.swift"]), L("Sucht nach „inject“", "Searching for “inject”"), ""][$0 % 3], lastActivity: now) },
                          hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true)
         }
         let demo = [
-            s("1", "weather-app", "Radar-Ansicht bauen", .working, "Bearbeitet RadarView.swift", 5, helpers: 3),
-            s("2", "api-server", nil, .waiting, "Terminal: git push", 20),
-            s("3", "portfolio", "Dunkelmodus", .done, "", 180),
-            s("4", "photo-sorter", nil, .working, "Terminal: swift build", 3),
-            s("6", "home-lab", nil, .error, "", 400),
-            s("5", "recipes", nil, .idle, "", 2000),
+            s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),
+            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20),
+            s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 180),
+            s("4", "photo-sorter", nil, .working, "Bash", ["command": "swift build"], 3),
+            s("6", "home-lab", nil, .error, "", [:], 400),
+            s("5", "recipes", nil, .idle, "", [:], 2000),
         ]
 
         let store = AppStore()

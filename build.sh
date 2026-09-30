@@ -37,6 +37,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Info.plist "$APP/Contents/Info.plist"
 [[ -f Resources/AppIcon.icns ]] && cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+# Sprachordner (InfoPlist.strings, z. B. für NSAppleEventsUsageDescription) – Oberflächentexte stehen in Sources/Lang.swift
+for lproj in Resources/*.lproj(N); do cp -R "$lproj" "$APP/Contents/Resources/"; done
 swiftc -O -swift-version 5 -parse-as-library -sdk "$SDK" -target arm64-apple-macos14 \
     Sources/*.swift -o "$APP/Contents/MacOS/AgentBar"
 codesign --force --sign - "$APP"

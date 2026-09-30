@@ -292,7 +292,7 @@ struct OfficeView: View {
         if !s.activity.isEmpty { t += ": \(s.activity)" }
         t += "\n\(s.cwd.replacingOccurrences(of: NSHomeDirectory(), with: "~"))"
         if !s.model.isEmpty { t += " · \(shortModel(s.model))" }
-        t += "\nKlicken, um zur Sitzung zu springen"
+        t += "\n" + L("Klicken, um zur Sitzung zu springen", "Click to go to the session")
         return t
     }
 }

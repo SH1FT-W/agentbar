@@ -39,7 +39,7 @@ struct MenuView: View {
             }
 
             MenuSeparator()
-            SectionHeader(title: "Agenten", detail: list.isEmpty ? nil : "\(list.count)")
+            SectionHeader(title: L("Agenten", "Agents"), detail: list.isEmpty ? nil : "\(list.count)")
             if list.isEmpty {
                 EmptyAgents()
             } else {
@@ -62,21 +62,21 @@ struct MenuView: View {
 
             MenuSeparator()
             VStack(spacing: 0) {
-                MenuItem(title: store.office.isOpen ? "Büro schließen" : "Büro öffnen", icon: "building.2",
+                MenuItem(title: store.office.isOpen ? L("Büro schließen", "Close Office") : L("Büro öffnen", "Open Office"), icon: "building.2",
                          shortcut: "⌃⌥A") { store.office.toggle() }
                 KeepAwakeRow(mode: $keepAwake)
                     .onChange(of: keepAwake) { _ in store.updateKeepAwake() }
-                ToggleRow(title: "Beim Anmelden starten", icon: "power",
+                ToggleRow(title: L("Beim Anmelden starten", "Launch at login"), icon: "power",
                           isOn: Binding(get: { loginItem }, set: { _ in toggleLoginItem() }))
             }
             .padding(.horizontal, MenuMetrics.rowInset)
 
             MenuSeparator()
             VStack(spacing: 0) {
-                MenuItem(title: "Einstellungen …", icon: "gearshape", shortcut: "⌘,") { SettingsWindow.show(store) }
+                MenuItem(title: L("Einstellungen …", "Settings…"), icon: "gearshape", shortcut: "⌘,") { SettingsWindow.show(store) }
                     .keyboardShortcut(",")
                 updateItem
-                MenuItem(title: "AgentBar beenden", icon: "xmark.rectangle", shortcut: "⌘Q") { NSApp.terminate(nil) }
+                MenuItem(title: L("AgentBar beenden", "Quit AgentBar"), icon: "xmark.rectangle", shortcut: "⌘Q") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
             }
             .padding(.horizontal, MenuMetrics.rowInset).padding(.bottom, 6)
@@ -89,27 +89,27 @@ struct MenuView: View {
     private var updateItem: some View {
         switch updater.state {
         case .available(let v, let notes):
-            MenuItem(title: "Update auf v\(v) installieren", icon: "arrow.down.app.fill", detail: "v\(AppInfo.version)") {
+            MenuItem(title: L("Update auf v\(v) installieren", "Install update v\(v)"), icon: "arrow.down.app.fill", detail: "v\(AppInfo.version)") {
                 Task { await updater.install() }
             }
             .help(notes)
         case .installing(let text):
             MenuItem(title: text, icon: "arrow.down.app") {}.disabled(true)
         case .checking:
-            MenuItem(title: "Suche Updates …", icon: "arrow.down.app", detail: "v\(AppInfo.version)") {}.disabled(true)
+            MenuItem(title: L("Suche Updates …", "Checking for updates…"), icon: "arrow.down.app", detail: "v\(AppInfo.version)") {}.disabled(true)
         case .failed(let msg):
-            MenuItem(title: "Nach Updates suchen …", icon: "arrow.down.app", detail: "v\(AppInfo.version)") {
+            MenuItem(title: L("Nach Updates suchen …", "Check for updates…"), icon: "arrow.down.app", detail: "v\(AppInfo.version)") {
                 Task { await updater.check() }
             }
             .help(msg)
             Text(msg).font(.system(size: 11)).foregroundStyle(AgentStatus.error.color)
                 .lineLimit(2).padding(.horizontal, 33).padding(.bottom, 3)
         case .upToDate:
-            MenuItem(title: "Nach Updates suchen …", icon: "arrow.down.app", detail: "v\(AppInfo.version) · aktuell") {
+            MenuItem(title: L("Nach Updates suchen …", "Check for updates…"), icon: "arrow.down.app", detail: "v\(AppInfo.version) · " + L("aktuell", "latest")) {
                 Task { await updater.check() }
             }
         case .idle:
-            MenuItem(title: "Nach Updates suchen …", icon: "arrow.down.app", detail: "v\(AppInfo.version)") {
+            MenuItem(title: L("Nach Updates suchen …", "Check for updates…"), icon: "arrow.down.app", detail: "v\(AppInfo.version)") {
                 Task { await updater.check() }
             }
         }
@@ -131,16 +131,16 @@ struct MenuView: View {
                     .animation(quota.loading ? .linear(duration: 0.9).repeatForever(autoreverses: false) : .default,
                                value: quota.loading)
             }
-            .glassCircleButton().help("Neu einlesen")
+            .glassCircleButton().help(L("Neu einlesen", "Reload"))
         }
     }
 
     private var summary: String {
         let w = monitor.waitingCount, r = monitor.workingCount
         var parts: [String] = []
-        if w > 0 { parts.append(w == 1 ? "1 braucht dich" : "\(w) brauchen dich") }
-        if r > 0 { parts.append(r == 1 ? "1 arbeitet" : "\(r) arbeiten") }
-        if parts.isEmpty { return monitor.visible.isEmpty ? "Keine Sitzungen" : "Alles ruhig" }
+        if w > 0 { parts.append(w == 1 ? L("1 braucht dich", "1 needs you") : L("\(w) brauchen dich", "\(w) need you")) }
+        if r > 0 { parts.append(r == 1 ? L("1 arbeitet", "1 working") : L("\(r) arbeiten", "\(r) working")) }
+        if parts.isEmpty { return monitor.visible.isEmpty ? L("Keine Sitzungen", "No sessions") : L("Alles ruhig", "All quiet") }
         return parts.joined(separator: " · ")
     }
 
@@ -148,7 +148,7 @@ struct MenuView: View {
         do {
             if loginItem { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
         } catch {
-            store.message = "Anmeldeobjekt: \(error.localizedDescription)"
+            store.message = L("Anmeldeobjekt", "Login item") + ": \(error.localizedDescription)"
         }
         loginItem = SMAppService.mainApp.status == .enabled
     }
@@ -163,8 +163,8 @@ struct EmptyAgents: View {
                 Image(systemName: "sparkles").font(.system(size: 17, weight: .medium)).foregroundStyle(.secondary)
             }
             VStack(spacing: 2) {
-                Text("Keine aktiven Agenten").font(.system(size: 12, weight: .medium))
-                Text("Sobald Claude Code läuft, erscheint die Sitzung hier.")
+                Text(L("Keine aktiven Agenten", "No active agents")).font(.system(size: 12, weight: .medium))
+                Text(L("Sobald Claude Code läuft, erscheint die Sitzung hier.", "Sessions appear here as soon as Claude Code runs."))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }
@@ -185,11 +185,11 @@ struct HookHint: View {
             }
             .frame(width: MenuMetrics.circle, height: MenuMetrics.circle)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Präzise Erkennung").font(.system(size: 12, weight: .semibold))
-                Text("Mit Hooks weiß AgentBar sofort, wann Claude auf dich wartet – statt zu raten.")
+                Text(L("Präzise Erkennung", "Precise detection")).font(.system(size: 12, weight: .semibold))
+                Text(L("Mit Hooks weiß AgentBar sofort, wann Claude auf dich wartet – statt zu raten.", "With hooks, AgentBar knows right away when Claude is waiting for you – no guessing."))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Einrichten") { store.setHooks(true) }
+                Button(L("Einrichten", "Set up")) { store.setHooks(true) }
                     .controlSize(.small).glassProminentButton()
                     .padding(.top, 6)
             }
@@ -243,25 +243,25 @@ struct SessionRow: View {
 
     private var helperText: String {
         let n = session.workingHelpers > 0 ? session.workingHelpers : session.subagents.count
-        return n == 1 ? "1 Helfer" : "\(n) Helfer"
+        return n == 1 ? L("1 Helfer", "1 helper") : L("\(n) Helfer", "\(n) helpers")
     }
 
     private var subtitle: String {
         let s = session
         switch s.status {
-        case .working: return s.activity.isEmpty ? "Arbeitet …" : s.activity
-        case .waiting: return s.activity.isEmpty ? "Wartet auf deine Freigabe" : "Freigabe: \(s.activity)"
-        case .error: return "Fehler · \(ago(s.lastActivity))"
+        case .working: return s.activity.isEmpty ? L("Arbeitet …", "Working …") : s.activity
+        case .waiting: return s.activity.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : L("Freigabe", "Approve") + ": \(s.activity)"
+        case .error: return "\(AgentStatus.error.label) · \(ago(s.lastActivity))"
         default: return "\(s.status.label) · \(ago(s.lastActivity))"
         }
     }
 
     @ViewBuilder private var actions: some View {
-        Button("Zur Sitzung springen") { Focus.open(session) }
-        Button("Im Finder zeigen") { Focus.showInFinder(session.cwd) }
-        Button("Neues Terminal hier") { Focus.openTerminal(at: session.cwd) }
+        Button(L("Zur Sitzung springen", "Go to Session")) { Focus.open(session) }
+        Button(L("Im Finder zeigen", "Show in Finder")) { Focus.showInFinder(session.cwd) }
+        Button(L("Neues Terminal hier", "New Terminal Here")) { Focus.openTerminal(at: session.cwd) }
         Divider()
-        Button("Sitzungs-ID kopieren") {
+        Button(L("Sitzungs-ID kopieren", "Copy Session ID")) {
             NSPasteboard.general.clearContents(); NSPasteboard.general.setString(session.id, forType: .string)
         }
     }
@@ -270,12 +270,12 @@ struct SessionRow: View {
         let s = session
         return VStack(alignment: .leading, spacing: 8) {
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 3) {
-                detail("Ordner", s.cwd.replacingOccurrences(of: NSHomeDirectory(), with: "~"), middle: true)
-                detail("Modell", [shortModel(s.model), modeLabel(s.permissionMode)]
+                detail(L("Ordner", "Folder"), s.cwd.replacingOccurrences(of: NSHomeDirectory(), with: "~"), middle: true)
+                detail(L("Modell", "Model"), [shortModel(s.model), modeLabel(s.permissionMode)]
                     .compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
-                detail("Läuft in", hostName(s))
+                detail(L("Läuft in", "Runs in"), hostName(s))
                 detail("Tokens", formatTokens(s.totalTokens) + (s.cost.map { " · ≈ \(formatMoney($0))" } ?? ""))
-                if !s.lastText.isEmpty { detail("Zuletzt", s.lastText, lines: 3) }
+                if !s.lastText.isEmpty { detail(L("Zuletzt", "Last"), s.lastText, lines: 3) }
             }
             if !s.subagents.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -284,23 +284,23 @@ struct SessionRow: View {
                             Circle().fill(a.working ? Color.accentColor : Color.primary.opacity(0.25))
                                 .frame(width: 6, height: 6)
                             Text(a.type).font(.system(size: 11, weight: .medium))
-                            Text(a.working ? a.activity : (a.description.isEmpty ? "Fertig" : a.description))
+                            Text(a.working ? a.activity : (a.description.isEmpty ? AgentStatus.done.label : a.description))
                                 .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
                         }
                     }
                     if s.subagents.count > 6 {
-                        Text("und \(s.subagents.count - 6) weitere").font(.system(size: 11)).foregroundStyle(.tertiary)
+                        Text(L("und \(s.subagents.count - 6) weitere", "and \(s.subagents.count - 6) more")).font(.system(size: 11)).foregroundStyle(.tertiary)
                             .padding(.leading, 13)
                     }
                 }
             }
             HStack(spacing: 6) {
-                Button("Zur Sitzung") { Focus.open(s) }
+                Button(L("Zur Sitzung", "Open")) { Focus.open(s) }
                 Spacer()
                 Button { Focus.showInFinder(s.cwd) } label: { Image(systemName: "folder") }
-                    .help("Im Finder zeigen")
+                    .help(L("Im Finder zeigen", "Show in Finder"))
                 Button { Focus.openTerminal(at: s.cwd) } label: { Image(systemName: "terminal") }
-                    .help("Neues Terminal hier")
+                    .help(L("Neues Terminal hier", "New Terminal Here"))
             }
             .glassButton().controlSize(.small)
         }
@@ -353,7 +353,7 @@ struct QuotaSection: View {
             let v = values
             MenuSeparator()
             VStack(alignment: .leading, spacing: 0) {
-                SectionHeader(title: "Kontingent", detail: v.plan.map { "Claude \($0)" })
+                SectionHeader(title: L("Kontingent", "Usage"), detail: v.plan.map { "Claude \($0)" })
                 if let p = v.problem, v.session == nil {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AgentStatus.waiting.color)
@@ -366,8 +366,8 @@ struct QuotaSection: View {
                         QuotaRings(session: v.session?.percent ?? 0, weekly: v.weekly?.percent ?? 0)
                             .frame(width: 50, height: 50)
                         VStack(alignment: .leading, spacing: 7) {
-                            quotaLine("5 Stunden", v.session, RingColors.session)
-                            quotaLine("Woche", v.weekly, RingColors.weekly)
+                            quotaLine(L("5 Stunden", "5 hours"), v.session, RingColors.session)
+                            quotaLine(L("Woche", "Week"), v.weekly, RingColors.weekly)
                         }
                     }
                     .padding(.horizontal, MenuMetrics.inset).padding(.top, 3).padding(.bottom, 4)
@@ -382,7 +382,7 @@ struct QuotaSection: View {
                 Circle().fill(color).frame(width: 7, height: 7).alignmentGuide(.firstTextBaseline) { $0.height - 0.5 }
                 Text(title).font(.system(size: 12))
                 Spacer(minLength: 4)
-                Text(w.map { "\(Int($0.percent.rounded())) %" } ?? "–")
+                Text(w.map { percentText(Int($0.percent.rounded())) } ?? "–")
                     .font(.system(size: 12, weight: .semibold)).monospacedDigit()
             }
             Text(w.flatMap { $0.resetsAt }.map { resetText($0) } ?? " ")
@@ -458,7 +458,7 @@ struct Notice: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: close) { Image(systemName: "xmark.circle.fill") }
-                .buttonStyle(.borderless).foregroundStyle(.tertiary).help("Ausblenden")
+                .buttonStyle(.borderless).foregroundStyle(.tertiary).help(L("Ausblenden", "Hide"))
         }
         .font(.system(size: 11))
     }
@@ -543,15 +543,15 @@ struct KeepAwakeRow: View {
     private var current: KeepAwakeMode { KeepAwakeMode(rawValue: mode) ?? .off }
     private var short: String {
         switch current {
-        case .off: return "Aus"
-        case .auto: return "Bei Arbeit"
-        case .always: return "Immer"
+        case .off: return L("Aus", "Off")
+        case .auto: return L("Bei Arbeit", "While working")
+        case .always: return L("Immer", "Always")
         }
     }
 
     var body: some View {
         Menu {
-            Picker("Wach bleiben", selection: $mode) {
+            Picker(L("Wach bleiben", "Keep awake"), selection: $mode) {
                 ForEach(KeepAwakeMode.allCases) { Text($0.label).tag($0.rawValue) }
             }
             .pickerStyle(.inline).labelsHidden()
@@ -559,7 +559,7 @@ struct KeepAwakeRow: View {
             HStack(spacing: 7) {
                 Image(systemName: current == .off ? "cup.and.saucer" : "cup.and.saucer.fill")
                     .font(.system(size: 12)).frame(width: 17)
-                Text("Wach bleiben").font(.system(size: 13))
+                Text(L("Wach bleiben", "Keep awake")).font(.system(size: 13))
                 Spacer(minLength: 6)
                 Text(short).font(.system(size: 12)).opacity(hover ? 0.8 : 0.55)
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold))

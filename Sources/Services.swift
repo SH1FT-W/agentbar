@@ -36,7 +36,7 @@ enum Hooks {
         if fm.fileExists(atPath: url.path) {
             let d = try Data(contentsOf: url)
             guard let j = try JSONSerialization.jsonObject(with: d) as? [String: Any] else {
-                throw NSError(domain: "AgentBar", code: 1, userInfo: [NSLocalizedDescriptionKey: "settings.json ist kein JSON-Objekt"])
+                throw NSError(domain: "AgentBar", code: 1, userInfo: [NSLocalizedDescriptionKey: L("settings.json ist kein JSON-Objekt", "settings.json is not a JSON object")])
             }
             root = j
             let attrs = try fm.attributesOfItem(atPath: url.path)
@@ -76,7 +76,7 @@ enum Hooks {
         let out = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         // Hat Claude Code die Datei inzwischen selbst geändert? Dann lieber abbrechen als dessen Änderung überschreiben.
         if let stamp, let now = try? fm.attributesOfItem(atPath: url.path)[.modificationDate] as? Date, now != stamp {
-            throw NSError(domain: "AgentBar", code: 2, userInfo: [NSLocalizedDescriptionKey: "settings.json wurde gerade geändert – bitte nochmal versuchen"])
+            throw NSError(domain: "AgentBar", code: 2, userInfo: [NSLocalizedDescriptionKey: L("settings.json wurde gerade geändert – bitte nochmal versuchen", "settings.json was just changed – please try again")])
         }
         try out.write(to: url, options: .atomic)
         try fm.setAttributes([.posixPermissions: perms ?? 0o600], ofItemAtPath: url.path)
@@ -121,11 +121,11 @@ final class QuotaMonitor: ObservableObject {
         defer { loading = false }
         // Token nur lesen, nie erneuern: ein Refresh würde Claude Codes eigenen Refresh-Token ungültig machen können.
         guard let creds = await Task.detached(operation: { Self.readCredentials() }).value else {
-            problem = "Kein Claude-Code-Login im Schlüsselbund gefunden"
+            problem = L("Kein Claude-Code-Login im Schlüsselbund gefunden", "No Claude Code login found in the keychain")
             return
         }
         if let exp = creds.expires, exp < Date() {
-            problem = "Anmeldung abgelaufen – Claude Code einmal benutzen, dann aktualisiert es sich"
+            problem = L("Anmeldung abgelaufen – Claude Code einmal benutzen, dann aktualisiert es sich", "Login expired – use Claude Code once and it will refresh")
             return
         }
         do {
@@ -140,7 +140,8 @@ final class QuotaMonitor: ObservableObject {
             }
             checkThreshold()
         } catch {
-            problem = (error as NSError).code == 401 ? "Anmeldung abgelaufen – Claude Code einmal benutzen" : "Kontingent nicht abrufbar (\(error.localizedDescription))"
+            problem = (error as NSError).code == 401 ? L("Anmeldung abgelaufen – Claude Code einmal benutzen", "Login expired – use Claude Code once")
+                : L("Kontingent nicht abrufbar", "Usage unavailable") + " (\(error.localizedDescription))"
         }
     }
 
@@ -211,11 +212,12 @@ private func parseISO(_ s: String) -> Date? {
 func resetText(_ date: Date?) -> String {
     guard let date else { return "" }
     let s = Int(date.timeIntervalSinceNow)
-    if s <= 0 { return "gleich neu" }
-    if s < 3600 { return "neu in \(s / 60) Min." }
-    if s < 86400 { return "neu in \(s / 3600):\(String(format: "%02d", (s % 3600) / 60)) Std." }
-    let f = DateFormatter(); f.locale = Locale(identifier: "de_DE"); f.dateFormat = "EEEE, HH:mm"
-    return "neu am \(f.string(from: date))"
+    if s <= 0 { return L("gleich neu", "Resets soon") }
+    if s < 3600 { return L("neu in \(s / 60) Min.", "Resets in \(s / 60) min") }
+    let hm = "\(s / 3600):\(String(format: "%02d", (s % 3600) / 60))"
+    if s < 86400 { return L("neu in \(hm) Std.", "Resets in \(hm) h") }
+    let f = DateFormatter(); f.locale = Lang.locale; f.dateFormat = L("EEEE, HH:mm", "EEEE h:mm a")
+    return L("neu am", "Resets") + " \(f.string(from: date))"
 }
 
 // MARK: - Mitteilungen
@@ -268,7 +270,7 @@ final class KeepAwake {
         if want {
             active = IOPMAssertionCreateWithName(kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
                                                  IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                                                 "AgentBar: Agenten arbeiten" as CFString, &assertion) == kIOReturnSuccess
+                                                 L("AgentBar: Agenten arbeiten", "AgentBar: agents working") as CFString, &assertion) == kIOReturnSuccess
         } else {
             IOPMAssertionRelease(assertion)
             active = false
@@ -291,7 +293,7 @@ final class HotKey {
         }, 1, &spec, nil, nil)
         let id = EventHotKeyID(signature: OSType(0x4147_4254), id: 1)   // "AGBT"
         let status = RegisterEventHotKey(UInt32(kVK_ANSI_A), UInt32(optionKey | controlKey), id, GetApplicationEventTarget(), 0, &ref)
-        if status != noErr { NSLog("AgentBar: Tastenkürzel ⌃⌥A ist belegt (\(status))") }
+        if status != noErr { NSLog(L("AgentBar: Tastenkürzel ⌃⌥A ist belegt", "AgentBar: shortcut ⌃⌥A is taken") + " (\(status))") }
     }
 }
 

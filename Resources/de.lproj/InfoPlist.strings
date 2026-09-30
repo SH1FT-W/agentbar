@@ -1,0 +1,2 @@
+/* Begründung für den Zugriff auf Terminal (Apple Events) */
+"NSAppleEventsUsageDescription" = "AgentBar holt das Terminal-Fenster nach vorn, in dem dein Claude-Agent läuft.";

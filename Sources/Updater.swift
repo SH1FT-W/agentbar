@@ -47,19 +47,19 @@ final class Updater: ObservableObject {
             switch (resp as? HTTPURLResponse)?.statusCode ?? 0 {
             case 200: break
             case 404: release = nil; state = .upToDate; return
-            case 403, 429: throw Fail("GitHub-Abfragelimit erreicht – später nochmal")
-            case let c: throw Fail("GitHub antwortet mit \(c)")
+            case 403, 429: throw Fail(L("GitHub-Abfragelimit erreicht – später nochmal", "GitHub rate limit reached – try again later"))
+            case let c: throw Fail(L("GitHub antwortet mit \(c)", "GitHub responded with \(c)"))
             }
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw Fail("Unerwartete Antwort") }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw Fail(L("Unerwartete Antwort", "Unexpected response")) }
             let tag = String((json["tag_name"] as? String ?? "").drop(while: { $0 == "v" }))
-            guard tag.range(of: #"^[0-9]+(\.[0-9]+){0,3}$"#, options: .regularExpression) != nil else { throw Fail("Ungültige Versionsnummer") }
+            guard tag.range(of: #"^[0-9]+(\.[0-9]+){0,3}$"#, options: .regularExpression) != nil else { throw Fail(L("Ungültige Versionsnummer", "Invalid version number")) }
             let assets = json["assets"] as? [[String: Any]] ?? []
             func asset(_ name: String) -> URL? {
                 guard let s = assets.first(where: { $0["name"] as? String == name })?["browser_download_url"] as? String,
                       let u = URL(string: s), u.scheme == "https", u.host == "github.com" else { return nil }
                 return u
             }
-            guard let zip = asset("AgentBar.zip"), let sig = asset("AgentBar.zip.sig") else { throw Fail("Release ohne AgentBar.zip/.sig") }
+            guard let zip = asset("AgentBar.zip"), let sig = asset("AgentBar.zip.sig") else { throw Fail(L("Release ohne AgentBar.zip/.sig", "Release without AgentBar.zip/.sig")) }
             if Self.isNewer(tag, than: AppInfo.version) {
                 release = Release(version: tag, zip: zip, signature: sig)
                 state = .available(version: tag, notes: (json["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
@@ -68,7 +68,7 @@ final class Updater: ObservableObject {
                 state = .upToDate
             }
         } catch {
-            let msg = (error as? Fail)?.text ?? "GitHub nicht erreichbar"
+            let msg = (error as? Fail)?.text ?? L("GitHub nicht erreichbar", "Can’t reach GitHub")
             if silent { state = .idle } else { state = .failed(msg) }
         }
     }
@@ -77,48 +77,48 @@ final class Updater: ObservableObject {
 
     func install() async {
         guard let release else { return }
-        state = .installing("Lade v\(release.version) …")
+        state = .installing(L("Lade v\(release.version) …", "Downloading v\(release.version)…"))
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("AgentBar-Update-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
             let zipData = try await Self.download(release.zip)
             let sigText = String(decoding: try await Self.download(release.signature), as: UTF8.self)
 
-            state = .installing("Prüfe …")
+            state = .installing(L("Prüfe …", "Verifying…"))
             guard let key = Data(base64Encoded: Self.publicKey).flatMap({ try? Curve25519.Signing.PublicKey(rawRepresentation: $0) }),
                   let sig = Data(base64Encoded: sigText.trimmingCharacters(in: .whitespacesAndNewlines)),
                   key.isValidSignature(sig, for: zipData) else {
-                throw Fail("Signatur des Updates stimmt nicht – verworfen")
+                throw Fail(L("Signatur des Updates stimmt nicht – verworfen", "Update signature doesn’t match – discarded"))
             }
 
             let zipURL = work.appendingPathComponent("AgentBar.zip")
             try zipData.write(to: zipURL)
-            guard Self.run("/usr/bin/ditto", ["-x", "-k", zipURL.path, work.path]) else { throw Fail("Entpacken fehlgeschlagen") }
+            guard Self.run("/usr/bin/ditto", ["-x", "-k", zipURL.path, work.path]) else { throw Fail(L("Entpacken fehlgeschlagen", "Unzipping failed")) }
             let newApp = work.appendingPathComponent("AgentBar.app")
             let b = Bundle(url: newApp)
-            guard b?.bundleIdentifier == Bundle.main.bundleIdentifier else { throw Fail("Falsche App im Release") }
+            guard b?.bundleIdentifier == Bundle.main.bundleIdentifier else { throw Fail(L("Falsche App im Release", "Wrong app in release")) }
             guard b?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == release.version else {
-                throw Fail("Versionsnummer passt nicht zum Release")
+                throw Fail(L("Versionsnummer passt nicht zum Release", "Version number doesn’t match the release"))
             }
             try Self.verifySignature(newApp)
             // Erst nach bestandener Prüfung die Quarantäne entfernen
             _ = Self.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
 
-            state = .installing("Starte neu …")
+            state = .installing(L("Starte neu …", "Relaunching…"))
             try launchSwapScript(newApp: newApp, work: work)
             NSApp.terminate(nil)
         } catch {
             let msg = (error as? Fail)?.text ?? error.localizedDescription
-            state = .failed("Update fehlgeschlagen: \(msg)")
+            state = .failed(L("Update fehlgeschlagen", "Update failed") + ": \(msg)")
         }
     }
 
     /// Gültige (ad-hoc-)Code-Signatur – die Echtheit sichert die Ed25519-Prüfung oben.
     private static func verifySignature(_ app: URL) throws {
         var code: SecStaticCode?
-        guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code else { throw Fail("Signatur nicht lesbar") }
+        guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code else { throw Fail(L("Signatur nicht lesbar", "Can’t read signature")) }
         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
-        guard SecStaticCodeCheckValidity(code, flags, nil) == errSecSuccess else { throw Fail("Code-Signatur ungültig – Update verworfen") }
+        guard SecStaticCodeCheckValidity(code, flags, nil) == errSecSuccess else { throw Fail(L("Code-Signatur ungültig – Update verworfen", "Invalid code signature – update discarded")) }
     }
 
     /// Statisches Skript, Pfade nur als Argumente – nichts wird in den Skripttext eingesetzt.
@@ -164,7 +164,7 @@ final class Updater: ObservableObject {
         var req = URLRequest(url: url, timeoutInterval: 120)
         req.setValue("AgentBar/\(AppInfo.version)", forHTTPHeaderField: "User-Agent")
         let (data, resp) = try await URLSession.shared.data(for: req)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw Fail("Download fehlgeschlagen") }
+        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw Fail(L("Download fehlgeschlagen", "Download failed")) }
         return data
     }
 

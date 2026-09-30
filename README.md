@@ -10,22 +10,26 @@
 </p>
 
 <p align="center">
+  🇬🇧 English · <a href="README.de.md">🇩🇪 Deutsch</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/SH1FT-W/agentbar/releases/latest">Download</a> ·
   <a href="https://sh1ft-w.github.io/agentbar/">Website</a> ·
   <a href="#setup">Setup</a>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/office-day.jpg" alt="The office: every Claude session is a character at a desk" width="800">
+  <img src="docs/screenshots/en/office-day.jpg" alt="The office: every Claude session is a character at a desk" width="800">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/menu-live-light.png" alt="Menu bar dropdown (light)" width="330">
+  <img src="docs/screenshots/en/menu-live-light.png" alt="Menu bar dropdown (light)" width="330">
   &nbsp;
-  <img src="docs/screenshots/menu-live-dark.png" alt="Menu bar dropdown (dark)" width="330">
+  <img src="docs/screenshots/en/menu-live-dark.png" alt="Menu bar dropdown (dark)" width="330">
 </p>
 
-> **Language:** the app's interface is German. / **Sprache:** Die Oberfläche der App ist Deutsch.
+> **Language:** AgentBar follows your macOS language – German or English.
 
 ## Features
 
@@ -39,7 +43,7 @@
 - **Updates** via GitHub Releases, verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
 
 <p align="center">
-  <img src="docs/screenshots/office-night.jpg" alt="The office at night" width="800">
+  <img src="docs/screenshots/en/office-night.jpg" alt="The office at night" width="800">
 </p>
 
 ## Setup
@@ -65,10 +69,10 @@
 ### First run
 
 - **Notifications:** macOS asks once whether AgentBar may send notifications.
-- **Precise detection:** click **Hooks einrichten** in the dropdown (or *Einstellungen → Präzise Erkennung*). AgentBar adds small hook commands to `~/.claude/settings.json` (a backup is written to `settings.json.agentbar-backup`). Each hook appends one line to `~/Library/Application Support/AgentBar/hooks.log` – no network, no AgentBar process involved. Applies to Claude sessions started afterwards. You can remove the hooks again at any time from the settings.
+- **Precise detection:** click **Set up** on the *Precise detection* card in the dropdown (or *Settings → Precise detection*). AgentBar adds small hook commands to `~/.claude/settings.json` (a backup is written to `settings.json.agentbar-backup`). Each hook appends one line to `~/Library/Application Support/AgentBar/hooks.log` – no network, no AgentBar process involved. Applies to Claude sessions started afterwards. You can remove the hooks again at any time from the settings.
 - **Usage rings:** AgentBar reads Claude Code's login from the keychain (`Claude Code-credentials`) via the `security` tool. If macOS asks, allow it. The token is sent only to `api.anthropic.com`.
 - **Jump to Terminal:** the first time you click a session, macOS asks whether AgentBar may control Terminal – this is used only to select the right tab.
-- **Launch at login:** toggle *Beim Anmelden starten* in the dropdown.
+- **Launch at login:** toggle *Launch at login* in the dropdown.
 
 ### Shortcuts
 
@@ -97,7 +101,7 @@ Diagnostics: `build/AgentBar.app/Contents/MacOS/AgentBar --dump` lists the detec
 
 Everything stays on your Mac. AgentBar only reads local files (`~/.claude/projects`, Claude desktop metadata, its own hook log) and talks to exactly two servers:
 
-- `api.anthropic.com` – your plan usage (only if *Kontingent abrufen* is on)
+- `api.anthropic.com` – your plan usage (only if *Fetch usage* is on)
 - `api.github.com` – checking for updates
 
 No analytics, no telemetry.

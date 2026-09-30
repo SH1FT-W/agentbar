@@ -3,11 +3,16 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>de</string>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>AgentBar</string>
 	<key>CFBundleExecutable</key>
 	<string>AgentBar</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>de</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +30,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>AgentBar holt das Terminal-Fenster nach vorn, in dem dein Claude-Agent läuft.</string>
+	<string>AgentBar brings the Terminal window running your Claude agent to the front.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 </dict>

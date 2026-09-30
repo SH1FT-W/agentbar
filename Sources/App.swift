@@ -46,7 +46,7 @@ extension AppDelegate {
             for s in store.monitor.sessions {
                 print("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.project) | \(s.displayName) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
             }
-            print("Kontingent: \(store.quota.session?.percent ?? -1) / \(store.quota.weekly?.percent ?? -1) \(store.quota.plan ?? "") \(store.quota.problem ?? "")")
+            print(L("Kontingent", "Usage") + ": \(store.quota.session?.percent ?? -1) / \(store.quota.weekly?.percent ?? -1) \(store.quota.plan ?? "") \(store.quota.problem ?? "")")
             exit(0)
         }
     }
@@ -74,8 +74,8 @@ final class AppStore: ObservableObject {
         }
         quota.onThreshold = { [weak self] pct in
             guard UserDefaults.standard.bool(forKey: Prefs.notifyQuota) else { return }
-            self?.notifier.post(title: "Kontingent bei \(Int(pct)) %",
-                                body: "Das 5-Stunden-Fenster ist fast aufgebraucht. \(resetText(self?.quota.session?.resetsAt)).",
+            self?.notifier.post(title: L("Kontingent bei", "Usage at") + " " + percentText(Int(pct)),
+                                body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.") + " \(resetText(self?.quota.session?.resetsAt)).",
                                 sessionId: nil)
         }
     }
@@ -96,7 +96,8 @@ final class AppStore: ObservableObject {
     func setHooks(_ on: Bool) {
         do {
             if on { try Hooks.install() } else { try Hooks.uninstall() }
-            message = on ? "Präzise Erkennung aktiv – gilt für neu gestartete Claude-Sitzungen." : "Hooks entfernt."
+            message = on ? L("Präzise Erkennung aktiv – gilt für neu gestartete Claude-Sitzungen.", "Precise detection on – applies to newly started Claude sessions.")
+                          : L("Hooks entfernt.", "Hooks removed.")
         } catch {
             message = "settings.json: \(error.localizedDescription)"
         }
@@ -109,11 +110,11 @@ final class AppStore: ObservableObject {
            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == b { return }
         switch s.status {
         case .waiting where d.bool(forKey: Prefs.notifyWaiting):
-            notifier.post(title: "\(s.displayName) braucht dich", body: s.activity.isEmpty ? "Wartet auf deine Freigabe." : s.activity, sessionId: s.id)
+            notifier.post(title: L("\(s.displayName) braucht dich", "\(s.displayName) needs you"), body: s.activity.isEmpty ? L("Wartet auf deine Freigabe.", "Waiting for your approval.") : s.activity, sessionId: s.id)
         case .done where old == .working && d.bool(forKey: Prefs.notifyDone):
-            notifier.post(title: "\(s.displayName) ist fertig", body: s.lastText.isEmpty ? s.project : s.lastText, sessionId: s.id)
+            notifier.post(title: L("\(s.displayName) ist fertig", "\(s.displayName) is done"), body: s.lastText.isEmpty ? s.project : s.lastText, sessionId: s.id)
         case .error where d.bool(forKey: Prefs.notifyError):
-            notifier.post(title: "\(s.displayName): Fehler", body: "Die Sitzung ist auf einen Fehler gelaufen.", sessionId: s.id)
+            notifier.post(title: L("\(s.displayName): Fehler", "\(s.displayName): Error"), body: L("Die Sitzung ist auf einen Fehler gelaufen.", "The session ran into an error."), sessionId: s.id)
         default: break
         }
     }
@@ -133,7 +134,7 @@ struct MenuBarLabel: View {
             Image(nsImage: MenuBarIcon.make(waiting: waiting > 0, working: working > 0))
             // Zahl zeigt, wer dich braucht – sonst, wie viele arbeiten
             if showCount, waiting + working > 0 { Text("\(waiting > 0 ? waiting : working)").monospacedDigit() }
-            if showQuota, let s = quota.session { Text("\(Int(s.percent.rounded())) %").monospacedDigit() }
+            if showQuota, let s = quota.session { Text(percentText(Int(s.percent.rounded()))).monospacedDigit() }
         }
     }
 }

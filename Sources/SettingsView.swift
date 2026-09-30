@@ -7,7 +7,7 @@ enum SettingsWindow {
         if window == nil {
             let host = NSHostingController(rootView: SettingsView().environmentObject(store))
             let w = NSWindow(contentViewController: host)
-            w.title = "AgentBar-Einstellungen"
+            w.title = L("AgentBar-Einstellungen", "AgentBar Settings")
             w.styleMask = [.titled, .closable, .fullSizeContentView]
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
@@ -51,82 +51,83 @@ struct SettingsView: View {
                     .frame(width: 48, height: 48)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("AgentBar").font(.system(size: 15, weight: .semibold))
-                        Text("Deine Claude-Agenten im Blick – direkt in der Menüleiste.")
+                        Text(L("Deine Claude-Agenten im Blick – direkt in der Menüleiste.", "Keep an eye on your Claude agents – right in the menu bar."))
                             .font(.system(size: 12)).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 4)
             }
 
-            Section("Mitteilungen") {
-                Toggle(isOn: $notifyWaiting) { SettingLabel("Wenn ein Agent dich braucht", "hand.raised.fill", .orange) }
-                Toggle(isOn: $notifyDone) { SettingLabel("Wenn ein Agent fertig ist", "checkmark", .green) }
-                Toggle(isOn: $notifyError) { SettingLabel("Bei Fehlern", "exclamationmark", .red) }
-                Toggle(isOn: $notifyQuota) { SettingLabel("Kontingent wird knapp", "gauge.with.needle.fill", .pink) }
+            Section(L("Mitteilungen", "Notifications")) {
+                Toggle(isOn: $notifyWaiting) { SettingLabel(L("Wenn ein Agent dich braucht", "When an agent needs you"), "hand.raised.fill", .orange) }
+                Toggle(isOn: $notifyDone) { SettingLabel(L("Wenn ein Agent fertig ist", "When an agent is done"), "checkmark", .green) }
+                Toggle(isOn: $notifyError) { SettingLabel(L("Bei Fehlern", "On errors"), "exclamationmark", .red) }
+                Toggle(isOn: $notifyQuota) { SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink) }
                 if notifyQuota {
                     LabeledContent {
                         HStack(spacing: 10) {
                             Slider(value: $threshold, in: 50...95, step: 5).frame(width: 150)
-                            Text("\(Int(threshold)) %").monospacedDigit().foregroundStyle(.secondary)
+                            Text(percentText(Int(threshold))).monospacedDigit().foregroundStyle(.secondary)
                                 .frame(width: 44, alignment: .trailing)
                         }
                     } label: {
-                        SettingLabel("Warnen ab", nil, .clear)
+                        SettingLabel(L("Warnen ab", "Warn at"), nil, .clear)
                     }
                 }
                 Toggle(isOn: $whenFront) {
-                    SettingLabel("Auch im Vordergrund", "macwindow", .gray,
-                                 note: "Auch melden, wenn die Sitzung gerade sichtbar ist.")
+                    SettingLabel(L("Auch im Vordergrund", "Even when in front"), "macwindow", .gray,
+                                 note: L("Auch melden, wenn die Sitzung gerade sichtbar ist.", "Also notify when the session is visible."))
                 }
             }
 
-            Section("Menüleiste") {
-                Toggle(isOn: $showCount) { SettingLabel("Anzahl aktiver Agenten", "number", .blue) }
-                Toggle(isOn: $showQuota) { SettingLabel("5-Stunden-Kontingent in %", "percent", .blue) }
+            Section(L("Menüleiste", "Menu Bar")) {
+                Toggle(isOn: $showCount) { SettingLabel(L("Anzahl aktiver Agenten", "Number of active agents"), "number", .blue) }
+                Toggle(isOn: $showQuota) { SettingLabel(L("5-Stunden-Kontingent in %", "5-hour usage in %"), "percent", .blue) }
             }
 
             Section {
                 Picker(selection: $hours) {
-                    Text("30 Minuten").tag(0.5)
-                    Text("2 Stunden").tag(2.0)
-                    Text("8 Stunden").tag(8.0)
-                    Text("24 Stunden").tag(24.0)
+                    Text(L("30 Minuten", "30 minutes")).tag(0.5)
+                    Text(L("2 Stunden", "2 hours")).tag(2.0)
+                    Text(L("8 Stunden", "8 hours")).tag(8.0)
+                    Text(L("24 Stunden", "24 hours")).tag(24.0)
                 } label: {
-                    SettingLabel("Ruhende Sitzungen zeigen", "clock", .indigo)
+                    SettingLabel(L("Ruhende Sitzungen zeigen", "Show idle sessions for"), "clock", .indigo)
                 }
                 .onChange(of: hours) { _ in store.monitor.rescan() }
                 Toggle(isOn: $quotaEnabled) {
-                    SettingLabel("Kontingent abrufen", "chart.pie.fill", .pink,
-                                 note: "Liest dein Nutzungs-Kontingent bei Anthropic.")
+                    SettingLabel(L("Kontingent abrufen", "Fetch usage"), "chart.pie.fill", .pink,
+                                 note: L("Liest dein Nutzungs-Kontingent bei Anthropic.", "Reads your usage limits from Anthropic."))
                 }
                 LabeledContent {
-                    Button(store.hooksInstalled ? "Entfernen" : "Einrichten") { store.setHooks(!store.hooksInstalled) }
+                    Button(store.hooksInstalled ? L("Entfernen", "Remove") : L("Einrichten", "Set Up")) { store.setHooks(!store.hooksInstalled) }
                 } label: {
-                    SettingLabel("Präzise Erkennung", "scope", .accentColor,
-                                 note: store.hooksInstalled ? "Aktiv – Claude Code meldet sich über Hooks." : "Aus – AgentBar schätzt den Status.")
+                    SettingLabel(L("Präzise Erkennung", "Precise detection"), "scope", .accentColor,
+                                 note: store.hooksInstalled ? L("Aktiv – Claude Code meldet sich über Hooks.", "On – Claude Code reports via hooks.")
+                                                             : L("Aus – AgentBar schätzt den Status.", "Off – AgentBar estimates the status."))
                 }
             } header: {
-                Text("Sitzungen")
+                Text(L("Sitzungen", "Sessions"))
             } footer: {
-                Text("Die Hooks stehen in ~/.claude/settings.json (Sicherung liegt daneben) und schreiben nur eine Zeile nach ~/Library/Application Support/AgentBar/hooks.log – kein Netzwerk.")
+                Text(L("Die Hooks stehen in ~/.claude/settings.json (Sicherung liegt daneben) und schreiben nur eine Zeile nach ~/Library/Application Support/AgentBar/hooks.log – kein Netzwerk.", "The hooks live in ~/.claude/settings.json (a backup sits next to it) and only write one line to ~/Library/Application Support/AgentBar/hooks.log – no network."))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Section("Büro") {
-                Toggle(isOn: $floating) { SettingLabel("Immer im Vordergrund", "pin.fill", .orange) }
+            Section(L("Büro", "Office")) {
+                Toggle(isOn: $floating) { SettingLabel(L("Immer im Vordergrund", "Always on top"), "pin.fill", .orange) }
                     .onChange(of: floating) { _ in store.office.applyPrefs() }
                 LabeledContent {
                     HStack(spacing: 10) {
                         Slider(value: $opacity, in: 0.4...1).frame(width: 150)
                             .onChange(of: opacity) { _ in store.office.applyPrefs() }
-                        Text("\(Int((opacity * 100).rounded())) %").monospacedDigit().foregroundStyle(.secondary)
+                        Text(percentText(Int((opacity * 100).rounded()))).monospacedDigit().foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)
                     }
                 } label: {
-                    SettingLabel("Deckkraft", "circle.lefthalf.filled", .gray)
+                    SettingLabel(L("Deckkraft", "Opacity"), "circle.lefthalf.filled", .gray)
                 }
-                Toggle(isOn: $daylight) { SettingLabel("Himmel folgt der Tageszeit", "sun.horizon.fill", .cyan) }
+                Toggle(isOn: $daylight) { SettingLabel(L("Himmel folgt der Tageszeit", "Sky follows time of day"), "sun.horizon.fill", .cyan) }
             }
 
             Section {

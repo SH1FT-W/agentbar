@@ -454,7 +454,7 @@ private final class MonitorCore: @unchecked Sendable {
                 // Seit dem schlanken Hook stehen file_path/description direkt auf oberster Ebene
                 h.activity = describeTool(tool, (j["tool_input"] as? [String: Any]) ?? j)
             } else if event == "UserPromptSubmit" {
-                h.activity = "Denkt nach …"
+                h.activity = L("Denkt nach …", "Thinking …")
             }
             hooks[sid] = h
         }
@@ -534,7 +534,7 @@ private final class MonitorCore: @unchecked Sendable {
             if let pid = h?.pid, !alive(pid) { continue }
             let hooksActive = h != nil
             var status = heuristicStatus(st, now: now, hooksActive: hooksActive)
-            var activity = st.thinking ? "Denkt nach …" : (st.toolPending ? st.toolActivity : "")
+            var activity = st.thinking ? L("Denkt nach …", "Thinking …") : (st.toolPending ? st.toolActivity : "")
             var tool = st.thinking ? "thinking" : (st.toolPending ? st.toolName : "")
             if let h, h.time.addingTimeInterval(1.5) >= st.lastEvent {
                 // Hook ist das jüngste Signal → genauer als die Schätzung
@@ -562,15 +562,15 @@ private final class MonitorCore: @unchecked Sendable {
                 }
             }
             if status != .working && status != .waiting { activity = "" }
-            if status == .working && activity.isEmpty { activity = "Arbeitet …" }
+            if status == .working && activity.isEmpty { activity = L("Arbeitet …", "Working …") }
 
             let helpers = (subs[sid] ?? []).map { a -> SubAgent in
                 let age = now.timeIntervalSince(a.lastEvent)
                 let finished = a.lastType == "assistant" && !a.toolPending && !a.thinking
                 let working = !finished && age < 180
-                return SubAgent(id: a.sessionId, type: a.agentType.isEmpty ? "Helfer" : a.agentType,
+                return SubAgent(id: a.sessionId, type: a.agentType.isEmpty ? L("Helfer", "Helper") : a.agentType,
                                 description: a.agentDescription, working: working,
-                                activity: working ? (a.thinking ? "Denkt nach …" : a.toolActivity) : "Fertig",
+                                activity: working ? (a.thinking ? L("Denkt nach …", "Thinking …") : a.toolActivity) : L("Fertig", "Done"),
                                 lastActivity: a.lastEvent)
             }
             .filter { $0.working || now.timeIntervalSince($0.lastActivity) < 600 }
@@ -578,7 +578,8 @@ private final class MonitorCore: @unchecked Sendable {
             // Wartet die Hauptsitzung nur auf ihre Helfer, gilt sie als arbeitend
             if status == .done || status == .idle, helpers.contains(where: \.working), st.toolName == "Agent" || st.toolName == "Task" {
                 status = .working
-                activity = "Wartet auf \(helpers.filter(\.working).count) Helfer"
+                let n = helpers.filter(\.working).count
+                activity = L("Wartet auf \(n) Helfer", n == 1 ? "Waiting for 1 helper" : "Waiting for \(n) helpers")
                 tool = "Agent"
             }
 
@@ -672,24 +673,24 @@ func describeTool(_ name: String, _ input: [String: Any]) -> String {
         if let d = input["description"] as? String, !d.isEmpty { return d }
         let cmd = (input["command"] as? String ?? "").split(separator: "\n").first.map(String.init) ?? ""
         return "Terminal: " + String(cmd.prefix(40))
-    case "Edit", "MultiEdit": return "Bearbeitet \(file())"
-    case "Write": return "Schreibt \(file())"
-    case "Read": return "Liest \(file())"
-    case "NotebookEdit": return "Bearbeitet \(file("notebook_path"))"
-    case "Grep", "Glob": return "Durchsucht Code"
-    case "WebFetch", "WebSearch": return "Recherchiert im Web"
+    case "Edit", "MultiEdit": return L("Bearbeitet \(file())", "Editing \(file())")
+    case "Write": return L("Schreibt \(file())", "Writing \(file())")
+    case "Read": return L("Liest \(file())", "Reading \(file())")
+    case "NotebookEdit": return L("Bearbeitet \(file("notebook_path"))", "Editing \(file("notebook_path"))")
+    case "Grep", "Glob": return L("Durchsucht Code", "Searching code")
+    case "WebFetch", "WebSearch": return L("Recherchiert im Web", "Researching the web")
     case "Agent", "Task":
         let t = input["subagent_type"] as? String ?? ""
-        return t.isEmpty ? "Delegiert an Helfer" : "Delegiert an \(t)"
-    case "TodoWrite": return "Plant nächste Schritte"
-    case "Skill": return "Lädt Skill \(input["skill"] as? String ?? "")"
-    case "AskUserQuestion": return "Hat eine Frage"
-    case "ExitPlanMode": return "Plan fertig"
+        return t.isEmpty ? L("Delegiert an Helfer", "Delegating to a helper") : L("Delegiert an \(t)", "Delegating to \(t)")
+    case "TodoWrite": return L("Plant nächste Schritte", "Planning next steps")
+    case "Skill": return L("Lädt Skill", "Loading skill") + " \(input["skill"] as? String ?? "")"
+    case "AskUserQuestion": return L("Hat eine Frage", "Has a question")
+    case "ExitPlanMode": return L("Plan fertig", "Plan ready")
     default:
         if name.hasPrefix("mcp__") {
             let parts = name.components(separatedBy: "__")
             let server = parts.count > 1 ? parts[1].replacingOccurrences(of: "claude_ai_", with: "") : "MCP"
-            return "Nutzt \(server)"
+            return L("Nutzt \(server)", "Using \(server)")
         }
         return name
     }

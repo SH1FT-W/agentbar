@@ -14,11 +14,11 @@ enum AgentStatus: Int, Comparable {
 
     var label: String {
         switch self {
-        case .waiting: return "Braucht dich"
-        case .error: return "Fehler"
-        case .working: return "Arbeitet"
-        case .done: return "Fertig"
-        case .idle: return "Pause"
+        case .waiting: return L("Braucht dich", "Needs you")
+        case .error: return L("Fehler", "Error")
+        case .working: return L("Arbeitet", "Working")
+        case .done: return L("Fertig", "Done")
+        case .idle: return L("Pause", "Idle")
         }
     }
 
@@ -51,7 +51,7 @@ enum SessionSource: String {
     var label: String {
         switch self {
         case .cli: return "Terminal"
-        case .desktop: return "Claude-App"
+        case .desktop: return L("Claude-App", "Claude app")
         case .cowork: return "Cowork"
         case .xcode: return "Xcode"
         }
@@ -105,9 +105,9 @@ func shortModel(_ model: String) -> String {
 func modeLabel(_ mode: String) -> String? {
     switch mode {
     case "auto": return "Auto"
-    case "acceptEdits": return "Edits ok"
+    case "acceptEdits": return L("Edits ok", "Edits OK")
     case "plan": return "Plan"
-    case "bypassPermissions": return "Ohne Rückfrage"
+    case "bypassPermissions": return L("Ohne Rückfrage", "No prompts")
     default: return nil
     }
 }
@@ -164,9 +164,9 @@ enum KeepAwakeMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .off: return "Aus"
-        case .auto: return "Wenn Agenten arbeiten"
-        case .always: return "Immer"
+        case .off: return L("Aus", "Off")
+        case .auto: return L("Wenn Agenten arbeiten", "While agents work")
+        case .always: return L("Immer", "Always")
         }
     }
 }
@@ -215,22 +215,25 @@ enum Paths {
 func ago(_ date: Date?) -> String {
     guard let date, date > .distantPast else { return "–" }
     let s = Int(Date().timeIntervalSince(date))
-    if s < 10 { return "gerade eben" }
-    if s < 60 { return "vor \(s) Sek." }
-    if s < 3600 { return "vor \(s / 60) Min." }
-    if s < 86400 { return "vor \(s / 3600) Std." }
-    return "vor \(s / 86400) T."
+    if s < 10 { return L("gerade eben", "just now") }
+    if s < 60 { return L("vor \(s) Sek.", "\(s)s ago") }
+    if s < 3600 { return L("vor \(s / 60) Min.", "\(s / 60)m ago") }
+    if s < 86400 { return L("vor \(s / 3600) Std.", "\(s / 3600)h ago") }
+    return L("vor \(s / 86400) T.", "\(s / 86400)d ago")
 }
 
 func formatTokens(_ n: Int) -> String {
-    if n >= 1_000_000 { return String(format: "%.1f", Double(n) / 1_000_000).replacingOccurrences(of: ".", with: ",") + " Mio." }
-    if n >= 1000 { return "\(n / 1000) Tsd." }
+    if n >= 1_000_000 {
+        let v = String(format: "%.1f", Double(n) / 1_000_000)
+        return L(v.replacingOccurrences(of: ".", with: ",") + " Mio.", v + "M")
+    }
+    if n >= 1000 { return L("\(n / 1000) Tsd.", "\(n / 1000)k") }
     return "\(n)"
 }
 
 func formatMoney(_ v: Double) -> String {
     let f = NumberFormatter()
-    f.numberStyle = .currency; f.currencyCode = "USD"; f.locale = Locale(identifier: "de_DE")
+    f.numberStyle = .currency; f.currencyCode = "USD"; f.locale = Lang.locale
     f.maximumFractionDigits = v < 10 ? 2 : 0
     return f.string(from: NSNumber(value: v)) ?? "$\(v)"
 }

@@ -1,0 +1,2 @@
+/* Reason for controlling Terminal (Apple Events) */
+"NSAppleEventsUsageDescription" = "AgentBar brings the Terminal window running your Claude agent to the front.";
