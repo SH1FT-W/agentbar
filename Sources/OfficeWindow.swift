@@ -73,6 +73,14 @@ final class SystemLoad: ObservableObject {
     }
     func stop() { timer?.invalidate(); timer = nil }
 
+    /// Gefahrene Strecke des Saugroboters – aufsummiert, damit ein Lastwechsel nur das Tempo ändert, statt ihn springen zu lassen.
+    private var odometer: (t: Double, d: Double)?
+    func vacuumDistance(at now: Double) -> Double {
+        let d = odometer.map { $0.d + min(max(now - $0.t, 0), 0.5) * (20 + cpu * 140) } ?? 0
+        odometer = (now, d)
+        return d
+    }
+
     private func sample() {
         var info = host_cpu_load_info()
         var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.size / MemoryLayout<integer_t>.size)

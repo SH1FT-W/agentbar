@@ -82,14 +82,17 @@ final class OfficeModel {
 
     // MARK: Laufwege
     //
-    // Drei Gänge: Mittelgang zwischen den Tischreihen, vorderer Gang vor der ersten Reihe, Lounge-Gang vor dem Sofa.
+    // Zwei Gänge: Mittelgang zwischen den Tischreihen und Lounge-Gang vor dem Sofa (vor der ersten Reihe stehen Tischbeine).
     // Verbunden über einen senkrechten Verbindungsweg bei x = 730. Jeder Platz hat einen Zugang (Folge von Punkten
     // vom Platz bis in seinen Gang): aufstehen, seitlich durch die Lücke zwischen den Tischen, in den Gang.
 
-    private enum Lane: Int { case middle, lounge, front }
-    private static func laneY(_ l: Lane) -> CGFloat { [494, 524, 592][l.rawValue] }
+    private enum Lane: Int { case middle, lounge }
+    private static func laneY(_ l: Lane) -> CGFloat { [494, 524][l.rawValue] }
     private static let hubX: CGFloat = 730
-    static let door = CGPoint(x: -40, y: 592)
+    /// Eingang hinten rechts: hinter Sofa und hinteren Stühlen am Fenster entlang, dann durch die Lücke
+    /// zwischen den hinteren Tischen (x = doorGapX) in den Mittelgang.
+    static let door = CGPoint(x: 1040, y: 392)
+    private static let doorGapX: CGFloat = 560
 
     /// Zugang: Punkte vom Platz (Füße) bis zum Gang, plus der Gang.
     private static func access(_ p: Place) -> ([CGPoint], Lane) {
@@ -98,7 +101,8 @@ final class OfficeModel {
             let (pt, s) = deskSeat(i)
             let stand = CGPoint(x: pt.x, y: pt.y - 4 * s)          // hinter dem Tisch aufgestanden
             let gapX = pt.x + 78 * s                                // Lücke rechts neben dem Tisch
-            let lane: Lane = i < 4 ? .front : .middle
+            // Auch die vordere Reihe geht über den Mittelgang – vorn stehen die Tischbeine im Weg
+            let lane = Lane.middle
             return ([stand, CGPoint(x: gapX, y: stand.y), CGPoint(x: gapX, y: laneY(lane))], lane)
         case .sofa(let j):
             let (pt, _) = sofaSeat(j)
@@ -192,7 +196,7 @@ final class OfficeModel {
                     if let m = moves[s.id] {
                         // Richtungswechsel unterwegs: vom aktuellen Punkt in den nächstgelegenen Gang
                         let here = point(on: m, now: now)
-                        let lane = [Lane.middle, .lounge, .front].min { abs(Self.laneY($0) - here.y) < abs(Self.laneY($1) - here.y) }!
+                        let lane = [Lane.middle, .lounge].min { abs(Self.laneY($0) - here.y) < abs(Self.laneY($1) - here.y) }!
                         startMove(s.id, path: Self.route(from: here, startLane: lane, lead: [], to: target, jitter: jitter), now: now)
                     } else {
                         let (acc, lane) = Self.access(cur)
@@ -202,8 +206,9 @@ final class OfficeModel {
                 }
             } else {
                 at[s.id] = target
-                if started {   // neu dazugekommen: kommt vorne links zur Tür herein
-                    startMove(s.id, path: Self.route(from: Self.door, startLane: .front, lead: [], to: target, jitter: jitter), now: now)
+                if started {   // neu dazugekommen: kommt hinten rechts herein
+                    startMove(s.id, path: Self.route(from: Self.door, startLane: .middle, lead: [CGPoint(x: Self.doorGapX + jitter, y: Self.door.y)],
+                                                     to: target, jitter: jitter), now: now)
                 }
             }
 
@@ -262,7 +267,7 @@ struct OfficeView: View {
                 let scene = OfficeScene(time: now, date: tl.date, dark: scheme == .dark, daylight: daylight,
                                         actors: actors, overflow: overflow, hovered: hovered,
                                         session: quota.session?.percent, weekly: quota.weekly?.percent,
-                                        plan: quota.plan, cpu: load.cpu,
+                                        plan: quota.plan, cpu: load.cpu, vacuum: load.vacuumDistance(at: now),
                                         working: monitor.workingCount, waiting: monitor.waitingCount)
                 ZStack(alignment: .topLeading) {
                     Canvas { ctx, size in

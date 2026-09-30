@@ -33,7 +33,7 @@ struct Snap {
         func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
-                                    hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3, working: 3, waiting: 1)
+                                    hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3, vacuum: t * 40, working: 3, waiting: 1)
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
@@ -59,6 +59,12 @@ struct Snap {
         _ = model.actors(for: walk, now: settle)
         for (i, dt) in [0.6, 1.8, 3.2, 4.6].enumerated() { render("walk\(i + 1)", date, settle + dt, dark: false, sessions: walk) }
         render("lounge-full", date, settle + 30, dark: false, sessions: walk)
+        // Neue Sitzung kommt hinten rechts herein
+        var arrive = Array(demo.prefix(7))
+        _ = model.actors(for: arrive, now: settle + 40)
+        arrive.append(demo[7])
+        _ = model.actors(for: arrive, now: settle + 41)
+        for (i, dt) in [0.8, 2.5, 4.5, 6.5].enumerated() { render("arrive\(i + 1)", date, settle + 41 + dt, dark: false, sessions: arrive) }
         // Dropdown mit Demo-Daten
         let store = AppStore()
         store.monitor.inject(demo)

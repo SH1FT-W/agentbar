@@ -111,6 +111,7 @@ private final class MonitorCore: @unchecked Sendable {
     private var files: [String: FileState] = [:]          // Pfad → Zustand
     private var hooks: [String: HookState] = [:]          // session_id → letzter Hook
     private var hookOffset: UInt64 = 0
+    private var registryCache: [pid_t: String] = [:]         // ~/.claude/sessions: pid → Sitzung (falls iCloud die Datei auslagert)
     private var desktopMeta: [String: (title: String, open: Bool)] = [:]
     private var lastFullScan = Date.distantPast
     private var pendingPaths = Set<String>()
@@ -215,6 +216,19 @@ private final class MonitorCore: @unchecked Sendable {
         let fm = FileManager.default
         let cutoff = scanCutoff
         var alive = Set<String>()
+        // iCloud lagert ruhende Sitzungsdateien aus („dataless“). Gehört die Sitzung zu einem laufenden Claude-Prozess,
+        // im Hintergrund nachladen (Lesen würde blockieren) – FSEvents meldet die Datei danach, sonst verschwinden
+        // pausierende Sitzungen aus der Liste.
+        let registry = sessionRegistry()
+        func usable(_ url: URL) -> Bool {
+            if isLocal(url) || files[url.path] != nil { return true }
+            let born = created(url.path)
+            if registry.ids.contains(url.deletingPathExtension().lastPathComponent)
+                || registry.unregistered.contains(where: { born >= $0.addingTimeInterval(-10) && born <= $0.addingTimeInterval(600) }) {
+                try? fm.startDownloadingUbiquitousItem(at: url)
+            }
+            return false
+        }
         for (root, _) in roots {
             guard let dirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey]) else { continue }
             for dir in dirs where isDir(dir) {
@@ -222,7 +236,7 @@ private final class MonitorCore: @unchecked Sendable {
                 // bei laufenden Sitzungen reicht das nicht – deshalb Dateien selbst prüfen, aber billig per Attribut)
                 guard let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey]) else { continue }
                 for item in items {
-                    if item.pathExtension == "jsonl", mtime(item) > cutoff, isLocal(item) {
+                    if item.pathExtension == "jsonl", mtime(item) > cutoff, usable(item) {
                         alive.insert(item.path)
                         track(item)
                     } else if isDir(item) {
@@ -487,13 +501,24 @@ private final class MonitorCore: @unchecked Sendable {
         let fm = FileManager.default
         var ids = Set<String>(), pids = Set<pid_t>(), complete = true
         guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: nil) else { return ([], false, []) }
+        var seen: [pid_t: String] = [:]
         for f in items where f.pathExtension == "json" {
-            if let pid = pid_t(f.deletingPathExtension().lastPathComponent) { pids.insert(pid) }
-            guard isLocal(f), let d = try? Data(contentsOf: f),
-                  let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-                  let sid = j["sessionId"] as? String else { complete = false; continue }
-            ids.insert(sid)
+            guard let pid = pid_t(f.deletingPathExtension().lastPathComponent) else { continue }
+            pids.insert(pid)
+            if isLocal(f), let d = try? Data(contentsOf: f),
+               let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let sid = j["sessionId"] as? String {
+                seen[pid] = sid
+            } else if let sid = registryCache[pid] {
+                // iCloud hat die Datei ausgelagert – letzte bekannte Sitzung nehmen, im Hintergrund nachladen
+                seen[pid] = sid
+                try? fm.startDownloadingUbiquitousItem(at: f)
+            } else {
+                complete = false
+                try? fm.startDownloadingUbiquitousItem(at: f)
+            }
         }
+        registryCache = seen
+        ids = Set(seen.values)
         let unregistered = claudePids().filter { !pids.contains($0) }.compactMap(processStart)
         return (ids, complete, unregistered)
     }
@@ -525,10 +550,26 @@ private final class MonitorCore: @unchecked Sendable {
         let n = Int(proc_listallpids(&buf, Int32(buf.count * MemoryLayout<pid_t>.size)))
         var path = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         // Native Installation: …/claude/versions/<version>; sonst heißt das Programm selbst „claude“
-        return buf.prefix(max(0, n)).filter { pid in
+        let all = Set(buf.prefix(max(0, n)).filter { pid in
             guard pid > 1, proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return false }
             let p = String(cString: path)
             return p.contains("/claude/versions/") || (p as NSString).lastPathComponent == "claude"
+        })
+        // Hilfsprozesse, die Claude aus demselben Programm startet (auch über eine Shell dazwischen, z. B. während
+        // eines Befehls), sind keine Sitzungen
+        func parent(_ pid: pid_t) -> pid_t? {
+            var info = proc_bsdinfo()
+            guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, Int32(MemoryLayout<proc_bsdinfo>.size)) > 0 else { return nil }
+            return pid_t(info.pbi_ppid)
+        }
+        return all.filter { pid in
+            var p = parent(pid)
+            for _ in 0..<12 {
+                guard let q = p, q > 1 else { return true }
+                if all.contains(q) { return false }
+                p = parent(q)
+            }
+            return true
         }
     }
 
@@ -588,6 +629,9 @@ private final class MonitorCore: @unchecked Sendable {
             var candidates: [String: Date] = [:]
             for (sid, st) in mains where st.source == .cli && !registry.ids.contains(sid) { candidates[sid] = created(mainPaths[sid] ?? "") }
             unregisteredKeep = unregisteredOwners(registry.unregistered, candidates)
+        }
+        if ProcessInfo.processInfo.environment["AGENTBAR_DEBUG"] != nil {
+            FileHandle.standardError.write("registry ids=\(registry.ids.count) complete=\(registry.complete) unregistered=\(registry.unregistered) keep=\(String(describing: unregisteredKeep))\n".data(using: .utf8)!)
         }
         for (sid, st) in mains {
             let h = hooks[sid]

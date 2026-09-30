@@ -21,6 +21,7 @@ struct OfficeScene {
     let weekly: Double?
     let plan: String?
     let cpu: Double
+    let vacuum: Double          // gefahrene Strecke in Punkten
     let working: Int
     let waiting: Int
 
@@ -94,7 +95,8 @@ struct OfficeScene {
         items.append((566, { c in drawCoffeeTable(&c) }))
         for a in seated["stand"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
         for a in actors { if case .walking(let t) = a.pose { items.append((a.depth, { c in drawStanding(&c, a, walk: t) })) } }
-        items.append((592, { c in drawVacuum(&c) }))
+        let bot = vacuumPose()
+        items.append((bot.p.y, { c in drawVacuum(&c, bot) }))
         for (_, f) in items.sorted(by: { $0.0 < $1.0 }) { f(&ctx) }
 
         drawLighting(&ctx, seated: seated)
@@ -621,13 +623,24 @@ struct OfficeScene {
         for a in actors {
             let s = a.scale, px = a.point.x
             let pants = a.look.pants
-            let lap = CGRect(x: px - 21 * s, y: 466, width: 42 * s, height: 16)
-            ctx.fill(Path(roundedRect: lap, cornerRadius: 8, style: .continuous), with: vgrad([lighter(pants, 0.12), pants], lap.minY, lap.maxY))
+            // Oberschenkel (von vorn verkürzt) liegen auf dem Kissen und überlappen den Rumpf – sonst wirkt die Figur,
+            // als sinke sie ins Polster. Runde Knie, darunter verjüngte Unterschenkel.
+            shadow(&ctx, CGRect(x: px - 24 * s, y: 478, width: 48 * s, height: 8), 0.12)
             for side in [-1.0, 1.0] as [CGFloat] {
                 let lx = px + side * 10.5 * s
-                ctx.fill(rounded(lx - 6.5 * s, 474, 13 * s, 26, 6 * s), with: vgrad([pants, darker(pants, 0.18)], 474, 500))
+                var shin = Path()
+                shin.move(to: P(lx - 7 * s, 480)); shin.addLine(to: P(lx + 7 * s, 480))
+                shin.addLine(to: P(lx + 5.5 * s, 498)); shin.addLine(to: P(lx - 5.5 * s, 498)); shin.closeSubpath()
+                ctx.fill(shin, with: vgrad([darker(pants, 0.18), darker(pants, 0.1)], 480, 498))
                 ctx.fill(rounded(lx - 7.5 * s + side * 1.5, 496, 15 * s, 7.5, 3.5), with: .color(rgb(0xF6F6F8)))
                 ctx.fill(rounded(lx - 7.5 * s + side * 1.5, 501.5, 15 * s, 1.6, 0.8), with: .color(rgb(0xC9CBD0)))
+            }
+            for side in [-1.0, 1.0] as [CGFloat] {
+                let tx = px + side * 11 * s
+                let thigh = CGRect(x: tx - 12 * s, y: 456, width: 24 * s, height: 27)
+                ctx.fill(Path(roundedRect: thigh, cornerRadius: 11 * s, style: .continuous),
+                         with: vgrad([darker(pants, 0.12), lighter(pants, 0.1), pants], thigh.minY, thigh.maxY))
+                ctx.fill(oval(tx - 7 * s, 468, 14 * s, 7), with: .color(.white.opacity(0.035)))   // Knie-Glanz
             }
         }
         // Armlehnen
@@ -763,20 +776,36 @@ struct OfficeScene {
         ctx.stroke(lip, with: .color(lighter(light, 0.3)), lineWidth: 1.6 * s)
     }
 
-    /// Saugroboter: fährt über das Parkett, je höher die CPU-Last, desto schneller.
-    private func drawVacuum(_ ctx: inout GraphicsContext) {
-        let speed = 0.05 + cpu * 0.35
-        // Phase aus Zeit×Geschwindigkeit – leichtes Springen bei Laständerung ist unauffällig
-        let phase = (time * speed).truncatingRemainder(dividingBy: 2 * .pi)
-        let x = 480 + CGFloat(cos(phase)) * 400
-        let y: CGFloat = 589 + CGFloat(sin(phase)) * 4
+    /// Saugroboter-Rundkurs über freie Flächen: Mittelgang, rechts an den vorderen Tischen vorbei, vor der Lounge
+    /// entlang, zwischen Sofa und Couchtisch zurück. Nie unter oder durch Tische.
+    static let vacuumLoop: [CGPoint] = [(30, 494), (700, 494), (672, 597), (975, 597), (975, 521), (742, 521), (700, 494)].map { CGPoint(x: $0.0, y: $0.1) }
+
+    private func vacuumPose() -> (p: CGPoint, dx: CGFloat) {
+        let pts = Self.vacuumLoop + [Self.vacuumLoop[0]]
+        var lens: [CGFloat] = []
+        for i in 1..<pts.count { lens.append(hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)) }
+        var d = CGFloat(vacuum.truncatingRemainder(dividingBy: Double(lens.reduce(0, +))))
+        for i in 0..<lens.count {
+            if d <= lens[i] {
+                let a = pts[i], b = pts[i + 1], t = d / max(lens[i], 1)
+                return (P(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t), b.x - a.x)
+            }
+            d -= lens[i]
+        }
+        return (pts[0], 1)
+    }
+
+    /// Saugroboter: je höher die CPU-Last, desto schneller.
+    private func drawVacuum(_ ctx: inout GraphicsContext, _ pose: (p: CGPoint, dx: CGFloat)) {
+        let x = pose.p.x, y = pose.p.y
+        let front: CGFloat = pose.dx < 0 ? -1 : 1
         shadow(&ctx, CGRect(x: x - 25, y: y - 3, width: 50, height: 10), 0.28)
         ctx.fill(oval(x - 20, y - 9, 40, 12), with: .color(rgb(0x1F1F21)))
         ctx.fill(oval(x - 20, y - 13, 40, 13), with: .linearGradient(Gradient(colors: [rgb(0xF4F4F6), rgb(0xCFD1D5)]), startPoint: P(0, y - 13), endPoint: P(0, y)))
         ctx.fill(oval(x - 6.5, y - 13, 13, 6), with: .color(rgb(0xB9BCC1)))
         ctx.fill(oval(x - 5.5, y - 14.2, 11, 4.6), with: .color(rgb(0xE8E9EC)))
         let led = cpu > 0.6 ? rgb(0xFF9F0A) : rgb(0x30D158)
-        ctx.fill(circle(P(x + 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * 4))))
+        ctx.fill(circle(P(x + front * 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * 4))))
     }
 
     // MARK: Figuren
