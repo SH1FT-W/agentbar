@@ -65,16 +65,35 @@
   pre { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 10px 0 0; }
   pre code { background: none; padding: 0; }
   footer { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0 60px; border-top: 1px solid var(--line); }
+  /* Zweisprachig: Browsersprache entscheidet, Schalter oben rechts merkt sich die Wahl */
+  html[lang="de"] .en, html[lang="en"] .de { display: none !important; }
+  .lang { display: inline-flex; border: 1px solid var(--line); border-radius: 980px; overflow: hidden; margin-left: 10px; }
+  .lang button { font: inherit; font-size: 12px; border: 0; background: none; color: var(--muted); padding: 3px 10px; cursor: pointer; }
+  .lang button.on { background: var(--text); color: var(--bg); }
+  nav .right { display: flex; align-items: center; }
 </style>
+<script>
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem("agentbar-lang"); } catch (e) {}
+    var pref = saved || ((navigator.languages && navigator.languages[0]) || navigator.language || "en");
+    document.documentElement.lang = /^de/i.test(pref) ? "de" : "en";
+  })();
+</script>
 </head>
 <body>
 <nav>
   <div class="wrap">
     <a class="brand" href="#"><img src="icon.png" alt="">AgentBar</a>
-    <div class="links">
-      <a href="#features">Features</a>
-      <a href="#setup">Setup</a>
-      <a href="https://github.com/SH1FT-W/agentbar">GitHub</a>
+    <div class="right">
+      <div class="links">
+        <a href="#features"><span class="en">Features</span><span class="de">Funktionen</span></a>
+        <a href="#setup"><span class="en">Setup</span><span class="de">Einrichten</span></a>
+        <a href="https://github.com/SH1FT-W/agentbar">GitHub</a>
+      </div>
+      <div class="lang" role="group" aria-label="Language">
+        <button data-l="de">DE</button><button data-l="en">EN</button>
+      </div>
     </div>
   </div>
 </nav>
@@ -83,72 +102,135 @@
   <div class="wrap">
     <img class="icon" src="icon.png" alt="AgentBar icon">
     <h1>AgentBar</h1>
-    <p class="tagline">Your Claude Code agents, right in the menu bar.<br>And a tiny office where they actually work.</p>
+    <p class="tagline">
+      <span class="en">Your Claude Code agents, right in the menu bar.<br>And a tiny office where they actually work.</span>
+      <span class="de">Deine Claude-Code-Agenten, direkt in der Menüleiste.<br>Und ein kleines Büro, in dem sie wirklich arbeiten.</span>
+    </p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/SH1FT-W/agentbar/releases/latest">Download for Mac</a>
-      <a class="btn secondary" href="https://github.com/SH1FT-W/agentbar">View on GitHub</a>
+      <a class="btn primary" href="https://github.com/SH1FT-W/agentbar/releases/latest"><span class="en">Download for Mac</span><span class="de">Für Mac laden</span></a>
+      <a class="btn secondary" href="https://github.com/SH1FT-W/agentbar"><span class="en">View on GitHub</span><span class="de">Auf GitHub ansehen</span></a>
     </div>
-    <p class="small">Free &amp; open source · macOS 14 or later · Apple Silicon · Interface in German</p>
+    <p class="small">
+      <span class="en">Free &amp; open source · macOS 14 or later · Apple Silicon · Interface in German</span>
+      <span class="de">Kostenlos &amp; Open Source · macOS 14 oder neuer · Apple Silicon · Oberfläche auf Deutsch</span>
+    </p>
   </div>
 </header>
 
-<div class="hero-shot"><img src="screenshots/office-day.jpg" alt="The AgentBar office: every Claude session is a character at a desk"></div>
+<div class="hero-shot"><img src="screenshots/office-day.jpg" alt="AgentBar office"></div>
 
 <section id="features">
   <div class="wrap">
-    <h2>Everything at a glance.</h2>
-    <p class="lead">Designed to feel like a native macOS 27 system menu – quiet until an agent needs you.</p>
+    <h2><span class="en">Everything at a glance.</span><span class="de">Alles auf einen Blick.</span></h2>
+    <p class="lead">
+      <span class="en">Designed to feel like a native macOS 27 system menu – quiet until an agent needs you.</span>
+      <span class="de">Fühlt sich an wie ein eingebautes macOS-27-Menü – ruhig, bis ein Agent dich braucht.</span>
+    </p>
     <div class="pair">
-      <img src="screenshots/menu-live-light.png" alt="Dropdown in light mode">
-      <img src="screenshots/menu-live-dark.png" alt="Dropdown in dark mode">
+      <img src="screenshots/menu-live-light.png" alt="Dropdown (light)">
+      <img src="screenshots/menu-live-dark.png" alt="Dropdown (dark)">
     </div>
     <div class="grid" style="margin-top:60px">
-      <div class="card"><div class="sym">✋</div><h3>Knows when you're needed</h3><p>Working, waiting for approval, done, error or idle – for every session. With Claude Code hooks it knows instantly instead of guessing.</p></div>
-      <div class="card"><div class="sym">◎</div><h3>Usage as activity rings</h3><p>Your 5-hour and weekly Claude plan usage, Apple-Watch style. The token is only read – never refreshed, never stored.</p></div>
-      <div class="card"><div class="sym">👥</div><h3>Helpers included</h3><p>Subagents show up as helpers of their session – in the list, and as glowing spheres orbiting their character.</p></div>
-      <div class="card"><div class="sym">↗︎</div><h3>Jump right in</h3><p>Click a session and the exact Terminal tab it runs in comes to the front.</p></div>
-      <div class="card"><div class="sym">🔔</div><h3>Notifications</h3><p>When an agent needs you, finishes or fails – and before your plan usage runs out.</p></div>
-      <div class="card"><div class="sym">☕︎</div><h3>Keep awake</h3><p>Stop your Mac from sleeping – always, or only while agents are working.</p></div>
+      <div class="card"><div class="sym">✋</div>
+        <h3><span class="en">Knows when you're needed</span><span class="de">Weiß, wann du gebraucht wirst</span></h3>
+        <p><span class="en">Working, waiting for approval, done, error or idle – for every session. With Claude Code hooks it knows instantly instead of guessing.</span>
+           <span class="de">Arbeitet, wartet auf Freigabe, fertig, Fehler oder Pause – für jede Sitzung. Mit Claude-Code-Hooks weiß AgentBar es sofort, statt zu raten.</span></p></div>
+      <div class="card"><div class="sym">◎</div>
+        <h3><span class="en">Usage as activity rings</span><span class="de">Kontingent als Aktivitätsringe</span></h3>
+        <p><span class="en">Your 5-hour and weekly Claude plan usage, Apple-Watch style. The token is only read – never refreshed, never stored.</span>
+           <span class="de">Dein 5-Stunden- und Wochenkontingent im Apple-Watch-Stil. Der Token wird nur gelesen – nie erneuert, nie gespeichert.</span></p></div>
+      <div class="card"><div class="sym">👥</div>
+        <h3><span class="en">Helpers included</span><span class="de">Mit Helfern</span></h3>
+        <p><span class="en">Subagents show up as helpers of their session – in the list, and as glowing spheres orbiting their character.</span>
+           <span class="de">Subagenten erscheinen als Helfer ihrer Sitzung – in der Liste und als leuchtende Kugeln über ihrer Figur.</span></p></div>
+      <div class="card"><div class="sym">↗︎</div>
+        <h3><span class="en">Jump right in</span><span class="de">Direkt hinspringen</span></h3>
+        <p><span class="en">Click a session and the exact Terminal tab it runs in comes to the front.</span>
+           <span class="de">Ein Klick auf eine Sitzung holt genau den Terminal-Tab nach vorn, in dem sie läuft.</span></p></div>
+      <div class="card"><div class="sym">🔔</div>
+        <h3><span class="en">Notifications</span><span class="de">Mitteilungen</span></h3>
+        <p><span class="en">When an agent needs you, finishes or fails – and before your plan usage runs out.</span>
+           <span class="de">Wenn ein Agent dich braucht, fertig ist oder scheitert – und bevor dein Kontingent aufgebraucht ist.</span></p></div>
+      <div class="card"><div class="sym">☕︎</div>
+        <h3><span class="en">Keep awake</span><span class="de">Wach bleiben</span></h3>
+        <p><span class="en">Stop your Mac from sleeping – always, or only while agents are working.</span>
+           <span class="de">Verhindert den Ruhezustand – immer oder nur, solange Agenten arbeiten.</span></p></div>
     </div>
   </div>
 </section>
 
 <section class="alt">
   <div class="wrap">
-    <h2>The office.</h2>
-    <p class="lead">Press ⌃⌥A. Every session gets a desk. They type while working, raise a hand when they need you, and walk over for a coffee when they're idle. The sky follows your local time.</p>
+    <h2><span class="en">The office.</span><span class="de">Das Büro.</span></h2>
+    <p class="lead">
+      <span class="en">Press ⌃⌥A. Every session gets a desk. They type while working, raise a hand when they need you, and walk over for a coffee when they're idle. The sky follows your local time.</span>
+      <span class="de">Drück ⌃⌥A. Jede Sitzung bekommt einen Schreibtisch. Die Figuren tippen beim Arbeiten, heben die Hand, wenn sie dich brauchen, und holen sich in der Pause einen Kaffee. Der Himmel folgt deiner Uhrzeit.</span>
+    </p>
     <div class="shots">
-      <figure><img src="screenshots/office-night.jpg" alt="The office at night"><figcaption>Late night, warm lights</figcaption></figure>
-      <figure><img src="screenshots/office-lounge-full.jpg" alt="Idle agents in the lounge"><figcaption>Coffee break for the idle ones</figcaption></figure>
+      <figure><img src="screenshots/office-night.jpg" alt="Night"><figcaption><span class="en">Late night, warm lights</span><span class="de">Spät abends, warmes Licht</span></figcaption></figure>
+      <figure><img src="screenshots/office-lounge-full.jpg" alt="Lounge"><figcaption><span class="en">Coffee break for the idle ones</span><span class="de">Kaffeepause für alle, die gerade nichts zu tun haben</span></figcaption></figure>
     </div>
   </div>
 </section>
 
 <section id="setup">
   <div class="wrap">
-    <h2>Set up in a minute.</h2>
-    <p class="lead">You need <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> on a Mac with Apple Silicon.</p>
+    <h2><span class="en">Set up in a minute.</span><span class="de">In einer Minute eingerichtet.</span></h2>
+    <p class="lead">
+      <span class="en">You need <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> on a Mac with Apple Silicon.</span>
+      <span class="de">Du brauchst <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> auf einem Mac mit Apple Silicon.</span>
+    </p>
     <ol class="steps">
-      <li><h3>Download</h3><p>Get <code>AgentBar.zip</code> from the <a href="https://github.com/SH1FT-W/agentbar/releases/latest">latest release</a>, unzip it and move <code>AgentBar.app</code> to <code>/Applications</code>.</p></li>
-      <li><h3>Allow the first launch</h3><p>AgentBar isn't notarized by Apple, so macOS blocks it once. Open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b> – or run:</p>
+      <li><h3><span class="en">Download</span><span class="de">Laden</span></h3>
+        <p><span class="en">Get <code>AgentBar.zip</code> from the <a href="https://github.com/SH1FT-W/agentbar/releases/latest">latest release</a>, unzip it and move <code>AgentBar.app</code> to <code>/Applications</code>.</span>
+           <span class="de">Lade <code>AgentBar.zip</code> aus dem <a href="https://github.com/SH1FT-W/agentbar/releases/latest">neuesten Release</a>, entpacke es und zieh <code>AgentBar.app</code> in den Ordner <code>Programme</code>.</span></p></li>
+      <li><h3><span class="en">Allow the first launch</span><span class="de">Ersten Start erlauben</span></h3>
+        <p><span class="en">AgentBar isn't notarized by Apple, so macOS blocks it once. Open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b> – or run:</span>
+           <span class="de">AgentBar ist nicht von Apple notarisiert, deshalb blockiert macOS den ersten Start. Öffne <b>Systemeinstellungen → Datenschutz &amp; Sicherheit</b> und klicke <b>Trotzdem öffnen</b> – oder im Terminal:</span></p>
         <pre><code>xattr -dr com.apple.quarantine /Applications/AgentBar.app</code></pre>
-        <p style="margin-top:8px">Only needed once. Updates from the built-in update button are verified with an Ed25519 signature.</p></li>
-      <li><h3>Turn on precise detection</h3><p>Click <b>Hooks einrichten</b> in the dropdown. AgentBar adds small hook commands to <code>~/.claude/settings.json</code> (with a backup). They only append status lines to a local file – no network.</p></li>
-      <li><h3>Done</h3><p>Allow notifications when asked, optionally enable <b>Beim Anmelden starten</b> (launch at login), and press ⌃⌥A for the office.</p></li>
+        <p style="margin-top:8px"><span class="en">Only needed once. Updates from the built-in update button are verified with an Ed25519 signature.</span>
+           <span class="de">Nur einmal nötig. Updates über den eingebauten Update-Button werden per Ed25519-Signatur geprüft.</span></p></li>
+      <li><h3><span class="en">Turn on precise detection</span><span class="de">Präzise Erkennung einschalten</span></h3>
+        <p><span class="en">Click <b>Hooks einrichten</b> in the dropdown. AgentBar adds small hook commands to <code>~/.claude/settings.json</code> (with a backup). They only append status lines to a local file – no network.</span>
+           <span class="de">Klicke im Menü auf <b>Hooks einrichten</b>. AgentBar trägt kleine Hook-Befehle in <code>~/.claude/settings.json</code> ein (mit Sicherung). Sie schreiben nur Statuszeilen in eine lokale Datei – kein Netzwerk.</span></p></li>
+      <li><h3><span class="en">Done</span><span class="de">Fertig</span></h3>
+        <p><span class="en">Allow notifications when asked, optionally enable <b>Beim Anmelden starten</b> (launch at login), and press ⌃⌥A for the office.</span>
+           <span class="de">Mitteilungen erlauben, wenn gefragt wird, optional <b>Beim Anmelden starten</b> einschalten – und mit ⌃⌥A das Büro öffnen.</span></p></li>
     </ol>
   </div>
 </section>
 
 <section class="alt">
   <div class="wrap">
-    <h2>Private by design.</h2>
-    <p class="lead" style="margin-bottom:0">Everything stays on your Mac. AgentBar reads local Claude Code logs and talks to exactly two servers: <code>api.anthropic.com</code> for your plan usage and <code>api.github.com</code> for updates. No analytics, no telemetry. The code is <a href="https://github.com/SH1FT-W/agentbar">open source</a>.</p>
+    <h2><span class="en">Private by design.</span><span class="de">Privat von Anfang an.</span></h2>
+    <p class="lead" style="margin-bottom:0">
+      <span class="en">Everything stays on your Mac. AgentBar reads local Claude Code logs and talks to exactly two servers: <code>api.anthropic.com</code> for your plan usage and <code>api.github.com</code> for updates. No analytics, no telemetry. The code is <a href="https://github.com/SH1FT-W/agentbar">open source</a>.</span>
+      <span class="de">Alles bleibt auf deinem Mac. AgentBar liest lokale Claude-Code-Protokolle und spricht mit genau zwei Servern: <code>api.anthropic.com</code> für dein Kontingent und <code>api.github.com</code> für Updates. Keine Analyse, keine Telemetrie. Der Code ist <a href="https://github.com/SH1FT-W/agentbar">Open Source</a>.</span>
+    </p>
   </div>
 </section>
 
 <footer>
-  AgentBar is an independent open-source project, not affiliated with Anthropic or Apple. Claude is a trademark of Anthropic.<br>
-  Inspired by <a href="https://github.com/sotthang/so-agentbar">so-agentbar</a>. MIT License.
+  <span class="en">AgentBar is an independent open-source project, not affiliated with Anthropic or Apple. Claude is a trademark of Anthropic.<br>Inspired by <a href="https://github.com/sotthang/so-agentbar">so-agentbar</a>. MIT License.</span>
+  <span class="de">AgentBar ist ein unabhängiges Open-Source-Projekt, nicht verbunden mit Anthropic oder Apple. Claude ist eine Marke von Anthropic.<br>Inspiriert von <a href="https://github.com/sotthang/so-agentbar">so-agentbar</a>. MIT-Lizenz.</span>
 </footer>
+
+<script>
+  (function () {
+    var titles = { en: "AgentBar – your Claude Code agents, in the menu bar", de: "AgentBar – deine Claude-Code-Agenten in der Menüleiste" };
+    function apply(l) {
+      document.documentElement.lang = l;
+      document.title = titles[l];
+      document.querySelectorAll(".lang button").forEach(function (b) { b.classList.toggle("on", b.dataset.l === l); });
+    }
+    document.querySelectorAll(".lang button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        try { localStorage.setItem("agentbar-lang", b.dataset.l); } catch (e) {}
+        apply(b.dataset.l);
+      });
+    });
+    apply(document.documentElement.lang);
+  })();
+</script>
 </body>
 </html>
