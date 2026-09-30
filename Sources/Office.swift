@@ -279,10 +279,12 @@ struct OfficeView: View {
                         Color.clear
                             .contentShape(RoundedRectangle(cornerRadius: 12))
                             .frame(width: r.width * k, height: r.height * k)
-                            .position(x: r.midX * k, y: r.midY * k)
+                            // Vor .position anhängen: .position füllt das ganze Fenster, sonst reagiert die
+                            // zuletzt gezeichnete Figur überall auf Maus und Klick
                             .onHover { hovered = $0 ? a.id : (hovered == a.id ? nil : hovered) }
                             .onTapGesture { Focus.open(a.session) }
                             .help(tooltip(a.session))
+                            .position(x: r.midX * k, y: r.midY * k)
                     }
                 }
             }

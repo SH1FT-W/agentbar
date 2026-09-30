@@ -171,7 +171,8 @@ enum MenuBarIcon {
 enum AppInfo {
     static var version: String {
         #if SNAPSHOT
-        return "1.2"   // Snapshot-Werkzeug läuft ohne App-Bundle
+        // Snapshot-Werkzeug läuft ohne App-Bundle – Version aus der Info.plist im Repo (Aufruf aus dem Repo-Ordner)
+        return NSDictionary(contentsOfFile: "Info.plist")?["CFBundleShortVersionString"] as? String ?? "dev"
         #else
         return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         #endif
