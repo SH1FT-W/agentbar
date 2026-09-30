@@ -659,6 +659,13 @@ private final class MonitorCore: @unchecked Sendable {
 
     static let askTools: Set<String> = ["AskUserQuestion", "ExitPlanMode"]
 
+    /// Claude-Modelle ab Generation 5 (z. B. claude-opus-5-5, claude-fable-5-1) laufen in Claude Code standardmäßig mit 1 Mio. Token.
+    static func millionByDefault(_ model: String) -> Bool {
+        let parts = model.split(separator: "-")
+        guard parts.count >= 3, parts[0] == "claude", let major = Int(parts[2]) else { return false }
+        return major >= 5
+    }
+
     private func autoApproved(_ tool: String, mode: String) -> Bool {
         let safe: Set<String> = ["Read", "Glob", "Grep", "Agent", "Task", "TodoWrite", "LS", "ToolSearch", "Skill",
                                  "WebSearch", "BashOutput", "KillShell", "TaskOutput"]
@@ -766,7 +773,8 @@ private final class MonitorCore: @unchecked Sendable {
                 lastText: st.lastText, lastActivity: max(st.lastEvent, h?.time ?? .distantPast),
                 tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive,
                 contextUsed: st.contextUsed,
-                contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0))
+                contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || Self.millionByDefault(st.model)
+                                                    || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0

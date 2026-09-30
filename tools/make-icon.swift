@@ -326,7 +326,7 @@ let json = """
         }
       ],
       "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
-      "translucency" : { "enabled" : true, "value" : 0.3 }
+      "translucency" : { "enabled" : false, "value" : 0 }
     },
     {
       "layers" : [ { "glass" : false, "image-name" : "Figur.png", "name" : "Figur" } ],
