@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentBar – your Claude Code agents, in the menu bar</title>
+<meta name="description" content="A macOS menu bar app that shows what your Claude Code agents are doing – with a little animated office.">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --bg: #fbfbfd; --bg2: #f5f5f7; --text: #1d1d1f; --muted: #6e6e73; --accent: #0071e3; --card: #ffffff;
+    --line: rgba(0,0,0,.08); --shadow: 0 20px 60px rgba(0,0,0,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #000; --bg2: #111113; --text: #f5f5f7; --muted: #a1a1a6; --accent: #2997ff; --card: #1c1c1e;
+            --line: rgba(255,255,255,.1); --shadow: 0 20px 60px rgba(0,0,0,.6); }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 22px; }
+  nav { position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+        background: color-mix(in srgb, var(--bg) 72%, transparent); border-bottom: 1px solid var(--line); }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 48px; font-size: 14px; }
+  nav .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); }
+  nav .brand img { width: 22px; height: 22px; }
+  nav .links { display: flex; gap: 22px; }
+  nav .links a { color: var(--muted); }
+  header { text-align: center; padding: 84px 0 40px; }
+  header img.icon { width: 132px; height: 132px; filter: drop-shadow(0 12px 28px rgba(0,0,0,.18)); }
+  h1 { font-size: clamp(44px, 7vw, 80px); line-height: 1.05; letter-spacing: -.02em; margin: 18px 0 12px; font-weight: 700; }
+  .tagline { font-size: clamp(20px, 2.6vw, 26px); color: var(--muted); max-width: 720px; margin: 0 auto; line-height: 1.35; }
+  .cta { margin-top: 30px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 12px 24px; border-radius: 980px; font-size: 17px; font-weight: 500; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.secondary { color: var(--accent); border: 1px solid var(--accent); }
+  .btn:hover { text-decoration: none; opacity: .9; }
+  .small { font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .hero-shot { margin: 30px auto 0; max-width: 1040px; padding: 0 22px; }
+  .hero-shot img { width: 100%; border-radius: 18px; box-shadow: var(--shadow); display: block; }
+  section { padding: 90px 0; }
+  section.alt { background: var(--bg2); }
+  h2 { font-size: clamp(32px, 4.5vw, 48px); line-height: 1.1; letter-spacing: -.015em; text-align: center; margin: 0 0 14px; }
+  .lead { text-align: center; color: var(--muted); font-size: 21px; max-width: 700px; margin: 0 auto 50px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .card { background: var(--card); border-radius: 20px; padding: 28px; border: 1px solid var(--line); }
+  .card .sym { font-size: 30px; line-height: 1; margin-bottom: 14px; }
+  .card h3 { margin: 0 0 6px; font-size: 21px; }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
+  .pair { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; }
+  .pair img { width: 340px; max-width: 100%; border-radius: 16px; box-shadow: var(--shadow); }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .shots img { width: 100%; border-radius: 14px; box-shadow: var(--shadow); display: block; }
+  .shots figcaption { text-align: center; color: var(--muted); font-size: 14px; margin-top: 10px; }
+  @media (max-width: 720px) { .shots { grid-template-columns: 1fr; } nav .links { gap: 14px; } }
+  ol.steps { counter-reset: s; list-style: none; padding: 0; max-width: 760px; margin: 0 auto; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 26px 58px; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 0; top: -2px; width: 38px; height: 38px; border-radius: 50%;
+                        background: var(--accent); color: #fff; font-weight: 600; display: grid; place-items: center; }
+  ol.steps h3 { margin: 0 0 4px; font-size: 19px; }
+  ol.steps p { margin: 0; color: var(--muted); }
+  code { font: 14px ui-monospace, "SF Mono", Menlo, monospace; background: var(--bg2); padding: 2px 6px; border-radius: 6px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 10px 0 0; }
+  pre code { background: none; padding: 0; }
+  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0 60px; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="icon.png" alt="">AgentBar</a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#setup">Setup</a>
+      <a href="https://github.com/SH1FT-W/agentbar">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <img class="icon" src="icon.png" alt="AgentBar icon">
+    <h1>AgentBar</h1>
+    <p class="tagline">Your Claude Code agents, right in the menu bar.<br>And a tiny office where they actually work.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/SH1FT-W/agentbar/releases/latest">Download for Mac</a>
+      <a class="btn secondary" href="https://github.com/SH1FT-W/agentbar">View on GitHub</a>
+    </div>
+    <p class="small">Free &amp; open source · macOS 14 or later · Apple Silicon · Interface in German</p>
+  </div>
+</header>
+
+<div class="hero-shot"><img src="screenshots/office-day.jpg" alt="The AgentBar office: every Claude session is a character at a desk"></div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything at a glance.</h2>
+    <p class="lead">Designed to feel like a native macOS 27 system menu – quiet until an agent needs you.</p>
+    <div class="pair">
+      <img src="screenshots/menu-live-light.png" alt="Dropdown in light mode">
+      <img src="screenshots/menu-live-dark.png" alt="Dropdown in dark mode">
+    </div>
+    <div class="grid" style="margin-top:60px">
+      <div class="card"><div class="sym">✋</div><h3>Knows when you're needed</h3><p>Working, waiting for approval, done, error or idle – for every session. With Claude Code hooks it knows instantly instead of guessing.</p></div>
+      <div class="card"><div class="sym">◎</div><h3>Usage as activity rings</h3><p>Your 5-hour and weekly Claude plan usage, Apple-Watch style. The token is only read – never refreshed, never stored.</p></div>
+      <div class="card"><div class="sym">👥</div><h3>Helpers included</h3><p>Subagents show up as helpers of their session – in the list, and as glowing spheres orbiting their character.</p></div>
+      <div class="card"><div class="sym">↗︎</div><h3>Jump right in</h3><p>Click a session and the exact Terminal tab it runs in comes to the front.</p></div>
+      <div class="card"><div class="sym">🔔</div><h3>Notifications</h3><p>When an agent needs you, finishes or fails – and before your plan usage runs out.</p></div>
+      <div class="card"><div class="sym">☕︎</div><h3>Keep awake</h3><p>Stop your Mac from sleeping – always, or only while agents are working.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>The office.</h2>
+    <p class="lead">Press ⌃⌥A. Every session gets a desk. They type while working, raise a hand when they need you, and walk over for a coffee when they're idle. The sky follows your local time.</p>
+    <div class="shots">
+      <figure><img src="screenshots/office-night.jpg" alt="The office at night"><figcaption>Late night, warm lights</figcaption></figure>
+      <figure><img src="screenshots/office-lounge-full.jpg" alt="Idle agents in the lounge"><figcaption>Coffee break for the idle ones</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="setup">
+  <div class="wrap">
+    <h2>Set up in a minute.</h2>
+    <p class="lead">You need <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> on a Mac with Apple Silicon.</p>
+    <ol class="steps">
+      <li><h3>Download</h3><p>Get <code>AgentBar.zip</code> from the <a href="https://github.com/SH1FT-W/agentbar/releases/latest">latest release</a>, unzip it and move <code>AgentBar.app</code> to <code>/Applications</code>.</p></li>
+      <li><h3>Allow the first launch</h3><p>AgentBar isn't notarized by Apple, so macOS blocks it once. Open <b>System Settings → Privacy &amp; Security</b> and click <b>Open Anyway</b> – or run:</p>
+        <pre><code>xattr -dr com.apple.quarantine /Applications/AgentBar.app</code></pre>
+        <p style="margin-top:8px">Only needed once. Updates from the built-in update button are verified with an Ed25519 signature.</p></li>
+      <li><h3>Turn on precise detection</h3><p>Click <b>Hooks einrichten</b> in the dropdown. AgentBar adds small hook commands to <code>~/.claude/settings.json</code> (with a backup). They only append status lines to a local file – no network.</p></li>
+      <li><h3>Done</h3><p>Allow notifications when asked, optionally enable <b>Beim Anmelden starten</b> (launch at login), and press ⌃⌥A for the office.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Private by design.</h2>
+    <p class="lead" style="margin-bottom:0">Everything stays on your Mac. AgentBar reads local Claude Code logs and talks to exactly two servers: <code>api.anthropic.com</code> for your plan usage and <code>api.github.com</code> for updates. No analytics, no telemetry. The code is <a href="https://github.com/SH1FT-W/agentbar">open source</a>.</p>
+  </div>
+</section>
+
+<footer>
+  AgentBar is an independent open-source project, not affiliated with Anthropic or Apple. Claude is a trademark of Anthropic.<br>
+  Inspired by <a href="https://github.com/sotthang/so-agentbar">so-agentbar</a>. MIT License.
+</footer>
+</body>
+</html>

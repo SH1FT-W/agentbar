@@ -1,0 +1,82 @@
+// Rendert Büro + Dropdown als PNG nach build/ (ohne Menüleiste). Aufruf: ./build.sh snapshot [--live]
+import SwiftUI
+
+@main
+struct Snap {
+    @MainActor static func main() async {
+        _ = NSApplication.shared
+        NSApp.setActivationPolicy(.prohibited)
+        Prefs.register()
+        let now = Date()
+        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ act: String, _ ago: Double, helpers: Int = 0) -> AgentSession {
+            AgentSession(id: id, source: .cli, cwd: "/Users/x/\(cwd)", title: title, model: "claude-opus-5-5", permissionMode: "auto",
+                         status: st, activity: act, tool: act.hasPrefix("Terminal") ? "Bash" : act.hasPrefix("Bearbeitet") ? "Edit" : act.hasPrefix("Recherchiert") ? "WebSearch" : "", lastText: "Build ist grün, alle 42 Tests bestanden.", lastActivity: now.addingTimeInterval(-ago),
+                         tokens: ["claude-sonnet-4-5": TokenTally(input: 1200, cacheWrite: 50000, cacheRead: 900000, output: 30000)],
+                         subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: "Explore", description: "Sucht Dateien", working: true, activity: "Liest App.swift", lastActivity: now) },
+                         hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true)
+        }
+        let demo = [
+            s("1", "weather-app", "Radar-Ansicht bauen", .working, "Bearbeitet RadarView.swift", 5, helpers: 3),
+            s("2", "api-server", nil, .waiting, "Terminal: git push", 20),
+            s("3", "portfolio", "Dunkelmodus", .done, "", 30),
+            s("4", "photo-sorter", nil, .working, "Terminal: swift build", 3),
+            s("5", "recipes", nil, .idle, "", 2000),
+            s("6", "home-lab", nil, .error, "", 40),
+            s("7", "blog", nil, .idle, "", 400),
+            s("8", "chess-engine", nil, .working, "Recherchiert im Web", 50),
+        ]
+        let model = OfficeModel()
+        let cal = Calendar.current
+        func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {
+            let (actors, overflow) = model.actors(for: sessions, now: t)
+            let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
+                                    hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3, working: 3, waiting: 1)
+            let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
+            let r = ImageRenderer(content: view); r.scale = 2
+            if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/office-\(name).png"))
+            }
+        }
+        for (name, hour, dark) in [("day", 11, false), ("dusk", 19, false), ("night", 23, true), ("dawn", 7, false), ("day-dark", 13, true)] {
+            let date = cal.date(bySettingHour: hour, minute: 20, second: 0, of: now)!
+            render(name, date, date.timeIntervalSinceReferenceDate, dark: dark, sessions: demo)
+        }
+        // Überfahren + Laufwege
+        let date = cal.date(bySettingHour: 15, minute: 5, second: 0, of: now)!
+        let t = date.timeIntervalSinceReferenceDate
+        render("hover", date, t, dark: false, sessions: demo, hovered: "2")
+        // Volle Lounge: 7 von 8 machen Pause, einer geht gerade (vordere Reihe → Kaffee-Ecke/Hocker)
+        var lounge = demo
+        for i in [0, 1, 2, 4, 5, 6] { lounge[i].status = .idle }
+        let settle = t + 100
+        _ = model.actors(for: lounge, now: t + 1)
+        render("lounge", date, settle, dark: false, sessions: lounge)
+        var walk = lounge
+        walk[3].status = .idle
+        _ = model.actors(for: walk, now: settle)
+        for (i, dt) in [0.6, 1.8, 3.2, 4.6].enumerated() { render("walk\(i + 1)", date, settle + dt, dark: false, sessions: walk) }
+        render("lounge-full", date, settle + 30, dark: false, sessions: walk)
+        // Dropdown mit Demo-Daten
+        let store = AppStore()
+        store.monitor.inject(demo)
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        for (name, dark) in [("light", false), ("dark", true)] {
+            shot(AnyView(MenuView(expanded: "1").environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater)), "build/menu-\(name).png", dark)
+        }
+    }
+
+    @MainActor static func shot(_ view: AnyView, _ path: String, _ dark: Bool) {
+        let host = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
+        host.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+        let size = host.fittingSize
+        let win = NSWindow(contentRect: NSRect(x: -5000, y: -5000, width: size.width, height: size.height), styleMask: .borderless, backing: .buffered, defer: false)
+        win.contentView = host
+        win.orderFrontRegardless()
+        host.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: rep)
+        try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
+        win.close()
+    }
+}
