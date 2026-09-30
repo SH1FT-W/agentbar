@@ -76,6 +76,8 @@ private final class FileState {
     var model = ""
     var mode = "default"
     var cwd: String?
+    var contextUsed = 0                      // Token im Kontext laut letzter Antwort
+    var contextMax = 0                       // größter je gesehener Kontext bzw. preTokens vor dem Zusammenfassen
     var projectVotes: [String: Int] = [:]   // Projektordner → Häufigkeit (Arbeitsordner + bearbeitete Dateien)
     var lastText = ""
     var usage: [String: (model: String, tally: TokenTally)] = [:]   // je message.id – Claude schreibt pro Inhaltsblock eine Zeile mit derselben usage
@@ -120,13 +122,15 @@ private final class MonitorCore: @unchecked Sendable {
 
     private var roots: [(URL, SessionSource)] = []
     private var allowed: [String] = []        // permissions.allow aus ~/.claude/settings.json (für die Schätzung ohne Hooks)
+    private var millionFamily: String?        // settings.json "model" mit [1m] (z. B. "opus[1m]") → 1M-Fenster für diese Modellfamilie
 
     private func refreshRoots() {
         roots = [(Paths.claudeProjects, .cli), (Paths.xcodeProjects, .xcode)] + coworkRoots().map { ($0, .cowork) }
         if let d = try? Data(contentsOf: Paths.claudeSettings),
-           let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
-           let perms = j["permissions"] as? [String: Any] {
-            allowed = perms["allow"] as? [String] ?? []
+           let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] {
+            allowed = (j["permissions"] as? [String: Any])?["allow"] as? [String] ?? []
+            let model = (j["model"] as? String)?.lowercased() ?? ""
+            millionFamily = model.contains("[1m]") ? ["opus", "sonnet", "haiku", "fable"].first { model.contains($0) } : nil
         }
     }
 
@@ -366,6 +370,12 @@ private final class MonitorCore: @unchecked Sendable {
 
         if type == "system" {
             if (j["level"] as? String) == "error" { st.apiError = true; st.lastType = "system" }
+            if (j["subtype"] as? String) == "compact_boundary" {
+                // Zusammengefasst: wieder frisch; die Menge davor verrät die Fenstergröße. (Bei Dateien > 8 MB wird nur
+                // das Ende gelesen – eine frühere Grenze fehlt dann, das Fenster ergibt sich weiter aus contextMax.)
+                if let pre = (j["compactMetadata"] as? [String: Any])?["preTokens"] as? Int { st.contextMax = max(st.contextMax, pre) }
+                st.contextUsed = 0
+            }
             return
         }
 
@@ -390,6 +400,10 @@ private final class MonitorCore: @unchecked Sendable {
         // assistant
         if j["isApiErrorMessage"] as? Bool == true { st.apiError = true; st.lastType = "assistant"; st.toolPending = false; return }
         if let model = msg["model"] as? String, model != "<synthetic>" { st.model = model }
+        if j["isSidechain"] as? Bool != true, (msg["model"] as? String) != "<synthetic>", let u = msg["usage"] as? [String: Any] {
+            let ctx = (u["input_tokens"] as? Int ?? 0) + (u["cache_read_input_tokens"] as? Int ?? 0) + (u["cache_creation_input_tokens"] as? Int ?? 0)
+            if ctx > 0 { st.contextUsed = ctx; st.contextMax = max(st.contextMax, ctx) }
+        }
         if let id = msg["id"] as? String, let u = msg["usage"] as? [String: Any], !st.model.isEmpty {
             st.setUsage(id, model: st.model, TokenTally(
                 input: u["input_tokens"] as? Int ?? 0,
@@ -738,7 +752,9 @@ private final class MonitorCore: @unchecked Sendable {
                 cwd: st.projectVotes.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
                 title: title, model: st.model, permissionMode: st.mode, status: status, activity: activity, tool: tool,
                 lastText: st.lastText, lastActivity: max(st.lastEvent, h?.time ?? .distantPast),
-                tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive))
+                tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive,
+                contextUsed: st.contextUsed,
+                contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0

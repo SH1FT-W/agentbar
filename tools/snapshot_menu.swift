@@ -39,7 +39,8 @@ struct SnapMenu {
                          subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: ["Explore", "Plan", "general-purpose"][$0 % 3],
                                                                    description: L("Sucht Dateien", "Finding files"), working: $0 < 2,
                                                                    activity: [describeTool("Read", ["file_path": "/x/App.swift"]), L("Sucht nach „inject“", "Searching for “inject”"), ""][$0 % 3], lastActivity: now) },
-                         hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true)
+                         hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true,
+                         contextUsed: 340_000, contextWindow: 1_000_000)
         }
         let demo = [
             s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),

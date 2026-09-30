@@ -275,6 +275,9 @@ struct SessionRow: View {
                     .compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
                 detail(L("Läuft in", "Runs in"), hostName(s))
                 detail("Tokens", formatTokens(s.totalTokens) + (s.cost.map { " · ≈ \(formatMoney($0))" } ?? ""))
+                if let f = s.contextFill {
+                    detail(L("Kontext", "Context"), percentText(Int((f * 100).rounded())) + L(" von ", " of ") + s.contextWindowText)
+                }
                 if !s.lastText.isEmpty { detail(L("Zuletzt", "Last"), s.lastText, lines: 3) }
             }
             if !s.subagents.isEmpty {

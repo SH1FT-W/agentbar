@@ -870,7 +870,7 @@ struct OfficeScene {
         ctx.stroke(collar, with: .color(T.shirtShade), style: StrokeStyle(lineWidth: 2.2 * s, lineCap: .round))
 
         // Kopf
-        drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt)
+        drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a))
 
         // Arme vorn
         switch a.pose {
@@ -925,7 +925,7 @@ struct OfficeScene {
             // Verschränkte Arme auf dem Tisch, Kopf darauf
             let armsR = CGRect(x: x - 30 * s, y: base - 22 * s, width: 60 * s, height: 16 * s)
             ctx.fill(Path(roundedRect: armsR, cornerRadius: 8 * s, style: .continuous), with: vgrad([T.shirtLight, T.shirt], armsR.minY, armsR.maxY))
-            drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt)
+            drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a))
         default:
             for side in [-1.0, 1.0] as [CGFloat] where a.pose != .relaxed {
                 var arm = Path(); arm.move(to: P(x + side * 19 * s, shoulderY + 10 * s))
@@ -1018,11 +1018,20 @@ struct OfficeScene {
             ctx.fill(circle(P(x + 22 * s + swing * 0.6, shoulderY + 43 * s), 4.8 * s), with: .color(T.skin))
         }
         ctx.fill(rounded(x - 6.5 * s, shoulderY - 9 * s, 13 * s, 14 * s, 5 * s), with: .color(T.skinShade))
-        drawHead(&ctx, center: P(x, shoulderY - 25 * s), s: s, tones: T, look: a.look, pose: a.pose, tilt: Double(swing) * 0.004)
+        drawHead(&ctx, center: P(x, shoulderY - 25 * s), s: s, tones: T, look: a.look, pose: a.pose, tilt: Double(swing) * 0.004, tired: tiredness(a))
     }
 
     /// Memoji-artiger Kopf: großer runder Schädel, weiche Schattierung, ausdrucksstarke Augen/Brauen.
-    private func drawHead(_ outer: inout GraphicsContext, center c: CGPoint, s: CGFloat, tones T: Tones, look L: Look, pose: Pose, tilt: Double) {
+    /// Müdigkeit aus dem Kontext-Füllstand: 0 frisch (< 50 %), 1 leicht (< 75 %), 2 müde (< 90 %), 3 erschöpft.
+    private func tiredness(_ a: Actor) -> Int {
+        guard let f = a.session.contextFill else { return 0 }
+        return f < 0.5 ? 0 : f < 0.75 ? 1 : f < 0.9 ? 2 : 3
+    }
+
+    private func drawHead(_ outer: inout GraphicsContext, center c: CGPoint, s: CGFloat, tones T: Tones, look L: Look, pose: Pose, tilt: Double, tired rawTired: Int = 0) {
+        // Melden und Fehler sollen deutlich bleiben: dort höchstens leicht müde
+        let alert = pose == .raiseHand || pose == .upset
+        let tired = alert ? min(rawTired, 1) : rawTired
         var ctx = outer
         ctx.translateBy(x: c.x, y: c.y)
         ctx.rotate(by: .radians(tilt))
@@ -1104,22 +1113,30 @@ struct OfficeScene {
         let browY: CGFloat = pose == .raiseHand ? -11 * s : -8.5 * s
         for side in [-1.0, 1.0] as [CGFloat] {
             var b = Path()
-            let inner: CGFloat, outer: CGFloat
+            let inner: CGFloat
+            var outer: CGFloat
             switch pose {
             case .upset: inner = 2.2 * s; outer = -1.2 * s
             case .typing: inner = 0.8 * s; outer = 0
             default: inner = 0; outer = 0.6 * s
             }
+            // Müde: äußere Brauenenden hängen (nicht beim Melden/Ärgern – die Pose soll lesbar bleiben)
+            let droop: CGFloat = (pose == .raiseHand || pose == .upset) ? 0 : CGFloat(max(0, tired - 1)) * 1.4 * s
+            outer += droop
             b.move(to: P(side * 4.6 * s, browY + inner))
             b.addQuadCurve(to: P(side * 12 * s, browY + outer), control: P(side * 8.4 * s, browY - 1.6 * s + (inner + outer) / 2))
             ctx.stroke(b, with: .color(darker(T.hair, 0.2).opacity(0.85)), style: StrokeStyle(lineWidth: 2 * s, lineCap: .round))
         }
+        // Gähnen: müde gelegentlich, erschöpft öfter – nur ohne andere starke Pose
+        let yawnCycle: Double = tired >= 3 ? 7 : 12
+        let yawning = tired >= 2 && !sleeping && pose != .raiseHand && pose != .upset
+            && (time + Double(c.x) * 0.73).truncatingRemainder(dividingBy: yawnCycle) < 1.8
         // Augen
         let blink = (time + Double(c.x) * 0.37).truncatingRemainder(dividingBy: 4.4) < 0.12
         let eyeY: CGFloat = 1 * s
         for side in [-1.0, 1.0] as [CGFloat] {
             let ex = side * 8.2 * s
-            if sleeping || blink {
+            if sleeping || blink || yawning {
                 var l = Path(); l.move(to: P(ex - 3.4 * s, eyeY)); l.addQuadCurve(to: P(ex + 3.4 * s, eyeY), control: P(ex, eyeY + 2.8 * s))
                 ctx.stroke(l, with: .color(rgb(0x2B2118)), style: StrokeStyle(lineWidth: 1.6 * s, lineCap: .round))
             } else {
@@ -1134,9 +1151,25 @@ struct OfficeScene {
                 ctx.fill(circle(P(ex + look.x, eyeY + look.y + 0.3 * s), 2.9 * s), with: .radialGradient(Gradient(colors: [rgb(0x6B4A33), rgb(0x2A1C14)]), center: P(ex + look.x, eyeY + look.y + 1.2 * s), startRadius: 0, endRadius: 3 * s))
                 ctx.fill(circle(P(ex + look.x, eyeY + look.y + 0.3 * s), 1.3 * s), with: .color(rgb(0x120C08)))
                 ctx.fill(circle(P(ex + look.x - 1 * s, eyeY + look.y - 1 * s), 0.95 * s), with: .color(.white))
-                // Oberlid
-                var lid = Path(); lid.addArc(center: P(ex, eyeY + 0.2 * s), radius: 4 * s, startAngle: .degrees(205), endAngle: .degrees(335), clockwise: false)
-                ctx.stroke(lid, with: .color(rgb(0x2B2118, 0.8)), style: StrokeStyle(lineWidth: 1.1 * s, lineCap: .round))
+                if tired > 0 {
+                    // Schwere Lider: Haut deckt das Auge von oben ab, Lidkante darunter
+                    let eye = CGRect(x: ex - 3.6 * s, y: eyeY - 4.2 * s, width: 7.2 * s, height: 8.4 * s)
+                    let cover = eye.height * [0, 0.34, 0.46, 0.56][min(tired, 3)]
+                    var lidCtx = ctx
+                    lidCtx.clip(to: Path(ellipseIn: eye.insetBy(dx: -0.4 * s, dy: -0.4 * s)))
+                    lidCtx.fill(Path(CGRect(x: eye.minX - s, y: eye.minY - s, width: eye.width + 2 * s, height: cover + s)), with: .color(T.skin))
+                    var edge = Path(); edge.move(to: P(eye.minX + 0.3 * s, eye.minY + cover)); edge.addQuadCurve(to: P(eye.maxX - 0.3 * s, eye.minY + cover), control: P(ex, eye.minY + cover + 1.2 * s))
+                    ctx.stroke(edge, with: .color(rgb(0x2B2118, 0.85)), style: StrokeStyle(lineWidth: 1.2 * s, lineCap: .round))
+                } else {
+                    // Oberlid
+                    var lid = Path(); lid.addArc(center: P(ex, eyeY + 0.2 * s), radius: 4 * s, startAngle: .degrees(205), endAngle: .degrees(335), clockwise: false)
+                    ctx.stroke(lid, with: .color(rgb(0x2B2118, 0.8)), style: StrokeStyle(lineWidth: 1.1 * s, lineCap: .round))
+                }
+            }
+            if tired >= 2 {
+                // Augenringe
+                var bag = Path(); bag.move(to: P(ex - 3.6 * s, eyeY + 4.6 * s)); bag.addQuadCurve(to: P(ex + 3.6 * s, eyeY + 4.6 * s), control: P(ex, eyeY + 7.4 * s))
+                ctx.stroke(bag, with: .color(darker(T.skin, 0.35).opacity(tired >= 3 ? 0.55 : 0.4)), style: StrokeStyle(lineWidth: 1.3 * s, lineCap: .round))
             }
         }
         if L.glasses {
@@ -1158,6 +1191,22 @@ struct OfficeScene {
         // Mund
         let my = 13 * s
         let lip = rgb(0x6B2B2B)
+        if tired >= 3 {
+            // Schweißtropfen an der Schläfe
+            let d = P(r * 0.86, -r * 0.42)
+            var drop = Path()
+            drop.move(to: P(d.x, d.y - 4.2 * s))
+            drop.addQuadCurve(to: P(d.x + 2.4 * s, d.y + 1.2 * s), control: P(d.x + 2.2 * s, d.y - 1.4 * s))
+            drop.addArc(center: P(d.x, d.y + 1.2 * s), radius: 2.4 * s, startAngle: .degrees(0), endAngle: .degrees(180), clockwise: false)
+            drop.addQuadCurve(to: P(d.x, d.y - 4.2 * s), control: P(d.x - 2.2 * s, d.y - 1.4 * s))
+            ctx.fill(drop, with: .linearGradient(Gradient(colors: [rgb(0xD8F0FF), rgb(0x7CC4F2)]), startPoint: P(d.x, d.y - 4 * s), endPoint: P(d.x, d.y + 3.6 * s)))
+            ctx.fill(circle(P(d.x - 0.8 * s, d.y + 0.4 * s), 0.7 * s), with: .color(.white.opacity(0.9)))
+        }
+        if yawning {
+            ctx.fill(oval(-4 * s, my - 3.5 * s, 8 * s, 9.5 * s), with: .color(lip))
+            ctx.fill(oval(-2.4 * s, my + 2.2 * s, 4.8 * s, 2.6 * s), with: .color(rgb(0xC9575A)))
+            return
+        }
         switch pose {
         case .raiseHand:
             ctx.fill(oval(-3 * s, my - 2 * s, 6 * s, 6.4 * s), with: .color(lip))

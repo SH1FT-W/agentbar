@@ -140,6 +140,16 @@ struct AgentSession: Identifiable, Equatable {
     var hostBundle: String?       // App, in der die Sitzung läuft (aus den Hooks)
     var tty: String?
     var usesHooks: Bool
+    var contextUsed = 0           // Token im Kontext (letzte Antwort der Hauptkette)
+    var contextWindow = 0         // 200k oder 1M (abgeleitet), 0 = unbekannt
+
+    var contextWindowText: String { contextWindow >= 1_000_000 ? L("1 Mio.", "1M") : "\(contextWindow / 1000)k" }
+
+    /// Kontext-Füllstand 0…1, nil ohne Daten.
+    var contextFill: Double? {
+        guard contextWindow > 0 else { return nil }   // 0 % direkt nach dem Zusammenfassen
+        return min(1, Double(contextUsed) / Double(contextWindow))
+    }
 
     var project: String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent

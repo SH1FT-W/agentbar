@@ -9,24 +9,26 @@ struct Snap {
         Prefs.register()
         let now = Date()
         // Aktivität kommt wie in der App aus describeTool – Werkzeugname explizit, damit nichts an der Sprache hängt
-        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0) -> AgentSession {
+        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0, ctx: Double = 0.2) -> AgentSession {
             AgentSession(id: id, source: .cli, cwd: "/Users/x/\(cwd)", title: title, model: "claude-opus-5-5", permissionMode: "auto",
                          status: st, activity: tool.isEmpty ? "" : describeTool(tool, input), tool: tool,
                          lastText: L("Build ist grün, alle 42 Tests bestanden.", "Build is green, all 42 tests passed."), lastActivity: now.addingTimeInterval(-ago),
                          tokens: ["claude-sonnet-4-5": TokenTally(input: 1200, cacheWrite: 50000, cacheRead: 900000, output: 30000)],
                          subagents: (0..<helpers).map { SubAgent(id: "h\($0)", type: "Explore", description: L("Sucht Dateien", "Finding files"), working: true,
                                                                 activity: describeTool("Read", ["file_path": "/x/App.swift"]), lastActivity: now) },
-                         hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true)
+                         hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true,
+                         contextUsed: Int(ctx * 1_000_000), contextWindow: 1_000_000)
         }
+        // Kontext-Füllstände so gewählt, dass alle Müdigkeitsstufen vorkommen
         let demo = [
-            s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),
-            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20),
-            s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 30),
-            s("4", "photo-sorter", nil, .working, "Bash", ["command": "swift build"], 3),
-            s("5", "recipes", nil, .idle, "", [:], 2000),
-            s("6", "home-lab", nil, .error, "", [:], 40),
-            s("7", "blog", nil, .idle, "", [:], 400),
-            s("8", "chess-engine", nil, .working, "WebSearch", [:], 50),
+            s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3, ctx: 0.22),
+            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20, ctx: 0.62),
+            s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 30, ctx: 0.35),
+            s("4", "photo-sorter", nil, .working, "Bash", ["command": "swift build"], 3, ctx: 0.82),
+            s("5", "recipes", nil, .idle, "", [:], 2000, ctx: 0.58),
+            s("6", "home-lab", nil, .error, "", [:], 40, ctx: 0.93),
+            s("7", "blog", nil, .idle, "", [:], 400, ctx: 0.4),
+            s("8", "chess-engine", nil, .working, "WebSearch", [:], 50, ctx: 0.96),
         ]
         let model = OfficeModel()
         let cal = Calendar.current
