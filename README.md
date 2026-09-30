@@ -36,7 +36,7 @@
 - **Live session status** – working, needs you, done, error or idle, for every Claude Code session (terminal, Claude desktop app, Cowork, Xcode). Subagents appear as helpers of their parent session.
 - **Precise detection (optional)** – with Claude Code hooks AgentBar knows *exactly* when an agent is waiting for your approval instead of guessing from pauses.
 - **Usage rings** – your 5-hour and weekly Claude plan usage as Apple-Watch-style activity rings. The OAuth token is only *read*, never refreshed or modified.
-- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle. The sky follows the time of day; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load.
+- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load.
 - **Jump to the session** – click a session (in the menu or the office) to bring its Terminal tab to the front.
 - **Notifications** when an agent needs you, finishes or fails, plus a usage warning.
 - **Keep awake** – off, always, or only while agents are working.

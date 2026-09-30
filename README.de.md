@@ -36,7 +36,7 @@
 - **Status in Echtzeit** – arbeitet, braucht dich, fertig, Fehler oder Pause, für jede Claude-Code-Sitzung (Terminal, Claude-App, Cowork, Xcode). Subagenten erscheinen als Helfer ihrer Sitzung.
 - **Präzise Erkennung (optional)** – mit Claude-Code-Hooks weiß AgentBar *genau*, wann ein Agent auf deine Freigabe wartet, statt es aus Pausen zu schätzen.
 - **Kontingent-Ringe** – dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
-- **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, und geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster. Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller.
+- **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller.
 - **Direkt zur Sitzung** – ein Klick auf eine Sitzung (im Menü oder im Büro) holt ihren Terminal-Tab nach vorn.
 - **Mitteilungen**, wenn ein Agent dich braucht, fertig ist oder scheitert, dazu eine Kontingent-Warnung.
 - **Wach bleiben** – aus, immer oder nur, solange Agenten arbeiten.
