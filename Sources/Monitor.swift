@@ -76,6 +76,7 @@ private final class FileState {
     var model = ""
     var mode = "default"
     var cwd: String?
+    var projectVotes: [String: Int] = [:]   // Projektordner → Häufigkeit (Arbeitsordner + bearbeitete Dateien)
     var lastText = ""
     var usage: [String: (model: String, tally: TokenTally)] = [:]   // je message.id – Claude schreibt pro Inhaltsblock eine Zeile mit derselben usage
     private(set) var tokens: [String: TokenTally] = [:]             // laufende Summe je Modell
@@ -340,7 +341,10 @@ private final class MonitorCore: @unchecked Sendable {
 
     private func process(_ j: [String: Any], _ st: FileState) {
         guard let type = j["type"] as? String else { return }
-        if let cwd = j["cwd"] as? String, !cwd.isEmpty { st.cwd = cwd }
+        if let cwd = j["cwd"] as? String, !cwd.isEmpty {
+            st.cwd = cwd
+            if let root = projectRoot(cwd, isFile: false) { st.projectVotes[root, default: 0] += 1 }
+        }
         switch type {
         case "ai-title":
             if let t = j["aiTitle"] as? String ?? j["title"] as? String, !t.isEmpty { st.aiTitle = t }
@@ -406,6 +410,12 @@ private final class MonitorCore: @unchecked Sendable {
         if let text = content.last(where: { $0["type"] as? String == "text" })?["text"] as? String, !text.isEmpty {
             st.lastText = preview(text)
         }
+        for item in content where item["type"] as? String == "tool_use" {
+            let input = item["input"] as? [String: Any] ?? [:]
+            for key in ["file_path", "notebook_path"] {
+                if let f = input[key] as? String, let root = projectRoot(f, isFile: true) { st.projectVotes[root, default: 0] += 3 }
+            }
+        }
         if let tool = content.last(where: { $0["type"] as? String == "tool_use" }) {
             st.toolPending = true
             st.toolName = tool["name"] as? String ?? ""
@@ -415,6 +425,30 @@ private final class MonitorCore: @unchecked Sendable {
             st.toolPending = false
         }
         if (msg["stop_reason"] as? String) == "tool_use" { st.toolPending = true }
+    }
+
+    // MARK: Projektname
+
+    /// Git-Wurzel eines Pfads (sonst der Ordner selbst). Home, ~/.claude, ~/Library und Temp-Ordner zählen nicht –
+    /// sonst heißt eine Sitzung nach dem Ordner, in den sie zuletzt kurz gewechselt ist.
+    private var rootCache: [String: String?] = [:]
+    private func projectRoot(_ path: String, isFile: Bool) -> String? {
+        let dir = isFile ? (path as NSString).deletingLastPathComponent : path
+        if let hit = rootCache[dir] { return hit }
+        let home = NSHomeDirectory()
+        let ignored = [home + "/.claude", home + "/Library", "/tmp", "/private", "/var", "/dev"]
+        var root: String?
+        if dir.hasPrefix(home + "/"), !ignored.contains(where: { dir == $0 || dir.hasPrefix($0 + "/") }) {
+            var d = dir
+            while d.count > home.count {
+                if FileManager.default.fileExists(atPath: d + "/.git") { root = d; break }
+                d = (d as NSString).deletingLastPathComponent
+            }
+            if root == nil { root = dir }
+        }
+        if rootCache.count > 2000 { rootCache.removeAll() }
+        rootCache[dir] = root
+        return root
     }
 
     // MARK: Hooks
@@ -700,7 +734,8 @@ private final class MonitorCore: @unchecked Sendable {
             for a in subs[sid] ?? [] { for (m, t) in a.tokens { tokens[m, default: TokenTally()] = tokens[m, default: TokenTally()] + t } }
 
             out.append(AgentSession(
-                id: sid, source: source, cwd: st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
+                id: sid, source: source,
+                cwd: st.projectVotes.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
                 title: title, model: st.model, permissionMode: st.mode, status: status, activity: activity, tool: tool,
                 lastText: st.lastText, lastActivity: max(st.lastEvent, h?.time ?? .distantPast),
                 tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive))
