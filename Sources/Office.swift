@@ -213,7 +213,7 @@ final class OfficeModel {
             }
 
             let age = now - (since[s.id]?.t ?? now)
-            let look = Look.of(s.project)
+            let look = Look.of(s.project == "Home" ? s.id : s.project)   // ohne Projekt: je Sitzung eigenes Aussehen
             if let m = moves[s.id] {
                 if now - m.start < m.duration {
                     let pt = point(on: m, now: now)

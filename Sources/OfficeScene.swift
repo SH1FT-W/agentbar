@@ -1226,7 +1226,7 @@ struct OfficeScene {
         let hover = hovered == a.id
         let fill: Color = hover ? .accentColor : st == .waiting ? rgb(0xFF9500) : (dark ? rgb(0x2C2C2E, 0.92) : rgb(0xFFFFFF, 0.94))
         let text: Color = hover || st == .waiting ? .white : ink
-        tag(&ctx, String(a.session.project.prefix(16)), icon: icon, tint: hover ? .white : tint,
+        tag(&ctx, String(a.session.label.prefix(21)), icon: icon, tint: hover ? .white : tint,
             at: P(a.point.x, nameY), size: s < 0.9 ? 9 : 10.5, fill: fill, text: text)
 
         guard !walking, !hover else { return }

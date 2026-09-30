@@ -145,6 +145,18 @@ struct AgentSession: Identifiable, Equatable {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
         return name == NSUserName() ? "Home" : name
     }
+    /// Kurzname fürs Büro: Projektordner, ohne Projekt (nur im Home-Ordner) der gekürzte Sitzungstitel.
+    var label: String {
+        guard project == "Home", let t = title?.trimmingCharacters(in: .whitespaces), !t.isEmpty else { return project }
+        var out = ""
+        for w in t.split(separator: " ") {
+            let next = out.isEmpty ? String(w) : out + " " + w
+            if next.count > 20 { break }
+            out = next
+        }
+        if out.isEmpty { return String(t.prefix(19)) + "…" }
+        return out.count < t.count ? out + "…" : out
+    }
     var displayName: String {
         if let t = title, !t.isEmpty { return t }
         return project

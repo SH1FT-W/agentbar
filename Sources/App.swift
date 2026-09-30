@@ -44,7 +44,7 @@ extension AppDelegate {
     func dump() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [self] in
             for s in store.monitor.sessions {
-                print("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.project) | \(s.displayName) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
+                print("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.displayName) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
             }
             print(L("Kontingent", "Usage") + ": \(store.quota.session?.percent ?? -1) / \(store.quota.weekly?.percent ?? -1) \(store.quota.plan ?? "") \(store.quota.problem ?? "")")
             exit(0)
