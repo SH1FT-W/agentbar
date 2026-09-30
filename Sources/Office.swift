@@ -260,10 +260,14 @@ struct OfficeView: View {
 
     var body: some View {
         GeometryReader { geo in
+            // Selbst einpassen (5:3, mittig) statt .aspectRatio – das verrutschte nach Größenänderungen
+            // zusammen mit dem Titelleisten-Bereich und schnitt den Raum rechts ab.
+            let fit = min(geo.size.width / OfficeScene.size.width, geo.size.height / OfficeScene.size.height)
+            let frame = CGSize(width: OfficeScene.size.width * fit, height: OfficeScene.size.height * fit)
             TimelineView(.animation(minimumInterval: 1 / 30)) { tl in
                 let now = tl.date.timeIntervalSinceReferenceDate
                 let (actors, overflow) = model.actors(for: Array(monitor.visible.prefix(12)), now: now)
-                let k = geo.size.width / OfficeScene.size.width
+                let k = fit
                 let scene = OfficeScene(time: now, date: tl.date, dark: scheme == .dark, daylight: daylight,
                                         actors: actors, overflow: overflow, hovered: hovered,
                                         session: quota.session?.percent, weekly: quota.weekly?.percent,
@@ -287,9 +291,11 @@ struct OfficeView: View {
                             .position(x: r.midX * k, y: r.midY * k)
                     }
                 }
+                .frame(width: frame.width, height: frame.height)
+                .clipped()
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
             }
         }
-        .aspectRatio(OfficeScene.size.width / OfficeScene.size.height, contentMode: .fit)
         .ignoresSafeArea()
         .background(Color.black)
     }

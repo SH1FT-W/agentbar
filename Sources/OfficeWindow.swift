@@ -43,12 +43,14 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
         load.start()
         window?.orderFrontRegardless()
         UserDefaults.standard.set(true, forKey: "officeWasOpen")
+        store.objectWillChange.send()   // Menüeintrag „Büro öffnen/schließen“ sofort umstellen
     }
 
     func close() {
         window?.orderOut(nil)
         load.stop()
         UserDefaults.standard.set(false, forKey: "officeWasOpen")
+        store?.objectWillChange.send()
     }
 
     func applyPrefs() {
@@ -58,6 +60,9 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { close(); return false }
+    // Im Dock abgelegt/zurückgeholt zählt auch als zu/offen
+    func windowDidMiniaturize(_ notification: Notification) { store?.objectWillChange.send() }
+    func windowDidDeminiaturize(_ notification: Notification) { store?.objectWillChange.send() }
 }
 
 /// CPU-Last für den Saugroboter (je mehr Last, desto flotter fährt er).
