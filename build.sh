@@ -67,6 +67,7 @@ if [[ "$1" == "release" ]]; then
     git commit -q -m "v$VERSION"
     git tag "v$VERSION"
     git push -q origin HEAD "v$VERSION"
+    # Release-Notizen bitte auf Englisch (öffentliches Repo)
     gh release create "v$VERSION" "$OUT/AgentBar.zip" "$OUT/AgentBar.zip.sha256" "$OUT/AgentBar.zip.sig" \
         --repo SH1FT-W/agentbar --title "v$VERSION" --notes "${3:-v$VERSION}"
     echo "Release v$VERSION veröffentlicht – in der App: „Nach Updates suchen“"
