@@ -42,7 +42,7 @@ struct SnapMenu {
                          hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true,
                          contextUsed: 340_000, contextWindow: 1_000_000)
         }
-        let demo = [
+        var demo = [
             s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),
             s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20),
             s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 180),
@@ -50,9 +50,13 @@ struct SnapMenu {
             s("6", "home-lab", nil, .error, "", [:], 400),
             s("5", "recipes", nil, .idle, "", [:], 2000),
         ]
+        // Zwei Sitzungen von einem anderen Mac (Andere Macs)
+        for i in [3, 5] { demo[i].device = "iMac" }
 
         let store = AppStore()
         UserDefaults.standard.set(true, forKey: Prefs.quotaEnabled)   // für die Einstellungen
+        UserDefaults.standard.set(true, forKey: Prefs.peersEnabled)   // Abschnitt „Andere Macs“ aufgeklappt (Demo-Code, keine Verbindung)
+        UserDefaults.standard.set("K7QM-4TXP-9WHR", forKey: Prefs.peerCode)
         try? await Task.sleep(nanoseconds: 1_500_000_000)             // ersten Scan abwarten, dann Demo drüberlegen
 
         func menu(_ expanded: String?) -> AnyView {
@@ -80,7 +84,7 @@ struct SnapMenu {
             live(menu(nil), "build/menu-empty-\(name).png", dark)
             // Einstellungen
             store.hooksInstalled = true
-            liveWindow(AnyView(SettingsView(height: 1320).environmentObject(store)), "build/settings-\(name).png", dark)
+            liveWindow(AnyView(SettingsView(height: 1500).environmentObject(store)), "build/settings-\(name).png", dark)
             if CommandLine.arguments.contains("--flat") {
                 keep = { store.monitor.inject(demo) }
                 shot(menu("1"), "build/menu-flat-\(name).png", dark)

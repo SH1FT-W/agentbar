@@ -20,7 +20,7 @@ struct Snap {
                          contextUsed: Int(ctx * 1_000_000), contextWindow: 1_000_000)
         }
         // Kontext-Füllstände so gewählt, dass alle Müdigkeitsstufen vorkommen
-        let demo = [
+        var demo = [
             s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3, ctx: 0.22),
             s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20, ctx: 0.62),
             s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 30, ctx: 0.35),
@@ -30,6 +30,8 @@ struct Snap {
             s("7", "blog", nil, .idle, "", [:], 400, ctx: 0.4),
             s("8", "chess-engine", nil, .working, "WebSearch", [:], 50, ctx: 0.96),
         ]
+        // Zwei Sitzungen von einem anderen Mac (Andere Macs)
+        for i in [3, 6] { demo[i].device = "iMac" }
         let model = OfficeModel()
         let cal = Calendar.current
         func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {

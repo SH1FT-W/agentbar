@@ -39,6 +39,7 @@
 - **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
 - **Direkt zur Sitzung** – ein Klick auf eine Sitzung (im Menü oder im Büro) holt ihren Terminal-Tab nach vorn.
 - **Mitteilungen**, wenn ein Agent dich braucht, fertig ist oder scheitert, dazu eine Kontingent-Warnung und ein Hinweis, sobald eine neue AgentBar-Version da ist.
+- **Deine anderen Macs** (optional) – koppel deine Macs per Code, dann erscheinen Sitzungen der anderen im Menü und im Büro, markiert mit einem kleinen Geräte-Symbol. Gefunden wird per Bonjour im lokalen Netzwerk, jede Nachricht ist mit dem Code verschlüsselt.
 - **Wach bleiben** – aus, immer oder nur, solange Agenten arbeiten.
 - **Updates** über GitHub-Releases, geprüft per Ed25519-Signatur (Schlüssel fest in der App), Bundle-ID, Version und Code-Signatur.
 
@@ -103,6 +104,8 @@ Alles bleibt auf deinem Mac. AgentBar liest nur lokale Dateien (`~/.claude/proje
 
 - `api.anthropic.com` – dein Kontingent (nur wenn *Kontingent abrufen* an ist)
 - `api.github.com` – Update-Prüfung
+
+Schaltest du *Andere Macs* ein, spricht AgentBar zusätzlich mit deinen gekoppelten Macs im lokalen Netzwerk (Bonjour, mit dem Kopplungscode verschlüsselt). Geteilt werden nur Status, Projekt, Titel und Tätigkeit der Sitzungen – nie Dateien oder Protokolle.
 
 Keine Analyse, keine Telemetrie.
 

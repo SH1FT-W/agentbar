@@ -122,7 +122,7 @@ struct SettingsView: View {
 
             Section {
                 Toggle(isOn: $peersEnabled) {
-                    SettingLabel(L("Andere Macs zeigen", "Show other Macs"), "macbook.and.imac", .teal,
+                    SettingLabel(L("Andere Macs zeigen", "Show other Macs"), "laptopcomputer", .teal,
                                  note: L("Sitzungen deiner anderen Macs im selben Netzwerk.", "Sessions from your other Macs on the same network."))
                 }
                 .onChange(of: peersEnabled) { on in
@@ -146,7 +146,8 @@ struct SettingsView: View {
                     }
                     LabeledContent {
                         HStack(spacing: 8) {
-                            TextField("XXXX-XXXX-XXXX", text: $codeInput).textFieldStyle(.roundedBorder).frame(width: 150)
+                            TextField("", text: $codeInput, prompt: Text("XXXX-XXXX-XXXX")).labelsHidden()
+                                .textFieldStyle(.roundedBorder).frame(width: 150)
                                 .font(.system(size: 12, design: .monospaced))
                                 .onSubmit(applyCode)
                             Button(L("Übernehmen", "Use"), action: applyCode).disabled(codeInput.isEmpty)

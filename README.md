@@ -39,6 +39,7 @@
 - **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
 - **Jump to the session** – click a session (in the menu or the office) to bring its Terminal tab to the front.
 - **Notifications** when an agent needs you, finishes or fails, plus a usage warning and a heads-up when a new AgentBar version is out.
+- **Your other Macs** (optional) – pair your Macs with a code and sessions running on the others show up in the menu and in the office, marked with a small device symbol. Discovery via Bonjour on your local network, every message encrypted with the pairing code.
 - **Keep awake** – off, always, or only while agents are working.
 - **Updates** via GitHub Releases, verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
 
@@ -103,6 +104,8 @@ Everything stays on your Mac. AgentBar only reads local files (`~/.claude/projec
 
 - `api.anthropic.com` – your plan usage (only if *Fetch usage* is on)
 - `api.github.com` – checking for updates
+
+If you turn on *Other Macs*, AgentBar also talks to your paired Macs on the local network (Bonjour, encrypted with the pairing code). Only the status, project, title and activity of sessions are shared – never files or logs.
 
 No analytics, no telemetry.
 
