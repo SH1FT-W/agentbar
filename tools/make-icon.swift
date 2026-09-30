@@ -1,7 +1,10 @@
 // Zeichnet das App-Icon von AgentBar im macOS-26/27-Stil (Liquid Glass) mit CoreGraphics:
 // Squircle mit ruhigem Blau-Verlauf, davor eine freundliche Memoji-Figur hinter einem gläsernen
 // Laptop mit Funkeln auf dem Deckel – ein Agent bei der Arbeit.
-// Ohne Xcode/actool: jede Größe wird vektoriell neu gerendert, dann iconutil → Resources/AppIcon.icns.
+// Zwei Ausgaben:
+//  • Resources/AppIcon.icon (Icon Composer): Ebenen-PNGs + icon.json mit Hell/Dunkel-Varianten. actool gibt es nur
+//    mit Xcode → GitHub-Workflow „App-Icon“ kompiliert zu Assets.car, tools/fetch-icon.sh holt es nach Resources/.
+//  • Resources/AppIcon.icns: fertig gezeichnetes Icon als Rückfall (iconutil, geht ohne Xcode).
 // Aufruf (im Repo-Wurzelordner):
 //   swift tools/make-icon.swift
 // oder, falls der Skript-Interpreter mit SDK 27 streikt:
@@ -103,31 +106,13 @@ extension CGContext {
 
 // MARK: Zeichnung (Koordinaten im 1024er-Raster, y nach oben)
 
-func drawIcon(_ ctx: CGContext) {
-    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)   // Apple-Raster: 824er Kachel, 100 Rand
-    let shape = squircle(tile)
+let desk = CGRect(x: 196, y: 238, width: 632, height: 60)
+let lid = CGRect(x: 290, y: 280, width: 444, height: 292)
 
-    // Schatten der Kachel
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: c(0x000000, 0.28))
-    ctx.fill(shape, bgBottom)
-    ctx.restoreGState()
-
-    // Hintergrund: ruhiger Verlauf + weicher Lichtschein oben links
-    ctx.fill(shape, gradient: gradient([bgTop, bgBottom]), from: CGPoint(x: 512, y: 924), to: CGPoint(x: 512, y: 100))
-    ctx.clipped(shape) {
-        ctx.drawRadialGradient(gradient([white(0.38), white(0)]), startCenter: CGPoint(x: 330, y: 860), startRadius: 0,
-                               endCenter: CGPoint(x: 330, y: 860), endRadius: 560, options: [])
-        // sanfter Bodenschatten unter dem Tisch
-        ctx.drawRadialGradient(gradient([c(0x0A3A9A, 0.35), c(0x0A3A9A, 0)]), startCenter: CGPoint(x: 512, y: 250),
-                               startRadius: 0, endCenter: CGPoint(x: 512, y: 250), endRadius: 380, options: [])
-    }
-
-    let desk = CGRect(x: 196, y: 238, width: 632, height: 60)
-    let lid = CGRect(x: 290, y: 280, width: 444, height: 292)
-
+/// Figur (Oberkörper, Kopf, Gesicht) – hinter dem Laptop.
+func drawFigure(_ ctx: CGContext) {
     // Figur: Oberkörper hinter dem Laptop
-    ctx.clipped(squircle(tile)) {
+    do {
         let body = rounded(CGRect(x: 318, y: 360, width: 388, height: 300), 150)
         ctx.fill(body, gradient: gradient([shirt, shirtShade]), from: CGPoint(x: 512, y: 660), to: CGPoint(x: 512, y: 440))
         // Hals
@@ -176,16 +161,26 @@ func drawIcon(_ ctx: CGContext) {
     ctx.addPath(smile); ctx.setStrokeColor(ink); ctx.setLineWidth(12); ctx.setLineCap(.round); ctx.strokePath()
     ctx.restoreGState()
 
+}
+
+/// Tisch: weiße Platte mit Kante. flat = einfarbige Form für Icon Composer (Glas/Schatten macht das System).
+func drawDesk(_ ctx: CGContext, flat: Bool = false) {
     // Tisch: weiße Platte mit Kante
     let deskPath = rounded(desk, 30)
+    if flat { ctx.fill(deskPath, white(1)); return }
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: c(0x06307F, 0.35))
     ctx.fill(deskPath, white(1))
     ctx.restoreGState()
     ctx.fill(deskPath, gradient: gradient([white(1), c(0xE3EAF5)]), from: CGPoint(x: 512, y: desk.maxY), to: CGPoint(x: 512, y: desk.minY))
 
+}
+
+/// Laptop-Deckel: Milchglas-Scheibe mit Randglanzlicht.
+func drawLid(_ ctx: CGContext, flat: Bool = false) {
     // Laptop-Deckel: Milchglas-Scheibe mit Randglanzlicht
     let lidPath = rounded(lid, 44)
+    if flat { ctx.fill(lidPath, white(1)); return }
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -14), blur: 30, color: c(0x06307F, 0.30))
     ctx.fill(lidPath, white(0.9))
@@ -202,12 +197,43 @@ func drawIcon(_ ctx: CGContext) {
     }
     ctx.rimLight(lidPath, bounds: lid, width: 5, top: 1.0, bottom: 0.6)
 
-    // Funkeln auf dem Deckel
+}
+
+/// Funkeln auf dem Deckel.
+func drawSparkles(_ ctx: CGContext) {
     let sc = CGPoint(x: lid.midX, y: lid.midY + 4)
     let big = sparkle(center: sc, radius: 92)
     ctx.fill(big, gradient: gradient([sparkleA, sparkleB]), from: CGPoint(x: sc.x - 60, y: sc.y + 92), to: CGPoint(x: sc.x + 60, y: sc.y - 92))
     let small = sparkle(center: CGPoint(x: sc.x + 98, y: sc.y + 70), radius: 34)
     ctx.fill(small, gradient: gradient([sparkleA, sparkleB]), from: CGPoint(x: sc.x + 98, y: sc.y + 104), to: CGPoint(x: sc.x + 98, y: sc.y + 36))
+
+}
+
+
+func drawIcon(_ ctx: CGContext) {
+    let tile = CGRect(x: 100, y: 100, width: 824, height: 824)   // Apple-Raster: 824er Kachel, 100 Rand
+    let shape = squircle(tile)
+
+    // Schatten der Kachel
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -12), blur: 28, color: c(0x000000, 0.28))
+    ctx.fill(shape, bgBottom)
+    ctx.restoreGState()
+
+    // Hintergrund: ruhiger Verlauf + weicher Lichtschein oben links
+    ctx.fill(shape, gradient: gradient([bgTop, bgBottom]), from: CGPoint(x: 512, y: 924), to: CGPoint(x: 512, y: 100))
+    ctx.clipped(shape) {
+        ctx.drawRadialGradient(gradient([white(0.38), white(0)]), startCenter: CGPoint(x: 330, y: 860), startRadius: 0,
+                               endCenter: CGPoint(x: 330, y: 860), endRadius: 560, options: [])
+        // sanfter Bodenschatten unter dem Tisch
+        ctx.drawRadialGradient(gradient([c(0x0A3A9A, 0.35), c(0x0A3A9A, 0)]), startCenter: CGPoint(x: 512, y: 250),
+                               startRadius: 0, endCenter: CGPoint(x: 512, y: 250), endRadius: 380, options: [])
+    }
+
+    drawFigure(ctx)
+    drawDesk(ctx)
+    drawLid(ctx)
+    drawSparkles(ctx)
 
     // Kachel: Glasrand-Glanzlicht
     ctx.rimLight(shape, bounds: tile, width: 6, top: 0.75, bottom: 0.25)
@@ -246,4 +272,70 @@ p.executableURL = URL(fileURLWithPath: "/usr/bin/iconutil")
 p.arguments = ["-c", "icns", iconset.path, "-o", "Resources/AppIcon.icns"]
 try! p.run(); p.waitUntilExit()
 guard p.terminationStatus == 0 else { fatalError("iconutil fehlgeschlagen") }
-print("Geschrieben: Resources/AppIcon.icns + Resources/icon-1024.png")
+
+// MARK: Icon Composer (Hell/Dunkel)
+
+/// Eine Ebene auf der vollen 1024er-Fläche – die Kachelmaske legt das System darüber, deshalb Kachel → ganze Fläche.
+func layer(_ draw: (CGContext) -> Void) -> Data {
+    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 1024, pixelsHigh: 1024, bitsPerSample: 8,
+                               samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                               colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    let g = NSGraphicsContext(bitmapImageRep: rep)!
+    let ctx = g.cgContext
+    ctx.scaleBy(x: 1024 / 824, y: 1024 / 824)
+    ctx.translateBy(x: -100, y: -100)
+    draw(ctx)
+    g.flushGraphics()
+    return rep.representation(using: .png, properties: [:])!
+}
+
+let iconDir = URL(fileURLWithPath: "Resources/AppIcon.icon")
+try? fm.removeItem(at: iconDir)
+try! fm.createDirectory(at: iconDir.appendingPathComponent("Assets"), withIntermediateDirectories: true)
+let layers: [(String, (CGContext) -> Void)] = [
+    ("Figur", drawFigure), ("Tisch", { drawDesk($0, flat: true) }), ("Deckel", { drawLid($0, flat: true) }), ("Funkeln", drawSparkles),
+]
+for (name, draw) in layers { try! layer(draw).write(to: iconDir.appendingPathComponent("Assets/\(name).png")) }
+
+// Reihenfolge: erste Gruppe liegt vorn. Hell = Himmelblau mit weißem Glas, Dunkel = Nachtblau mit dunklem Glas.
+let glassFill = """
+          "fill-specializations" : [
+            { "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } },
+            { "appearance" : "dark", "value" : { "solid" : "srgb:0.24000,0.28000,0.36000,1.00000" } }
+          ],
+"""
+let json = """
+{
+  "fill-specializations" : [
+    { "value" : { "automatic-gradient" : "srgb:0.15000,0.50000,0.97000,1.00000" } },
+    { "appearance" : "dark", "value" : { "automatic-gradient" : "srgb:0.06000,0.11000,0.22000,1.00000" } }
+  ],
+  "groups" : [
+    {
+      "layers" : [ { "glass" : true, "image-name" : "Funkeln.png", "name" : "Funkeln" } ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.4 },
+      "translucency" : { "enabled" : false, "value" : 0 }
+    },
+    {
+      "layers" : [
+        {
+\(glassFill)          "glass" : true, "image-name" : "Deckel.png", "name" : "Deckel"
+        },
+        {
+\(glassFill)          "glass" : true, "image-name" : "Tisch.png", "name" : "Tisch"
+        }
+      ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : true, "value" : 0.3 }
+    },
+    {
+      "layers" : [ { "glass" : false, "image-name" : "Figur.png", "name" : "Figur" } ],
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : false, "value" : 0 }
+    }
+  ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}
+"""
+try! json.write(to: iconDir.appendingPathComponent("icon.json"), atomically: true, encoding: .utf8)
+print("Geschrieben: Resources/AppIcon.icns + Resources/icon-1024.png + Resources/AppIcon.icon")

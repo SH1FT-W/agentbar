@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import ServiceManagement
 
 #if !SNAPSHOT
@@ -60,6 +61,8 @@ final class AppStore: ObservableObject {
     let notifier = Notifier()
     let keepAwake = KeepAwake()
     let updater = Updater()
+    let peers = PeerHub()
+    private var peerWatch: AnyCancellable?
     lazy var office = OfficeWindowController(store: self)
     private var hotKey: HotKey?
     private var awakeTimer: Timer?
@@ -68,6 +71,8 @@ final class AppStore: ObservableObject {
 
     init() {
         monitor.onTransition = { [weak self] s, old in self?.transition(s, from: old) }
+        peers.onChange = { [weak self] list in self?.monitor.remote = list }
+        peerWatch = monitor.$sessions.sink { [weak self] list in self?.peers.update(local: list) }
         notifier.onOpen = { [weak self] id in
             guard let s = self?.monitor.sessions.first(where: { $0.id == id }) else { return }
             Focus.open(s)
@@ -91,11 +96,12 @@ final class AppStore: ObservableObject {
             Task { @MainActor in self?.updateKeepAwake() }
         }
         if UserDefaults.standard.bool(forKey: "officeWasOpen") { office.show() }
+        peers.configure()
     }
 
     func updateKeepAwake() {
         let mode = KeepAwakeMode(rawValue: UserDefaults.standard.string(forKey: Prefs.keepAwake) ?? "") ?? .off
-        keepAwake.update(mode: mode, agentsWorking: monitor.workingCount + monitor.waitingCount > 0)
+        keepAwake.update(mode: mode, agentsWorking: monitor.localBusy)
     }
 
     func setHooks(_ on: Bool) {

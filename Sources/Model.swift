@@ -142,6 +142,10 @@ struct AgentSession: Identifiable, Equatable {
     var usesHooks: Bool
     var contextUsed = 0           // Token im Kontext (letzte Antwort der Hauptkette)
     var contextWindow = 0         // 200k oder 1M (abgeleitet), 0 = unbekannt
+    var device: String?           // Name des anderen Macs, nil = läuft auf diesem Mac
+    var deviceIsLaptop = false
+
+    var deviceSymbol: String { deviceIsLaptop ? "laptopcomputer" : "desktopcomputer" }
 
     var contextWindowText: String { contextWindow >= 1_000_000 ? L("1 Mio.", "1M") : "\(contextWindow / 1000)k" }
 
@@ -209,6 +213,8 @@ enum Prefs {
     static let officeDaylight = "officeDaylight"
     static let keepAwake = "keepAwake"
     static let quotaEnabled = "quotaEnabled"
+    static let peersEnabled = "peersEnabled"
+    static let peerCode = "peerCode"
 
     static func register() {
         UserDefaults.standard.register(defaults: [
@@ -216,7 +222,7 @@ enum Prefs {
             quotaThreshold: 80.0, notifyWhenFrontmost: false,
             showCount: true, showQuota: false, visibleHours: 2.0,
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,
-            keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true,
+            keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true, peersEnabled: false,
         ])
     }
 }

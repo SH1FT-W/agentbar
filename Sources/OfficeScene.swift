@@ -1328,7 +1328,8 @@ struct OfficeScene {
         let fill: Color = hover ? .accentColor : st == .waiting ? rgb(0xFF9500) : (dark ? rgb(0x2C2C2E, 0.92) : rgb(0xFFFFFF, 0.94))
         let text: Color = hover || st == .waiting ? .white : ink
         tag(&ctx, String(a.session.label.prefix(21)), icon: icon, tint: hover ? .white : tint,
-            at: P(a.point.x, nameY), size: s < 0.9 ? 9 : 10.5, fill: fill, text: text)
+            at: P(a.point.x, nameY), size: s < 0.9 ? 9 : 10.5, fill: fill, text: text,
+            device: a.session.device == nil ? nil : a.session.deviceSymbol)
 
         guard !walking, !hover else { return }
         // Status-Bläschen über dem Kopf
@@ -1350,6 +1351,7 @@ struct OfficeScene {
     private func drawHover(_ ctx: inout GraphicsContext, _ a: Actor) {
         let st = a.session.status
         var text = a.session.displayName
+        if let d = a.session.device { text += " · " + d }
         if !a.session.activity.isEmpty { text += " · " + a.session.activity } else { text += " · " + st.label }
         if text.count > 52 { text = String(text.prefix(51)) + "…" }
         speech(&ctx, text, at: P(a.point.x, headTop(a) - 8), size: 11.5,
@@ -1387,13 +1389,15 @@ struct OfficeScene {
         ctx.draw(Text(Image(systemName: symbol)).font(.system(size: d * 0.48, weight: .bold)).foregroundColor(fg), at: p)
     }
 
-    /// Namensschild: helles Milchglas-Pill mit Status-Symbol.
-    private func tag(_ ctx: inout GraphicsContext, _ str: String, icon: String, tint: Color, at p: CGPoint, size: CGFloat, fill: Color, text: Color) {
+    /// Namensschild: helles Milchglas-Pill mit Status-Symbol; Sitzungen vom anderen Mac mit dezentem Geräte-Symbol am Ende.
+    private func tag(_ ctx: inout GraphicsContext, _ str: String, icon: String, tint: Color, at p: CGPoint, size: CGFloat, fill: Color, text: Color, device: String? = nil) {
         let t = ctx.resolve(Text(str).font(.system(size: size, weight: .semibold, design: .rounded)).foregroundColor(text))
         let ic = ctx.resolve(Text(Image(systemName: icon)).font(.system(size: size * 0.92, weight: .semibold)).foregroundColor(tint))
+        let dv = device.map { ctx.resolve(Text(Image(systemName: $0)).font(.system(size: size * 0.85, weight: .medium)).foregroundColor(text.opacity(0.45))) }
         let m = t.measure(in: CGSize(width: 400, height: 40))
         let im = ic.measure(in: CGSize(width: 40, height: 40))
-        let w = m.width + im.width + 20, h = size + 10
+        let dm = dv?.measure(in: CGSize(width: 40, height: 40)).width ?? 0
+        let w = m.width + im.width + 20 + (dv == nil ? 0 : dm + 6), h = size + 10
         let r = CGRect(x: p.x - w / 2, y: p.y - h / 2, width: w, height: h)
         let path = Path(roundedRect: r, cornerRadius: h / 2)
         softShadow(&ctx, path, dark ? 0.3 : 0.08)
@@ -1401,6 +1405,7 @@ struct OfficeScene {
         ctx.stroke(path, with: .color(dark ? .white.opacity(0.08) : .black.opacity(0.06)), lineWidth: 0.5)
         ctx.draw(ic, at: P(r.minX + 8 + im.width / 2, p.y))
         ctx.draw(t, at: P(r.minX + 12 + im.width + m.width / 2, p.y))
+        if let dv { ctx.draw(dv, at: P(r.maxX - 8 - dm / 2, p.y)) }
     }
 
     private func speech(_ ctx: inout GraphicsContext, _ str: String, at p: CGPoint, size: CGFloat, fill: Color, text: Color) {

@@ -1,0 +1,33 @@
+# Kompiliert Resources/AppIcon.icon (Icon Composer) zu Assets.car + AppIcon.icns.
+# actool gibt es nur mit Xcode – lokal ist nur CommandLineTools installiert.
+# Ergebnis holt tools/fetch-icon.sh ab.
+name: App-Icon
+on:
+  push:
+    paths: [ "Resources/AppIcon.icon/**", ".github/workflows/icon.yml" ]
+  workflow_dispatch:
+jobs:
+  icon:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Neuestes Xcode wählen
+        run: |
+          X=$(ls -d /Applications/Xcode_2[6-9]*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+      - name: actool
+        run: |
+          mkdir -p out
+          xcrun actool Resources/AppIcon.icon --compile out \
+            --output-format human-readable-text --notices --warnings --errors \
+            --output-partial-info-plist out/partial.plist \
+            --app-icon AppIcon --include-all-app-icons \
+            --enable-on-demand-resources NO --development-region en \
+            --target-device mac --minimum-deployment-target 14.0 --platform macosx
+          ls -la out
+          test -f out/Assets.car
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-icon
+          path: out/

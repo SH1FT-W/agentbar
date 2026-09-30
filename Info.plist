@@ -10,6 +10,8 @@
 	<string>AgentBar</string>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>io.github.sh1ft-w.agentbar</string>
 	<key>CFBundleLocalizations</key>
@@ -31,7 +33,13 @@
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>AgentBar brings the Terminal window running your Claude agent to the front.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_agentbar._tcp</string>
+	</array>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>AgentBar shows the Claude sessions of your other Macs on the same network.</string>
 </dict>
 </plist>

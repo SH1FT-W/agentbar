@@ -38,6 +38,10 @@ struct SettingsView: View {
     @AppStorage(Prefs.officeOpacity) private var opacity = 1.0
     @AppStorage(Prefs.officeDaylight) private var daylight = true
     @AppStorage(Prefs.quotaEnabled) private var quotaEnabled = true
+    @AppStorage(Prefs.peersEnabled) private var peersEnabled = false
+    @AppStorage(Prefs.peerCode) private var peerCode = ""
+    @State private var codeInput = ""
+    @State private var codeInvalid = false
     var height: CGFloat = 700
 
     var body: some View {
@@ -116,6 +120,56 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            Section {
+                Toggle(isOn: $peersEnabled) {
+                    SettingLabel(L("Andere Macs zeigen", "Show other Macs"), "macbook.and.imac", .teal,
+                                 note: L("Sitzungen deiner anderen Macs im selben Netzwerk.", "Sessions from your other Macs on the same network."))
+                }
+                .onChange(of: peersEnabled) { on in
+                    if on, PeerCode.normalize(peerCode) == nil { peerCode = PeerCode.generate() }
+                    store.peers.configure()
+                }
+                if peersEnabled {
+                    LabeledContent {
+                        HStack(spacing: 8) {
+                            Text(peerCode).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
+                            Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(peerCode, forType: .string) } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .help(L("Kopieren", "Copy"))
+                            Button { peerCode = PeerCode.generate(); store.peers.configure() } label: { Image(systemName: "arrow.clockwise") }
+                                .help(L("Neuen Code erzeugen – alle anderen Macs brauchen ihn dann auch", "New code – all other Macs need it too"))
+                        }
+                        .buttonStyle(.borderless)
+                    } label: {
+                        SettingLabel(L("Kopplungscode", "Pairing code"), "key.fill", .gray)
+                    }
+                    LabeledContent {
+                        HStack(spacing: 8) {
+                            TextField("XXXX-XXXX-XXXX", text: $codeInput).textFieldStyle(.roundedBorder).frame(width: 150)
+                                .font(.system(size: 12, design: .monospaced))
+                                .onSubmit(applyCode)
+                            Button(L("Übernehmen", "Use"), action: applyCode).disabled(codeInput.isEmpty)
+                        }
+                    } label: {
+                        SettingLabel(L("Code eines anderen Macs", "Code from another Mac"), "keyboard", .gray,
+                                     note: codeInvalid ? L("Ungültiger Code – 12 Zeichen, z. B. ABCD-EFGH-JKLM.", "Invalid code – 12 characters, e.g. ABCD-EFGH-JKLM.") : nil)
+                    }
+                    LabeledContent {
+                        PeerStatus(hub: store.peers)
+                    } label: {
+                        SettingLabel(L("Verbunden", "Connected"), "wifi", .green)
+                    }
+                }
+            } header: {
+                Text(L("Andere Macs", "Other Macs"))
+            } footer: {
+                Text(L("Auf allen Macs denselben Code verwenden. Die Verbindung bleibt im lokalen Netzwerk und ist mit dem Code verschlüsselt. Übertragen werden nur Status, Projekt, Titel und Tätigkeit der Sitzungen.",
+                       "Use the same code on all your Macs. The connection stays on your local network and is encrypted with the code. Only the status, project, title and activity of sessions are shared."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Section(L("Büro", "Office")) {
                 Toggle(isOn: $floating) { SettingLabel(L("Immer im Vordergrund", "Always on top"), "pin.fill", .orange) }
                     .onChange(of: floating) { _ in store.office.applyPrefs() }
@@ -142,6 +196,27 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 500, height: height)
+    }
+}
+
+extension SettingsView {
+    private func applyCode() {
+        guard let c = PeerCode.normalize(codeInput) else { codeInvalid = true; return }
+        codeInvalid = false
+        codeInput = ""
+        peerCode = c
+        store.peers.configure()
+    }
+}
+
+/// Wer gerade verbunden ist (beobachtet den PeerHub direkt, damit die Zeile live bleibt).
+private struct PeerStatus: View {
+    @ObservedObject var hub: PeerHub
+
+    var body: some View {
+        let names = hub.peers.values.map(\.name).sorted()
+        Text(hub.problem ?? (names.isEmpty ? L("Suche andere Macs …", "Looking for other Macs …") : names.joined(separator: ", ")))
+            .foregroundStyle(hub.problem == nil ? Color.secondary : Color.orange).multilineTextAlignment(.trailing)
     }
 }
 

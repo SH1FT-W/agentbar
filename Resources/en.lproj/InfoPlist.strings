@@ -1,2 +1,4 @@
 /* Reason for controlling Terminal (Apple Events) */
 "NSAppleEventsUsageDescription" = "AgentBar brings the Terminal window running your Claude agent to the front.";
+/* Reason for local network access (other Macs) */
+"NSLocalNetworkUsageDescription" = "AgentBar shows the Claude sessions of your other Macs on the same network.";

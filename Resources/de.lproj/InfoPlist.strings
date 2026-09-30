@@ -1,2 +1,4 @@
 /* Begründung für den Zugriff auf Terminal (Apple Events) */
 "NSAppleEventsUsageDescription" = "AgentBar holt das Terminal-Fenster nach vorn, in dem dein Claude-Agent läuft.";
+/* Begründung für das lokale Netzwerk (andere Macs) */
+"NSLocalNetworkUsageDescription" = "AgentBar zeigt die Claude-Sitzungen deiner anderen Macs im selben Netzwerk.";

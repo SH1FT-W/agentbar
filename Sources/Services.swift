@@ -358,6 +358,7 @@ enum Focus {
     static let claudeApp = "com.anthropic.claudefordesktop"
 
     static func open(_ s: AgentSession) {
+        guard s.device == nil else { return }   // läuft auf einem anderen Mac
         if s.hostBundle == "com.apple.Terminal", let tty = s.tty, selectTerminalTab(tty) { return }
         if let b = s.hostBundle, !b.isEmpty, activate(bundle: b) { return }
         if s.source == .desktop || s.source == .cowork, activate(bundle: claudeApp, launch: true) { return }

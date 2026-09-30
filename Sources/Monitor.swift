@@ -7,6 +7,8 @@ import Darwin
 @MainActor
 final class SessionMonitor: ObservableObject {
     @Published fileprivate(set) var sessions: [AgentSession] = []
+    /// Sitzungen anderer Macs (über PeerHub) – nur zur Anzeige, ohne Mitteilungen.
+    @Published var remote: [AgentSession] = []
     @Published private(set) var hooksSeen = false
     /// Wird bei jedem Statuswechsel einer Hauptsitzung aufgerufen (für Mitteilungen).
     var onTransition: ((AgentSession, AgentStatus) -> Void)?
@@ -39,14 +41,24 @@ final class SessionMonitor: ObservableObject {
         if list != sessions { sessions = list }
     }
 
+    /// Eigene und fremde Sitzungen. Liegt ~/.claude in einer geteilten Cloud, kann eine fremde Sitzung auch
+    /// lokal auftauchen – dann gilt die Meldung des Macs, auf dem sie läuft.
+    var all: [AgentSession] {
+        guard !remote.isEmpty else { return sessions }
+        let ids = Set(remote.map(\.id))
+        return sessions.filter { !ids.contains($0.id) } + remote
+    }
+
     var visible: [AgentSession] {
         let hours = UserDefaults.standard.double(forKey: Prefs.visibleHours)
         let cutoff = Date().addingTimeInterval(-hours * 3600)
-        return sessions.filter { $0.status < .done || $0.lastActivity > cutoff }
+        return all.filter { $0.status < .done || $0.lastActivity > cutoff }
     }
 
-    var waitingCount: Int { sessions.filter { $0.status == .waiting }.count }
-    var workingCount: Int { sessions.filter { $0.status == .working }.count }
+    var waitingCount: Int { all.filter { $0.status == .waiting }.count }
+    var workingCount: Int { all.filter { $0.status == .working }.count }
+    /// Nur dieser Mac (z. B. fürs Wachhalten).
+    var localBusy: Bool { sessions.contains { $0.status == .working || $0.status == .waiting } }
 }
 
 // MARK: - Zustand je Datei

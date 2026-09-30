@@ -45,9 +45,11 @@ struct MenuView: View {
             } else {
                 ScrollView {
                     VStack(spacing: 2) {
-                        ForEach(list) { s in
-                            SessionRow(session: s, expanded: Binding(get: { expanded == s.id },
-                                                                     set: { expanded = $0 ? s.id : nil }))
+                        ForEach(list.filter { $0.device == nil }) { row($0) }
+                        // Sitzungen anderer Macs darunter, je Gerät mit schlichter Überschrift
+                        ForEach(devices(list), id: \.self) { d in
+                            DeviceHeader(name: d, symbol: list.first { $0.device == d }?.deviceSymbol ?? "desktopcomputer")
+                            ForEach(list.filter { $0.device == d }) { row($0) }
                         }
                     }
                     .padding(.horizontal, MenuMetrics.rowInset)
@@ -144,6 +146,14 @@ struct MenuView: View {
         return parts.joined(separator: " · ")
     }
 
+    private func row(_ s: AgentSession) -> some View {
+        SessionRow(session: s, expanded: Binding(get: { expanded == s.id }, set: { expanded = $0 ? s.id : nil }))
+    }
+
+    private func devices(_ list: [AgentSession]) -> [String] {
+        Array(Set(list.compactMap(\.device))).sorted()
+    }
+
     private func toggleLoginItem() {
         do {
             if loginItem { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
@@ -233,7 +243,7 @@ struct SessionRow: View {
                     Chevron(open: expanded)
                 }
             }
-            .contextMenu { actions }
+            .contextMenu { if s.device == nil { actions } }
             if expanded { details.transition(.opacity.combined(with: .move(edge: .top))) }
         }
         .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -297,22 +307,27 @@ struct SessionRow: View {
                     }
                 }
             }
-            HStack(spacing: 6) {
-                Button(L("Zur Sitzung", "Open")) { Focus.open(s) }
-                Spacer()
-                Button { Focus.showInFinder(s.cwd) } label: { Image(systemName: "folder") }
-                    .help(L("Im Finder zeigen", "Show in Finder"))
-                Button { Focus.openTerminal(at: s.cwd) } label: { Image(systemName: "terminal") }
-                    .help(L("Neues Terminal hier", "New Terminal Here"))
-            }
-            .glassButton().controlSize(.small)
+            if s.device == nil { buttons(s) }
         }
         // Einzug bündig mit dem Namen: Zeilen-Innenabstand + Kreis + Abstand
         .padding(.leading, MenuMetrics.rowPadding + MenuMetrics.circle + 10)
         .padding(.trailing, MenuMetrics.rowPadding).padding(.top, 1).padding(.bottom, 10)
     }
 
+    private func buttons(_ s: AgentSession) -> some View {
+        HStack(spacing: 6) {
+            Button(L("Zur Sitzung", "Open")) { Focus.open(s) }
+            Spacer()
+            Button { Focus.showInFinder(s.cwd) } label: { Image(systemName: "folder") }
+                .help(L("Im Finder zeigen", "Show in Finder"))
+            Button { Focus.openTerminal(at: s.cwd) } label: { Image(systemName: "terminal") }
+                .help(L("Neues Terminal hier", "New Terminal Here"))
+        }
+        .glassButton().controlSize(.small)
+    }
+
     private func hostName(_ s: AgentSession) -> String {
+        if let d = s.device { return "\(d) · \(s.source.label)" }
         guard let b = s.hostBundle, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: b) else { return s.source.label }
         return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
@@ -436,6 +451,22 @@ struct QuotaRings: View {
 }
 
 // MARK: - Bausteine
+
+/// Überschrift für die Sitzungen eines anderen Macs in der Agenten-Liste.
+struct DeviceHeader: View {
+    let name: String
+    let symbol: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+            Text(L("Auf \(name)", "On \(name)"))
+        }
+        .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, MenuMetrics.rowPadding).padding(.top, 8).padding(.bottom, 2)
+    }
+}
 
 struct SectionHeader: View {
     let title: String
