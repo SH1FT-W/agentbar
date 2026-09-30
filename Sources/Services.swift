@@ -103,20 +103,35 @@ final class QuotaMonitor: ObservableObject {
 
     private var timer: Timer?
     private var notifiedWindow: Date?
+    /// Nach HTTP 429 bis hierhin nicht mehr fragen (Anthropic drosselt den Endpunkt)
+    private var blockedUntil: Date?
+    private var backoff: TimeInterval = 600
+    private let online: Bool
+
+    static let interval: TimeInterval = 300
 
     init() {
-        timer = Timer.scheduledTimer(withTimeInterval: 120, repeats: true) { [weak self] _ in
+        // Test-Werkzeuge und `--dump` fragen nie ab – sonst kostet jeder Lauf eine Anfrage
+        #if SNAPSHOT
+        online = false
+        #else
+        online = !CommandLine.arguments.contains("--dump")
+        #endif
+        restore()
+        timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
-        Task { await refresh() }
+        // Gespeicherter Stand ist frisch genug (z. B. nach Neustart/Update) → nicht sofort fragen
+        if lastFetch.map({ Date().timeIntervalSince($0) > Self.interval }) ?? true { Task { await refresh() } }
     }
 
     func refreshIfStale() {
-        if (lastFetch.map { Date().timeIntervalSince($0) > 45 } ?? true) { Task { await refresh() } }
+        if (lastFetch.map { Date().timeIntervalSince($0) > 120 } ?? true) { Task { await refresh() } }
     }
 
     func refresh() async {
-        guard UserDefaults.standard.bool(forKey: Prefs.quotaEnabled), !loading else { return }
+        guard online, UserDefaults.standard.bool(forKey: Prefs.quotaEnabled), !loading else { return }
+        if let until = blockedUntil, until > Date() { return }
         loading = true
         defer { loading = false }
         // Token nur lesen, nie erneuern: ein Refresh würde Claude Codes eigenen Refresh-Token ungültig machen können.
@@ -135,14 +150,52 @@ final class QuotaMonitor: ObservableObject {
             weeklyOpus = window(json["seven_day_opus"])
             problem = nil
             lastFetch = Date()
+            blockedUntil = nil
+            backoff = 600
             if plan == nil, let acc = try? await get("https://api.anthropic.com/api/oauth/account", token: creds.token) {
                 plan = Self.planName(acc)
             }
+            save()
             checkThreshold()
         } catch {
-            problem = (error as NSError).code == 401 ? L("Anmeldung abgelaufen – Claude Code einmal benutzen", "Login expired – use Claude Code once")
-                : L("Kontingent nicht abrufbar", "Usage unavailable") + " (\(error.localizedDescription))"
+            let e = error as NSError
+            if e.code == 429 {
+                // Gedrosselt: die vom Server genannte Wartezeit, mindestens 10 Min., bei Wiederholung länger (max. 1 Std.)
+                let wait = max(backoff, (e.userInfo["retryAfter"] as? TimeInterval) ?? 0)
+                blockedUntil = Date().addingTimeInterval(wait)
+                backoff = min(backoff * 2, 3600)
+                problem = L("Anthropic bremst die Abfrage – nächster Versuch in \(Int(wait / 60)) Min.",
+                            "Anthropic is rate-limiting – retrying in \(Int(wait / 60)) min")
+            } else {
+                problem = e.code == 401 ? L("Anmeldung abgelaufen – Claude Code einmal benutzen", "Login expired – use Claude Code once")
+                    : L("Kontingent nicht abrufbar", "Usage unavailable") + " (\(error.localizedDescription))"
+            }
         }
+    }
+
+    // MARK: Letzten Stand merken (Neustarts/Updates fragen dann nicht sofort neu)
+
+    private func save() {
+        let d = UserDefaults.standard
+        func put(_ w: QuotaWindow?, _ key: String) {
+            d.set(w.map { ["p": $0.percent, "r": $0.resetsAt?.timeIntervalSince1970 ?? 0] }, forKey: key)
+        }
+        put(session, "quotaCache.session"); put(weekly, "quotaCache.weekly")
+        d.set(plan, forKey: "quotaCache.plan")
+        d.set(lastFetch?.timeIntervalSince1970, forKey: "quotaCache.time")
+    }
+
+    private func restore() {
+        let d = UserDefaults.standard
+        func get(_ key: String) -> QuotaWindow? {
+            guard let m = d.dictionary(forKey: key), let p = m["p"] as? Double else { return nil }
+            let r = m["r"] as? Double ?? 0
+            return QuotaWindow(percent: p, resetsAt: r > 0 ? Date(timeIntervalSince1970: r) : nil)
+        }
+        session = get("quotaCache.session"); weekly = get("quotaCache.weekly")
+        plan = d.string(forKey: "quotaCache.plan")
+        let t = d.double(forKey: "quotaCache.time")
+        lastFetch = t > 0 ? Date(timeIntervalSince1970: t) : nil
     }
 
     private func checkThreshold() {
@@ -166,7 +219,9 @@ final class QuotaMonitor: ObservableObject {
         req.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
         let (data, resp) = try await URLSession.shared.data(for: req)
         if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
-            throw NSError(domain: "HTTP", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"])
+            var info: [String: Any] = [NSLocalizedDescriptionKey: "HTTP \(http.statusCode)"]
+            if let ra = http.value(forHTTPHeaderField: "Retry-After"), let secs = TimeInterval(ra) { info["retryAfter"] = secs }
+            throw NSError(domain: "HTTP", code: http.statusCode, userInfo: info)
         }
         return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }

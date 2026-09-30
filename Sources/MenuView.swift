@@ -371,6 +371,12 @@ struct QuotaSection: View {
                         }
                     }
                     .padding(.horizontal, MenuMetrics.inset).padding(.top, 3).padding(.bottom, 4)
+                    // Abruf gerade gedrosselt/fehlgeschlagen: Werte bleiben stehen, aber man sieht, wie alt sie sind
+                    if let p = v.problem {
+                        Text(L("Stand \(ago(quota.lastFetch)) · ", "As of \(ago(quota.lastFetch)) · ") + p)
+                            .font(.system(size: 11)).foregroundStyle(.tertiary).lineLimit(2)
+                            .padding(.horizontal, MenuMetrics.inset).padding(.bottom, 4)
+                    }
                 }
             }
         }
