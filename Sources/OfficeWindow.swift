@@ -8,6 +8,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     let model = OfficeModel()
     let load = SystemLoad()
+    let visibility = OfficeVisibility()
 
     init(store: AppStore) { self.store = store }
 
@@ -18,7 +19,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     func show() {
         guard let store else { return }
         if window == nil {
-            let root = OfficeView(model: model, load: load)
+            let root = OfficeView(model: model, load: load, visibility: visibility)
                 .environmentObject(store.monitor)
                 .environmentObject(store.quota)
                 .environmentObject(store.stats)
@@ -64,6 +65,19 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     // Im Dock abgelegt/zurückgeholt zählt auch als zu/offen
     func windowDidMiniaturize(_ notification: Notification) { store?.objectWillChange.send() }
     func windowDidDeminiaturize(_ notification: Notification) { store?.objectWillChange.send() }
+
+    /// Verdeckt, im Dock oder auf einem anderen Space: Animation und CPU-Messung pausieren.
+    func windowDidChangeOcclusionState(_ notification: Notification) {
+        guard let w = window else { return }
+        let visible = w.isVisible && w.occlusionState.contains(.visible)
+        if visibility.visible != visible { visibility.visible = visible }
+        if visible { load.start() } else { load.stop() }
+    }
+}
+
+/// Ob das Bürofenster gerade überhaupt zu sehen ist (NSWindow.occlusionState).
+final class OfficeVisibility: ObservableObject {
+    @Published var visible = true
 }
 
 /// CPU-Last für den Saugroboter (je mehr Last, desto flotter fährt er).

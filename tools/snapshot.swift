@@ -34,11 +34,16 @@ struct Snap {
         for i in [3, 6] { demo[i].device = "iMac" }
         let model = OfficeModel()
         let cal = Calendar.current
+        if CommandLine.arguments.contains("--bench") { bench(demo, cached: !CommandLine.arguments.contains("--nocache")); return }
+        let backdrop = OfficeBackdrop()
+        let forecast = QuotaForecast(percentPerHour: 9, exhaustsAt: cal.date(bySettingHour: 16, minute: 40, second: 0, of: now))
         func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
+            let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
                                     hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
-                                    vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1)
+                                    vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1,
+                                    forecast: forecast, todayTokens: 12_400_000, backdrop: bg)
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
@@ -70,12 +75,68 @@ struct Snap {
         arrive.append(demo[7])
         _ = model.actors(for: arrive, now: settle + 41)
         for (i, dt) in [0.8, 2.5, 4.5, 6.5].enumerated() { render("arrive\(i + 1)", date, settle + 41 + dt, dark: false, sessions: arrive) }
+        // Beendete Sitzung (vordere Reihe) geht zur Tür, eine andere wechselt den Status (kurzer Lichtring)
+        var leave = arrive
+        leave.remove(at: 3)
+        leave[0].status = .waiting
+        _ = model.actors(for: leave, now: settle + 60)
+        for (i, dt) in [0.3, 2.0, 4.0, 6.5].enumerated() { render("leave\(i + 1)", date, settle + 60 + dt, dark: false, sessions: leave) }
+        // Pause gibt den Tisch frei: zwei gehen in die Lounge, zwei neue arbeitende bekommen deren Tische
+        let free = OfficeModel()
+        var busy = Array(demo.prefix(8))
+        for i in busy.indices { busy[i].status = .working }
+        _ = free.actors(for: busy, now: settle)
+        busy[0].status = .idle; busy[1].status = .idle
+        _ = free.actors(for: busy, now: settle + 1)
+        var more = busy
+        more.append(s("9", "notes", nil, .working, "Read", ["file_path": "/x/a.md"], 1))
+        more.append(s("10", "maps", nil, .working, "Grep", [:], 1))
+        let (fa, fo) = free.actors(for: more, now: settle + 40)
+        print("Tischvergabe: \(fa.count) Figuren, \(fo) im Nebenraum (erwartet 10/0)")
         // Dropdown mit Demo-Daten
         let store = AppStore()
         store.monitor.inject(demo)
         try? await Task.sleep(nanoseconds: 3_000_000_000)
         for (name, dark) in [("light", false), ("dark", true)] {
             shot(AnyView(MenuView(expanded: "1").environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater)), "build/menu-\(name).png", dark)
+        }
+    }
+
+    /// Grobe Frame-Zeit: rendert die Szene wiederholt offscreen (1000×600 @2x) und misst die Zeit je Bild.
+    @MainActor static func bench(_ demo: [AgentSession], cached: Bool) {
+        let model = OfficeModel()
+        let cal = Calendar.current
+        let backdrop = OfficeBackdrop()
+        do {
+            let date = cal.date(bySettingHour: 11, minute: 20, second: 0, of: Date())!
+            let t = date.timeIntervalSinceReferenceDate
+            let (actors, overflow) = OfficeModel().actors(for: demo, now: t)
+            func png() -> Data? {
+                let scene = OfficeScene(time: t, date: date, dark: false, daylight: true, actors: actors, overflow: overflow, hovered: nil,
+                                        session: 42, weekly: 18, plan: nil, cpu: 0.3, vacuum: .docked, working: 3, waiting: 1)
+                let r = ImageRenderer(content: Canvas { ctx, _ in scene.draw(&ctx) }.frame(width: 1000, height: 600)); r.scale = 2
+                return r.nsImage?.tiffRepresentation
+            }
+            let a = png(), b = png(); print("Namensschild-Cache über Bilder hinweg identisch: \(a != nil && a == b) (\(a?.count ?? 0) Bytes)")
+        }
+        for (name, hour, dark) in [("day", 11, false), ("night", 23, true)] {
+            let date = cal.date(bySettingHour: hour, minute: 20, second: 0, of: Date())!
+            let t0 = date.timeIntervalSinceReferenceDate
+            _ = model.actors(for: demo, now: t0)
+            let n = 120
+            var start = Date()
+            for i in 0..<n + 5 {
+                if i == 5 { start = Date() }   // Aufwärmen (Caches)
+                let t = t0 + Double(i) / 30
+                let (actors, overflow) = model.actors(for: demo, now: t)
+                let bg = cached ? backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t) : nil
+                let scene = OfficeScene(time: t, date: date.addingTimeInterval(Double(i) / 30), dark: dark, daylight: true, actors: actors, overflow: overflow,
+                                        hovered: nil, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
+                                        vacuum: VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1, backdrop: bg)
+                let r = ImageRenderer(content: Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)); r.scale = 2
+                _ = r.cgImage
+            }
+            print("\(name): \(String(format: "%.1f", Date().timeIntervalSince(start) / Double(n) * 1000)) ms/Bild")
         }
     }
 
