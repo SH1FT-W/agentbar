@@ -31,6 +31,32 @@ struct OfficeScene {
     let vacuum: VacuumState
     let working: Int
     let waiting: Int
+    /// Hochrechnung fürs 5-Stunden-Fenster (Paket A) und heutige Tokens – beides optional.
+    let forecast: QuotaForecast?
+    let todayTokens: Int?
+    /// Vorgerenderter statischer Hintergrund (Wand + Parkett, Landschaft); nil = direkt zeichnen.
+    let backdrop: OfficeBackdrop.Images?
+
+    /// Stunde (Kommazahl), Tageslicht 0…1 und Abendröte – einmal je Bild statt bei jedem Zugriff.
+    let hour: Double
+    let dayness: Double
+    let golden: Double
+    private let tone: DayTone
+
+    init(time: Double, date: Date, dark: Bool, daylight: Bool, actors: [Actor], overflow: Int, hovered: String?,
+         session: Double?, weekly: Double?, plan: String?, cpu: Double, vacuum: VacuumState, working: Int, waiting: Int,
+         forecast: QuotaForecast? = nil, todayTokens: Int? = nil, backdrop: OfficeBackdrop.Images? = nil, fixedDayness: Double? = nil) {
+        self.time = time; self.date = date; self.dark = dark; self.daylight = daylight
+        self.actors = actors; self.overflow = overflow; self.hovered = hovered
+        self.session = session; self.weekly = weekly; self.plan = plan; self.cpu = cpu; self.vacuum = vacuum
+        self.working = working; self.waiting = waiting
+        self.forecast = forecast; self.todayTokens = todayTokens; self.backdrop = backdrop
+        let h = Self.hour(date: date, dark: dark, daylight: daylight)
+        hour = h
+        dayness = fixedDayness ?? Self.dayness(hour: h)
+        golden = Self.golden(hour: h)
+        tone = DayTone.at(hour: h, dayness: dayness, golden: golden)
+    }
 
     // MARK: Farben
 
@@ -55,24 +81,21 @@ struct OfficeScene {
         let c = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
         return Double(c.hour ?? 12) + Double(c.minute ?? 0) / 60 + Double(c.second ?? 0) / 3600
     }
-    private var hour: Double { Self.hour(date: date, dark: dark, daylight: daylight) }
 
     /// 0 = Nacht, 1 = Tag
-    static func dayness(date: Date, dark: Bool, daylight: Bool) -> Double {
-        let h = hour(date: date, dark: dark, daylight: daylight)
+    static func dayness(date: Date, dark: Bool, daylight: Bool) -> Double { dayness(hour: hour(date: date, dark: dark, daylight: daylight)) }
+    static func dayness(hour h: Double) -> Double {
         if h < 5 || h > 21 { return 0 }
         if h < 7.5 { return (h - 5) / 2.5 }
         if h > 18.5 { return 1 - (h - 18.5) / 2.5 }
         return 1
     }
-    private var dayness: Double { Self.dayness(date: date, dark: dark, daylight: daylight) }
 
     /// Deckenlicht brennt (gleiche Schwelle wie in drawWall) – dann gehört der Saugroboter in die Ladestation.
     static func lightsOn(date: Date, dark: Bool, daylight: Bool) -> Bool { dayness(date: date, dark: dark, daylight: daylight) < 0.7 }
 
     /// 0 = Mittag, 1 = tief stehende Sonne (Morgen-/Abendröte)
-    private var golden: Double {
-        let h = hour
+    static func golden(hour h: Double) -> Double {
         guard h > 5.5 && h < 21 else { return 0 }
         let fromEdge = min(h - 5.5, 21 - h)
         return max(0, 1 - fromEdge / 3.2)
@@ -81,9 +104,13 @@ struct OfficeScene {
     // MARK: Einstieg
 
     func draw(_ ctx: inout GraphicsContext) {
-        drawWall(&ctx)
+        // Wand und Parkett überlappen die Glasfassade nicht – darum dürfen beide vorab (und gecacht) gezeichnet werden.
+        if let b = backdrop {
+            ctx.draw(Image(decorative: b.room, scale: b.scale), in: CGRect(origin: .zero, size: Self.size))
+        } else {
+            drawRoom(&ctx)
+        }
         drawGlass(&ctx)
-        drawFloor(&ctx)
         drawSunlight(&ctx)
 
         // Tiefensortiert: Tischgruppen, Lounge, Pflanzen, Laufende, Saugroboter
@@ -146,15 +173,23 @@ struct OfficeScene {
         ctx.fill(Path(ellipseIn: r), with: .radialGradient(Gradient(colors: [.black.opacity(o), .black.opacity(o * 0.4), .clear]),
                                                           center: P(r.midX, r.midY), startRadius: 0, endRadius: r.width / 2))
     }
-    /// Farbmischung (0 = a, 1 = b)
-    private func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
-        let na = NSColor(a).usingColorSpace(.sRGB) ?? .gray, nb = NSColor(b).usingColorSpace(.sRGB) ?? .gray
-        return Color(nsColor: na.blended(withFraction: CGFloat(max(0, min(1, t))), of: nb) ?? na)
-    }
+    /// Farbmischung (0 = a, 1 = b) – Komponenten je Farbe gecacht, statt bei jedem Aufruf über NSColor zu wandeln.
+    private func mix(_ a: Color, _ b: Color, _ t: Double) -> Color { ColorMath.mix(a, b, t) }
     private func darker(_ c: Color, _ t: Double) -> Color { mix(c, .black, t) }
     private func lighter(_ c: Color, _ t: Double) -> Color { mix(c, .white, t) }
 
     // MARK: Raum
+
+    /// Statischer Teil: Wand, Decke, Parkett, Teppich (hängt nur von Hell/Dunkel und dem Tageslicht ab).
+    func drawRoom(_ ctx: inout GraphicsContext) {
+        drawWall(&ctx)
+        drawFloor(&ctx)
+    }
+
+    /// Statischer Teil der Landschaft hinter dem Glas, in Glas-Koordinaten (für den Cache).
+    func drawLandscapeLayer(_ ctx: inout GraphicsContext) {
+        drawLandscape(&ctx, Self.glass, trees: false)
+    }
 
     private func drawWall(_ ctx: inout GraphicsContext) {
         ctx.fill(Path(CGRect(x: 0, y: 0, width: 1000, height: Self.floorY)), with: vgrad([wallTop, wallBottom], 0, Self.floorY))
@@ -182,7 +217,12 @@ struct OfficeScene {
             c.clip(to: Path(g))
             c.fill(Path(g), with: vgrad([sky.0, sky.1], g.minY, g.minY + 250))
             drawSkyObjects(&c, g)
-            drawLandscape(&c, g)
+            if let b = backdrop {
+                c.draw(Image(decorative: b.land, scale: b.scale), in: g)
+                drawLandscape(&c, g, hills: false)
+            } else {
+                drawLandscape(&c, g)
+            }
             // Dunst: Himmel färbt die Landschaft leicht (Abendrot, Nacht)
             c.fill(Path(g), with: vgrad([sky.1.opacity(0), sky.1.opacity(0.10 + 0.15 * golden)], g.minY + 150, g.maxY))
             // Leichte Tönung und Spiegelungen im Glas
@@ -214,7 +254,9 @@ struct OfficeScene {
         ctx.fill(Path(CGRect(x: g.minX - 5, y: g.maxY - 5, width: g.width + 10, height: 5)), with: .color(darker(fr, 0.08)))
     }
 
-    private func skyColors() -> (Color, Color) {
+    private func skyColors() -> (Color, Color) { tone.sky }
+
+    static func skyColors(hour h: Double) -> (Color, Color) {
         typealias C = (Double, Double, Double)
         let keys: [(Double, C, C)] = [
             (0, (0.05, 0.07, 0.16), (0.13, 0.16, 0.30)),
@@ -226,7 +268,6 @@ struct OfficeScene {
             (21, (0.07, 0.09, 0.21), (0.18, 0.20, 0.36)),
             (24, (0.05, 0.07, 0.16), (0.13, 0.16, 0.30)),
         ]
-        let h = hour
         var i = 0
         while i < keys.count - 2 && keys[i + 1].0 <= h { i += 1 }
         let a = keys[i], b = keys[i + 1]
@@ -252,7 +293,7 @@ struct OfficeScene {
         let x = f.minX + 50 + CGFloat(p) * (f.width - 100)
         let y = f.minY + 210 - CGFloat(sin(p * .pi)) * 165
         if isSun {
-            let tint = mix(rgb(0xFFF6D6), rgb(0xFFC48A), golden)
+            let tint = tone.sunTint
             blob(&ctx, P(x, y), 110, tint, 0.55)
             ctx.fill(circle(P(x, y), 17), with: .radialGradient(Gradient(colors: [.white, tint]), center: P(x - 4, y - 4), startRadius: 0, endRadius: 20))
         } else {
@@ -261,8 +302,7 @@ struct OfficeScene {
             ctx.fill(moon, with: .color(rgb(0xF4F1E8)))
         }
         // Wolken ziehen langsam
-        let cloudTop = mix(rgb(0x5A6380), .white, dayness)
-        let cloudBottom = mix(rgb(0x3A4260), mix(rgb(0xDCE6F2), rgb(0xFFCFB0), golden), dayness)
+        let cloudTop = tone.cloudTop, cloudBottom = tone.cloudBottom
         for (i, c) in [(0.0, 1.0), (0.42, 0.75), (0.7, 0.9)].enumerated() {
             let speed = 3.0 + Double(i) * 1.6
             let span = Double(f.width + 240)
@@ -277,7 +317,8 @@ struct OfficeScene {
         }
     }
 
-    private func drawLandscape(_ ctx: inout GraphicsContext, _ f: CGRect) {
+    /// hills = Berge, Baumreihe, Wiese (statisch, gecacht) · trees = Obstbäume (wiegen sich, bleiben live)
+    private func drawLandscape(_ ctx: inout GraphicsContext, _ f: CGRect, hills: Bool = true, trees: Bool = true) {
         let d = dayness
         func tone(_ day: Int, _ night: Int) -> Color { mix(rgb(night), rgb(day), d) }
         let b = f.maxY
@@ -288,6 +329,7 @@ struct OfficeScene {
             p.addLine(to: P(f.maxX, b)); p.addLine(to: P(f.minX, b)); p.closeSubpath()
             return p
         }
+        if hills {
         // Ferne Berge (bläulich, Luftperspektive)
         ctx.fill(hill(b - 128, P(f.minX + 180, b - 170), P(f.maxX - 260, b - 105), b - 140), with: .color(tone(0xB4C7CF, 0x1C2436)))
         // Hügel mit Baumreihe
@@ -304,6 +346,8 @@ struct OfficeScene {
         // Wiese vorn mit sanftem Lichtverlauf
         let meadow = hill(b - 66, P(f.minX + 240, b - 92), P(f.maxX - 200, b - 44), b - 70)
         ctx.fill(meadow, with: vgrad([tone(0x9DCB7E, 0x16241E), tone(0x7FB266, 0x121E19)], b - 90, b))
+        }
+        guard trees else { return }
         // Bäume (Obstgarten-Anmutung): runde Kronen mit Licht oben links
         let trees: [(CGFloat, CGFloat, CGFloat)] = [(30, 0, 1.0), (96, 6, 0.8), (168, -4, 1.2), (250, 10, 0.72), (318, 4, 0.9),
                                                     (500, 8, 0.85), (566, -2, 1.15), (626, 6, 0.8), (650, 14, 1.05)]
@@ -362,7 +406,7 @@ struct OfficeScene {
         let p = (h - 6) / 14.5
         let elev = sin(p * .pi)
         let strength = min(1, (h - 6.2) / 0.8, (20.2 - h) / 0.8)
-        let color = mix(rgb(0xFFF8E6), rgb(0xFFB870), golden)
+        let color = tone.sunlight
         let len = CGFloat(110 + (1 - elev) * 120)
         let dx = CGFloat(0.5 - p) * 2 * 150
         let g = Self.glass
@@ -381,7 +425,7 @@ struct OfficeScene {
     private func drawDisplay(_ ctx: inout GraphicsContext) {
         let r = CGRect(x: 728, y: 72, width: 246, height: 146)
         shadow(&ctx, CGRect(x: r.minX + 10, y: r.maxY - 6, width: r.width - 20, height: 14), dark ? 0.3 : 0.10)
-        ctx.fill(Path(roundedRect: r, cornerRadius: 12, style: .continuous), with: vgrad([mix(rgb(0xD9DCE0), rgb(0x55585E), 1 - dayness), mix(rgb(0xA9AEB5), rgb(0x3A3C41), 1 - dayness)], r.minY, r.maxY))
+        ctx.fill(Path(roundedRect: r, cornerRadius: 12, style: .continuous), with: vgrad([tone.displayTop, tone.displayBottom], r.minY, r.maxY))
         let bezel = r.insetBy(dx: 2, dy: 2)
         ctx.fill(Path(roundedRect: bezel, cornerRadius: 10.5, style: .continuous), with: .color(rgb(0x0B0B0D)))
         let screen = bezel.insetBy(dx: 6, dy: 6)
@@ -393,23 +437,38 @@ struct OfficeScene {
         ring(&ctx, center: center, radius: 30, width: 15, pct: weekly ?? 0, colors: [rgb(0x7DDC00), rgb(0xCDFF4F)])
         // Texte
         let tx = screen.minX + 130
-        let clock = DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .short)
+        let avail = screen.maxX - tx - 4
+        let (clock, day) = Self.clockTexts(date)
         ctx.draw(Text(clock).font(.system(size: 27, weight: .semibold, design: .rounded)).foregroundColor(.white),
                  at: P(tx, screen.minY + 26), anchor: .leading)
-        let day = date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Lang.locale))
         ctx.draw(Text(day).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
-                 at: P(tx + 1, screen.minY + 47), anchor: .leading)
+                 at: P(tx + 1, screen.minY + 46), anchor: .leading)
+        // Kontingent, darunter klein: Prognose (bis wann es reicht) und heutige Tokens – nur, wenn es die Daten gibt
+        var y = screen.minY + 62
         ctx.draw(Text(L("5 Std.", "5 h") + "  " + (session.map { percentText(Int($0.rounded())) } ?? "–")).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xFF4F7E)),
-                 at: P(tx, screen.minY + 70), anchor: .leading)
+                 at: P(tx, y), anchor: .leading)
+        if let f = forecast, session != nil {
+            y += 11
+            let soon = f.exhaustsAt.map { $0.timeIntervalSince(date) < 3600 } ?? false
+            let str = f.exhaustsAt.map { L("reicht bis ~", "lasts till ~") + Self.timeText($0) } ?? L("reicht bis zum Reset", "lasts till reset")
+            small(&ctx, str, at: P(tx + 1, y), color: soon ? rgb(0xFFAA33) : rgb(0xFF4F7E, 0.7), maxWidth: avail)
+        }
+        y += 14
         ctx.draw(Text(L("Woche", "Week") + "  " + (weekly.map { percentText(Int($0.rounded())) } ?? "–")).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xB6F53A)),
-                 at: P(tx, screen.minY + 86), anchor: .leading)
+                 at: P(tx, y), anchor: .leading)
+        if let n = todayTokens, n > 0, overflow == 0 {
+            y += 11
+            let t = formatTokens(n)
+            small(&ctx, L("Heute \(t) Tokens", "Today \(t) tokens"), fallback: L("Heute \(t)", "Today \(t)"),
+                  at: P(tx + 1, y), color: .white.opacity(0.5), maxWidth: avail)
+        }
         let team: String
         if actors.isEmpty { team = L("Alle im Feierabend", "Everyone’s off") }
         else if waiting > 0 { team = waiting == 1 ? L("1 braucht dich", "1 needs you") : L("\(waiting) brauchen dich", "\(waiting) need you") }
         else if working > 0 { team = working == 1 ? L("1 arbeitet", "1 working") : L("\(working) arbeiten", "\(working) working") }
         else { team = L("Alle haben Pause", "Everyone’s on break") }
         ctx.draw(Text(team).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(waiting > 0 ? rgb(0xFFAA33) : .white.opacity(0.8)),
-                 at: P(tx, screen.maxY - (overflow > 0 ? 28 : 16)), anchor: .leading)
+                 at: P(tx, screen.maxY - (overflow > 0 ? 28 : 13)), anchor: .leading)
         if overflow > 0 {
             ctx.draw(Text(L("+\(overflow) im Nebenraum", "+\(overflow) next door")).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
                      at: P(tx, screen.maxY - 13), anchor: .leading)
@@ -419,6 +478,34 @@ struct OfficeScene {
         sheen.move(to: P(screen.minX, screen.minY)); sheen.addLine(to: P(screen.minX + 110, screen.minY))
         sheen.addLine(to: P(screen.minX + 40, screen.maxY)); sheen.addLine(to: P(screen.minX, screen.maxY)); sheen.closeSubpath()
         ctx.fill(sheen, with: .color(.white.opacity(0.035)))
+    }
+
+    /// Kleine Zeile auf dem Display; zu breit → Kurzfassung, notfalls gekürzt.
+    private func small(_ ctx: inout GraphicsContext, _ str: String, fallback: String? = nil, at p: CGPoint, color: Color, maxWidth: CGFloat) {
+        let font = Font.system(size: 9.5, weight: .medium, design: .rounded)
+        var t = ctx.resolve(Text(str).font(font).foregroundColor(color))
+        if let fallback, t.measure(in: CGSize(width: 400, height: 40)).width > maxWidth {
+            t = ctx.resolve(Text(fallback).font(font).foregroundColor(color))
+        }
+        ctx.draw(t, at: p, anchor: .leading)
+    }
+
+    private static var clockCache: (minute: Int, clock: String, day: String)?
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f
+    }()
+    static func timeText(_ d: Date) -> String { timeFormatter.string(from: d) }
+
+    /// Uhrzeit und Datum fürs Display – nur einmal pro Minute formatiert.
+    private static func clockTexts(_ date: Date) -> (String, String) {
+        let minute = Int(date.timeIntervalSinceReferenceDate / 60)
+        if let c = clockCache, c.minute == minute { return (c.clock, c.day) }
+        let day = date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).locale(Lang.locale))
+        clockCache = (minute, timeText(date), day)
+        return (timeText(date), day)
     }
 
     private func ring(_ ctx: inout GraphicsContext, center: CGPoint, radius: CGFloat, width: CGFloat, pct: Double, colors: [Color]) {
@@ -863,13 +950,20 @@ struct OfficeScene {
     // MARK: Figuren
 
     private struct Tones {
-        let skin, skinShade, skinLight, hair, hairLight, hairShade, shirt, shirtShade, shirtLight: Color
+        let skin, skinShade, skinLight, hair, hairLight, hairShade, shirt, shirtShade, shirtLight, sleeve, sleeveShadow: Color
     }
 
+    private static var toneCache: [Look: Tones] = [:]
+
+    /// Abgeleitete Töne je Aussehen – einmal berechnet statt je Figur und Bild.
     private func tones(_ L: Look) -> Tones {
-        Tones(skin: L.skin, skinShade: darker(L.skin, 0.14), skinLight: lighter(L.skin, 0.22),
-              hair: L.hair, hairLight: lighter(L.hair, 0.28), hairShade: darker(L.hair, 0.2),
-              shirt: L.shirt, shirtShade: darker(L.shirt, 0.14), shirtLight: lighter(L.shirt, 0.16))
+        if let t = Self.toneCache[L] { return t }
+        let t = Tones(skin: L.skin, skinShade: darker(L.skin, 0.14), skinLight: lighter(L.skin, 0.22),
+                      hair: L.hair, hairLight: lighter(L.hair, 0.28), hairShade: darker(L.hair, 0.2),
+                      shirt: L.shirt, shirtShade: darker(L.shirt, 0.14), shirtLight: lighter(L.shirt, 0.16),
+                      sleeve: darker(L.shirt, 0.07), sleeveShadow: darker(L.shirt, 0.45))
+        Self.toneCache[L] = t
+        return t
     }
 
     /// Sitzende Figur: a.point = Tischkante bzw. Sofasitz unter dem Oberkörper.
@@ -1020,12 +1114,14 @@ struct OfficeScene {
     }
 
     /// Arm vor dem Oberkörper: weicher Schatten darunter + etwas dunklerer Ärmel, sonst verschwindet er im gleichfarbigen Pullover.
+    /// Der Schatten sind gestaffelte, sehr blasse Striche (wirkt wie ein Weichzeichner, kostet aber keinen Filter je Arm).
     private func sleeve(_ ctx: inout GraphicsContext, _ arm: Path, _ T: Tones, _ s: CGFloat) {
-        let style = StrokeStyle(lineWidth: 10 * s, lineCap: .round, lineJoin: .round)
-        var shade = ctx
-        shade.addFilter(.blur(radius: 2.2 * s))
-        shade.stroke(arm.applying(CGAffineTransform(translationX: 0, y: 1.5 * s)), with: .color(darker(T.shirt, 0.45).opacity(0.35)), style: style)
-        ctx.stroke(arm, with: .color(darker(T.shirt, 0.07)), style: style)
+        let shadowPath = arm.applying(CGAffineTransform(translationX: 0, y: 1.5 * s))
+        for (grow, o) in [(4.6, 0.07), (3.0, 0.08), (1.6, 0.1), (0.2, 0.13)] as [(CGFloat, Double)] {
+            ctx.stroke(shadowPath, with: .color(T.sleeveShadow.opacity(o)),
+                       style: StrokeStyle(lineWidth: (10 + grow) * s, lineCap: .round, lineJoin: .round))
+        }
+        ctx.stroke(arm, with: .color(T.sleeve), style: StrokeStyle(lineWidth: 10 * s, lineCap: .round, lineJoin: .round))
     }
 
     /// Stehende/laufende Figur: a.point = Füße.
@@ -1310,10 +1406,20 @@ struct OfficeScene {
         var walking = false
         if case .walking = a.pose { walking = true }
         let nameY: CGFloat
+        var maxWidth: CGFloat = 170
+        var nameX = a.point.x
         switch a.pose {
         case .walking: nameY = headTop(a) - 12 * s        // über dem Kopf – unten wäre es am Bildrand abgeschnitten
-        case .standing: nameY = a.point.y + 12 * s
-        case .sofa: nameY = 516
+        case .standing:
+            nameY = a.point.y + 12 * s
+            // Kaffee-Ecke steht direkt links vom Sofa: Schild schmaler und etwas nach links
+            if a.place == .stand(0) || a.place == .stand(1) { maxWidth = 110 }
+            if a.place == .stand(0) { nameX -= 10 }
+        case .sofa:
+            // Sofaplätze liegen nur 76 pt auseinander: mittleres Schild tiefer, alle in der Breite begrenzt
+            let middle = abs(a.point.x - OfficeModel.sofaSeat(1).0.x) < 1
+            nameY = middle ? 538 : 516
+            maxWidth = 130
         default: nameY = a.point.y + 22 * s
         }
         let icon: String, tint: Color
@@ -1327,11 +1433,22 @@ struct OfficeScene {
         let hover = hovered == a.id
         let fill: Color = hover ? .accentColor : st == .waiting ? rgb(0xFF9500) : (dark ? rgb(0x2C2C2E, 0.92) : rgb(0xFFFFFF, 0.94))
         let text: Color = hover || st == .waiting ? .white : ink
+        let size: CGFloat = s < 0.9 ? 9 : 10.5
+        // Statuswechsel: kurzer, weicher Lichtring um das Schild
+        if let c = a.changeAge, c < 0.9 {
+            let k = c / 0.9
+            let w = 60 + 50 * CGFloat(k), h = (size + 10) * (1.4 + 0.9 * CGFloat(k))
+            var g = ctx
+            g.translateBy(x: nameX, y: nameY)
+            g.scaleBy(x: 1, y: h / w)
+            g.fill(circle(.zero, w / 2), with: glow(.zero, w / 2, st == .waiting ? rgb(0xFF9500) : tint, 0.35 * (1 - k)))
+        }
         tag(&ctx, String(a.session.label.prefix(21)), icon: icon, tint: hover ? .white : tint,
-            at: P(a.point.x, nameY), size: s < 0.9 ? 9 : 10.5, fill: fill, text: text,
-            device: a.session.device == nil ? nil : a.session.deviceSymbol)
+            at: P(nameX, nameY), size: size, fill: fill, text: text,
+            device: a.session.device == nil ? nil : a.session.deviceSymbol,
+            warning: a.session.contextWarning ? (hover || st == .waiting ? Color.white : rgb(0xFF9F0A)) : nil, maxWidth: maxWidth)
 
-        guard !walking, !hover else { return }
+        guard !walking, !hover, !a.leaving else { return }
         // Status-Bläschen über dem Kopf
         let top = P(a.point.x + (a.pose == .napping ? 6 * s : 0), headTop(a) - 13 * s)
         switch st {
@@ -1389,23 +1506,64 @@ struct OfficeScene {
         ctx.draw(Text(Image(systemName: symbol)).font(.system(size: d * 0.48, weight: .bold)).foregroundColor(fg), at: p)
     }
 
-    /// Namensschild: helles Milchglas-Pill mit Status-Symbol; Sitzungen vom anderen Mac mit dezentem Geräte-Symbol am Ende.
-    private func tag(_ ctx: inout GraphicsContext, _ str: String, icon: String, tint: Color, at p: CGPoint, size: CGFloat, fill: Color, text: Color, device: String? = nil) {
-        let t = ctx.resolve(Text(str).font(.system(size: size, weight: .semibold, design: .rounded)).foregroundColor(text))
-        let ic = ctx.resolve(Text(Image(systemName: icon)).font(.system(size: size * 0.92, weight: .semibold)).foregroundColor(tint))
-        let dv = device.map { ctx.resolve(Text(Image(systemName: $0)).font(.system(size: size * 0.85, weight: .medium)).foregroundColor(text.opacity(0.45))) }
-        let m = t.measure(in: CGSize(width: 400, height: 40))
-        let im = ic.measure(in: CGSize(width: 40, height: 40))
-        let dm = dv?.measure(in: CGSize(width: 40, height: 40)).width ?? 0
-        let w = m.width + im.width + 20 + (dv == nil ? 0 : dm + 6), h = size + 10
+    private struct TagKey: Hashable {
+        let str: String, icon: String, device: String?, warning: Color?, tint: Color, text: Color, size: CGFloat, maxWidth: CGFloat
+    }
+    private struct TagParts {
+        let text: GraphicsContext.ResolvedText, icon: GraphicsContext.ResolvedText
+        let extras: [(GraphicsContext.ResolvedText, CGFloat)]
+        let textWidth: CGFloat, iconWidth: CGFloat
+    }
+    private static var tagCache: [TagKey: TagParts] = [:]
+
+    /// Namensschild: helles Milchglas-Pill mit Status-Symbol; am Ende ggf. ein oranges Akku-Symbol (Kontext fast voll)
+    /// und für Sitzungen vom anderen Mac ein dezentes Geräte-Symbol. Gesetzte Texte werden gemerkt (Layout nur einmal).
+    private func tag(_ ctx: inout GraphicsContext, _ str: String, icon: String, tint: Color, at p: CGPoint, size: CGFloat, fill: Color, text: Color,
+                     device: String? = nil, warning: Color? = nil, maxWidth: CGFloat = 170) {
+        let key = TagKey(str: str, icon: icon, device: device, warning: warning, tint: tint, text: text, size: size, maxWidth: maxWidth)
+        let parts: TagParts
+        if let c = Self.tagCache[key] {
+            parts = c
+        } else {
+            let font = Font.system(size: size, weight: .semibold, design: .rounded)
+            let ic = ctx.resolve(Text(Image(systemName: icon)).font(.system(size: size * 0.92, weight: .semibold)).foregroundColor(tint))
+            var extras: [(GraphicsContext.ResolvedText, CGFloat)] = []
+            if let warning {
+                let b = ctx.resolve(Text(Image(systemName: "battery.25")).font(.system(size: size * 0.95, weight: .semibold)).foregroundColor(warning))
+                extras.append((b, b.measure(in: CGSize(width: 40, height: 40)).width))
+            }
+            if let device {
+                let d = ctx.resolve(Text(Image(systemName: device)).font(.system(size: size * 0.85, weight: .medium)).foregroundColor(text.opacity(0.45)))
+                extras.append((d, d.measure(in: CGSize(width: 40, height: 40)).width))
+            }
+            let iw = ic.measure(in: CGSize(width: 40, height: 40)).width
+            let fixed = iw + 20 + extras.reduce(0) { $0 + $1.1 + 6 }
+            var label = str
+            var t = ctx.resolve(Text(label).font(font).foregroundColor(text))
+            var tw = t.measure(in: CGSize(width: 400, height: 40)).width
+            while fixed + tw > maxWidth && label.count > 4 {
+                label = String(label.dropLast(label.hasSuffix("…") ? 2 : 1)).trimmingCharacters(in: .whitespaces) + "…"
+                t = ctx.resolve(Text(label).font(font).foregroundColor(text))
+                tw = t.measure(in: CGSize(width: 400, height: 40)).width
+            }
+            parts = TagParts(text: t, icon: ic, extras: extras, textWidth: tw, iconWidth: iw)
+            if Self.tagCache.count > 300 { Self.tagCache.removeAll() }
+            Self.tagCache[key] = parts
+        }
+        let im = parts.iconWidth, m = parts.textWidth
+        let w = m + im + 20 + parts.extras.reduce(0) { $0 + $1.1 + 6 }, h = size + 10
         let r = CGRect(x: p.x - w / 2, y: p.y - h / 2, width: w, height: h)
         let path = Path(roundedRect: r, cornerRadius: h / 2)
         softShadow(&ctx, path, dark ? 0.3 : 0.08)
         ctx.fill(path, with: .color(fill))
         ctx.stroke(path, with: .color(dark ? .white.opacity(0.08) : .black.opacity(0.06)), lineWidth: 0.5)
-        ctx.draw(ic, at: P(r.minX + 8 + im.width / 2, p.y))
-        ctx.draw(t, at: P(r.minX + 12 + im.width + m.width / 2, p.y))
-        if let dv { ctx.draw(dv, at: P(r.maxX - 8 - dm / 2, p.y)) }
+        ctx.draw(parts.icon, at: P(r.minX + 8 + im / 2, p.y))
+        ctx.draw(parts.text, at: P(r.minX + 12 + im + m / 2, p.y))
+        var x = r.maxX - 8
+        for (e, ew) in parts.extras.reversed() {
+            ctx.draw(e, at: P(x - ew / 2, p.y))
+            x -= ew + 6
+        }
     }
 
     private func speech(_ ctx: inout GraphicsContext, _ str: String, at p: CGPoint, size: CGFloat, fill: Color, text: Color) {
@@ -1435,5 +1593,93 @@ struct SeededRandom {
     mutating func next() -> CGFloat {
         state = state &* 6364136223846793005 &+ 1442695040888963407
         return CGFloat(Double(state >> 11) / Double(1 << 53))
+    }
+}
+
+// MARK: - Caches
+
+/// Farbmischung ohne NSColor-Umweg je Aufruf: sRGB-Komponenten je Farbe werden einmal ermittelt und gemerkt.
+enum ColorMath {
+    private static var components: [Color: SIMD4<Double>] = [:]
+
+    static func rgba(_ c: Color) -> SIMD4<Double> {
+        if let v = components[c] { return v }
+        let n = NSColor(c).usingColorSpace(.sRGB) ?? .gray
+        let v = SIMD4(Double(n.redComponent), Double(n.greenComponent), Double(n.blueComponent), Double(n.alphaComponent))
+        if components.count > 4000 { components.removeAll() }   // Sicherheitsnetz, normal bleibt es bei ein paar Hundert
+        components[c] = v
+        return v
+    }
+
+    /// Wie NSColor.blended(withFraction:of:): lineare Mischung in sRGB inklusive Deckkraft.
+    static func mix(_ a: Color, _ b: Color, _ t: Double) -> Color {
+        let f = max(0, min(1, t))
+        let x = rgba(a), y = rgba(b)
+        let m = x + (y - x) * f
+        return Color(.sRGB, red: m.x, green: m.y, blue: m.z, opacity: m.w)
+    }
+}
+
+/// Tageszeitfarben – ändern sich höchstens im Minutentakt, also je Minute einmal berechnet.
+struct DayTone {
+    let sky: (Color, Color)
+    let cloudTop, cloudBottom, sunTint, sunlight, displayTop, displayBottom: Color
+
+    private static var cache: (key: Int, tone: DayTone)?
+
+    static func at(hour: Double, dayness: Double, golden: Double) -> DayTone {
+        let key = Int((hour * 60).rounded(.down)) * 1000 + Int((dayness * 999).rounded())
+        if let c = cache, c.key == key { return c.tone }
+        let mix = ColorMath.mix
+        let t = DayTone(sky: OfficeScene.skyColors(hour: hour),
+                        cloudTop: mix(rgb(0x5A6380), .white, dayness),
+                        cloudBottom: mix(rgb(0x3A4260), mix(rgb(0xDCE6F2), rgb(0xFFCFB0), golden), dayness),
+                        sunTint: mix(rgb(0xFFF6D6), rgb(0xFFC48A), golden),
+                        sunlight: mix(rgb(0xFFF8E6), rgb(0xFFB870), golden),
+                        displayTop: mix(rgb(0xD9DCE0), rgb(0x55585E), 1 - dayness),
+                        displayBottom: mix(rgb(0xA9AEB5), rgb(0x3A3C41), 1 - dayness))
+        cache = (key, t)
+        return t
+    }
+}
+
+/// Statischer Hintergrund als Bild: Wand + Parkett (ca. 300 Flächen) und Landschaft hinter dem Glas (Berge, 56 Baumkronen).
+/// Neu gerendert nur, wenn sich Hell/Dunkel, die Tageslicht-Stufe oder die Pixelgröße ändern – nicht 30× pro Sekunde.
+@MainActor
+final class OfficeBackdrop {
+    struct Images {
+        let room: CGImage
+        let land: CGImage
+        let scale: CGFloat
+    }
+    private struct Key: Equatable { let dark: Bool; let day: Int; let scale: Int }
+    private var key: Key?
+    private var images: Images?
+    private var renderedAt = 0.0
+
+    /// scale = Pixel je Szenen-Punkt (Fenster-Einpassung × Bildschirm-Skalierung).
+    func images(dark: Bool, dayness: Double, scale: CGFloat, now: Double) -> Images? {
+        let k = Key(dark: dark, day: Int((dayness * 100).rounded()), scale: Int((scale * 100).rounded()))
+        if k == key, let images { return images }
+        // Während des Aufziehens nicht jedes Bild neu rendern – kurz das alte (skaliert) weiterverwenden
+        if let images, let key, key.dark == k.dark, key.day == k.day, abs(now - renderedAt) < 0.25 { return images }
+        let px = max(0.5, CGFloat(k.scale) / 100)
+        let base = OfficeScene(time: 0, date: Date(), dark: dark, daylight: true, actors: [], overflow: 0, hovered: nil,
+                               session: nil, weekly: nil, plan: nil, cpu: 0, vacuum: .docked, working: 0, waiting: 0,
+                               fixedDayness: Double(k.day) / 100)
+        let size = OfficeScene.size, g = OfficeScene.glass
+        let room = ImageRenderer(content: Canvas { ctx, _ in base.drawRoom(&ctx) }.frame(width: size.width, height: size.height))
+        room.scale = px
+        room.isOpaque = true
+        let land = ImageRenderer(content: Canvas { ctx, _ in
+            ctx.translateBy(x: -g.minX, y: -g.minY)
+            base.drawLandscapeLayer(&ctx)
+        }.frame(width: g.width, height: g.height))
+        land.scale = px
+        guard let r = room.cgImage, let l = land.cgImage else { return nil }
+        key = k
+        renderedAt = now
+        images = Images(room: r, land: l, scale: px)
+        return images
     }
 }
