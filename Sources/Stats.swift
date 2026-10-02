@@ -124,11 +124,14 @@ final class StatsCollector: @unchecked Sendable {
             guard let nl = carry.lastIndex(of: 0x0A) else { continue }
             let complete = carry[carry.startIndex...nl]
             p.offset += UInt64(complete.count)
-            for line in complete.split(separator: 0x0A) where !line.isEmpty {
-                if skipFirst { skipFirst = false; continue }
-                guard Self.needles.allSatisfy({ line.range(of: $0) != nil }),
-                      let j = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
-                count(j, &p, session: sid)
+            // Pool je Block: sonst sammeln sich die JSON-Objekte des ganzen Start-Scans bis zum Ende an (Spitze > 300 MB)
+            autoreleasepool {
+                for line in complete.split(separator: 0x0A) where !line.isEmpty {
+                    if skipFirst { skipFirst = false; continue }
+                    guard Self.needles.allSatisfy({ line.range(of: $0) != nil }),
+                          let j = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+                    count(j, &p, session: sid)
+                }
             }
             carry.removeSubrange(carry.startIndex...nl)
         }
