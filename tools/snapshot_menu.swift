@@ -25,12 +25,13 @@ struct SnapMenu {
         // Kein Schlüsselbund-Zugriff im Snapshot – das Kontingent kommt aus festen Demo-Werten
         UserDefaults.standard.set(false, forKey: Prefs.quotaEnabled)
         let now = Date()
-        QuotaSection.demo = (QuotaWindow(percent: 42, resetsAt: now.addingTimeInterval(2 * 3600 + 13 * 60)),
-                             QuotaWindow(percent: 18, resetsAt: now.addingTimeInterval(4 * 86400)),
-                             "Max 20×", nil)
+        QuotaSection.demo = QuotaValues(session: QuotaWindow(percent: 42, resetsAt: now.addingTimeInterval(2 * 3600 + 13 * 60)),
+                                        weekly: QuotaWindow(percent: 18, resetsAt: now.addingTimeInterval(4 * 86400)),
+                                        plan: "Max 20×", problem: nil,
+                                        forecast: QuotaForecast(percentPerHour: 14, exhaustsAt: nil))
 
         // Aktivität kommt wie in der App aus describeTool, damit die Texte der Sprache folgen
-        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0) -> AgentSession {
+        func s(_ id: String, _ cwd: String, _ title: String?, _ st: AgentStatus, _ tool: String, _ input: [String: Any], _ ago: Double, helpers: Int = 0, ctx: Int = 340_000) -> AgentSession {
             AgentSession(id: id, source: .cli, cwd: "\(NSHomeDirectory())/\(cwd)", title: title, model: "claude-opus-5-5", permissionMode: "auto",
                          status: st, activity: tool.isEmpty ? "" : describeTool(tool, input), tool: "",
                          lastText: L("Build ist grün, alle 42 Tests bestanden.", "Build is green, all 42 tests passed."),
@@ -40,11 +41,11 @@ struct SnapMenu {
                                                                    description: L("Sucht Dateien", "Finding files"), working: $0 < 2,
                                                                    activity: [describeTool("Read", ["file_path": "/x/App.swift"]), L("Sucht nach „inject“", "Searching for “inject”"), ""][$0 % 3], lastActivity: now) },
                          hostBundle: "com.apple.Terminal", tty: nil, usesHooks: true,
-                         contextUsed: 340_000, contextWindow: 1_000_000)
+                         contextUsed: ctx, contextWindow: 1_000_000)
         }
         var demo = [
             s("1", "weather-app", L("Radar-Ansicht bauen", "Build radar view"), .working, "Edit", ["file_path": "/x/RadarView.swift"], 5, helpers: 3),
-            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20),
+            s("2", "api-server", nil, .waiting, "Bash", ["command": "git push"], 20, ctx: 890_000),
             s("3", "portfolio", L("Dunkelmodus", "Dark mode"), .done, "", [:], 180),
             s("4", "photo-sorter", nil, .working, "Bash", ["command": "swift build"], 3),
             s("6", "home-lab", nil, .error, "", [:], 400),
@@ -54,13 +55,25 @@ struct SnapMenu {
         for i in [3, 5] { demo[i].device = "iMac" }
 
         let store = AppStore()
+        // Statistik: 7 Tage Demo-Verbrauch, heute mit Top-Projekten
+        store.stats.days = (0..<7).reversed().map { off in
+            let day = StatsStore.key(Calendar.current.date(byAdding: .day, value: -off, to: now)!)
+            let m = [1.7, 1.2, 2.1, 0.0, 0.9, 1.4, 0.6][off]
+            var d = DayStats(day: day)
+            d.tokens = TokenCount(input: Int(20_000 * m), cacheWrite: Int(400_000 * m), cacheRead: Int(3_500_000 * m), output: Int(90_000 * m))
+            d.cost = 6.8 * m
+            d.sessions = Int(4 * m)
+            if off == 0 { d.byProject = ["weather-app": 3_100_000, "api-server": 2_200_000, "portfolio": 1_100_000, "recipes": 300_000] }
+            return d
+        }
+        UserDefaults.standard.set(true, forKey: "menuStatsExpanded")
         UserDefaults.standard.set(true, forKey: Prefs.quotaEnabled)   // für die Einstellungen
         UserDefaults.standard.set(true, forKey: Prefs.peersEnabled)   // Abschnitt „Andere Macs“ aufgeklappt (Demo-Code, keine Verbindung)
         UserDefaults.standard.set("K7QM-4TXP-9WHR", forKey: Prefs.peerCode)
         try? await Task.sleep(nanoseconds: 1_500_000_000)             // ersten Scan abwarten, dann Demo drüberlegen
 
         func menu(_ expanded: String?) -> AnyView {
-            AnyView(MenuView(expanded: expanded).environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater))
+            AnyView(MenuView(expanded: expanded).environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater).environmentObject(store.stats))
         }
 
         // Menüleisten-Symbole: ruhig, arbeitet, braucht dich
@@ -84,7 +97,7 @@ struct SnapMenu {
             live(menu(nil), "build/menu-empty-\(name).png", dark)
             // Einstellungen
             store.hooksInstalled = true
-            liveWindow(AnyView(SettingsView(height: 1500).environmentObject(store)), "build/settings-\(name).png", dark)
+            liveWindow(AnyView(SettingsView(height: 1800).environmentObject(store)), "build/settings-\(name).png", dark)
             if CommandLine.arguments.contains("--flat") {
                 keep = { store.monitor.inject(demo) }
                 shot(menu("1"), "build/menu-flat-\(name).png", dark)
