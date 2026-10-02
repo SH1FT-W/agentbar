@@ -144,6 +144,7 @@ struct AgentSession: Identifiable, Equatable {
     var contextWindow = 0         // 200k oder 1M (abgeleitet), 0 = unbekannt
     var device: String?           // Name des anderen Macs, nil = läuft auf diesem Mac
     var deviceIsLaptop = false
+    var question: String? = nil   // Fragetext, solange die Sitzung auf eine Antwort (AskUserQuestion) wartet
 
     var deviceSymbol: String { deviceIsLaptop ? "laptopcomputer" : "desktopcomputer" }
 
@@ -183,6 +184,20 @@ struct AgentSession: Identifiable, Equatable {
     var workingHelpers: Int { subagents.filter(\.working).count }
     /// Kontext fast voll (≥ 85 %) – Warnung in Zeile, Büro und Mitteilung.
     var contextWarning: Bool { (contextFill ?? 0) >= 0.85 }
+
+    /// Fertiger Text, worauf eine wartende Sitzung wartet – ohne weiteres Präfix anzeigen.
+    /// „Frage: <Text>“ bei AskUserQuestion, „Plan prüfen“ bei ExitPlanMode, sonst „Freigabe: <Tätigkeit>“. nil, wenn nicht wartend.
+    var waitingReason: String? {
+        guard status == .waiting else { return nil }
+        if let q = question, !q.isEmpty { return L("Frage", "Question") + ": " + q }
+        switch tool {
+        case "AskUserQuestion": return L("Hat eine Frage", "Has a question")
+        case "ExitPlanMode": return L("Plan prüfen", "Review the plan")
+        default:
+            let what = activity.isEmpty ? tool : activity
+            return what.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : L("Freigabe", "Approve") + ": " + what
+        }
+    }
 }
 
 // MARK: - Statistik & Prognose (2.0)

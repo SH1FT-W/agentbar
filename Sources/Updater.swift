@@ -83,6 +83,12 @@ final class Updater: ObservableObject {
 
     func install() async {
         guard let release else { return }
+        // Ziel muss ersetzbar sein – sonst endet jeder Versuch in derselben Schleife (z. B. Start aus „Downloads“ mit
+        // App-Translocation oder von einem schreibgeschützten Volume)
+        if let problem = Self.targetProblem(Bundle.main.bundleURL) {
+            state = .failed(problem)
+            return
+        }
         state = .installing(L("Lade v\(release.version) …", "Downloading v\(release.version)…"))
         do {
             let work = FileManager.default.temporaryDirectory.appendingPathComponent("AgentBar-Update-\(UUID().uuidString)")
@@ -98,17 +104,22 @@ final class Updater: ObservableObject {
             }
 
             let zipURL = work.appendingPathComponent("AgentBar.zip")
-            try zipData.write(to: zipURL)
-            guard Self.run("/usr/bin/ditto", ["-x", "-k", zipURL.path, work.path]) else { throw Fail(L("Entpacken fehlgeschlagen", "Unzipping failed")) }
             let newApp = work.appendingPathComponent("AgentBar.app")
-            let b = Bundle(url: newApp)
-            guard b?.bundleIdentifier == Bundle.main.bundleIdentifier else { throw Fail(L("Falsche App im Release", "Wrong app in release")) }
-            guard b?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == release.version else {
-                throw Fail(L("Versionsnummer passt nicht zum Release", "Version number doesn’t match the release"))
-            }
-            try Self.verifySignature(newApp)
-            // Erst nach bestandener Prüfung die Quarantäne entfernen
-            _ = Self.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
+            let bundleID = Bundle.main.bundleIdentifier, version = release.version
+            // Entpacken und Signaturprüfung dauern – nicht auf dem Main-Thread
+            try await Task.detached(priority: .userInitiated) {
+                try zipData.write(to: zipURL)
+                guard Self.run("/usr/bin/ditto", ["-x", "-k", zipURL.path, work.path]) else { throw Fail(L("Entpacken fehlgeschlagen", "Unzipping failed")) }
+                let b = Bundle(url: newApp)
+                guard b?.bundleIdentifier == bundleID else { throw Fail(L("Falsche App im Release", "Wrong app in release")) }
+                guard b?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == version else {
+                    throw Fail(L("Versionsnummer passt nicht zum Release", "Version number doesn’t match the release"))
+                }
+                try Self.verifySignature(newApp)
+                // Erst nach bestandener Prüfung die Quarantäne entfernen
+                _ = Self.run("/usr/bin/xattr", ["-dr", "com.apple.quarantine", newApp.path])
+            }.value
+            if let problem = Self.targetProblem(Bundle.main.bundleURL) { throw Fail(problem) }
 
             state = .installing(L("Starte neu …", "Relaunching…"))
             try launchSwapScript(newApp: newApp, work: work)
@@ -119,8 +130,22 @@ final class Updater: ObservableObject {
         }
     }
 
+    /// nil = AgentBar.app lässt sich an ihrem Ort ersetzen; sonst ein verständlicher Hinweis.
+    nonisolated static func targetProblem(_ app: URL) -> String? {
+        let move = L("Bitte AgentBar in den Ordner „Programme“ ziehen, von dort öffnen und das Update dann erneut starten.",
+                     "Please move AgentBar to the Applications folder, open it from there and start the update again.")
+        if app.path.contains("/AppTranslocation/") {
+            return L("AgentBar läuft aus einem vorübergehenden Ort (macOS-Schutz für geladene Apps).", "AgentBar is running from a temporary location (macOS app translocation).") + " " + move
+        }
+        let fm = FileManager.default
+        if !fm.isWritableFile(atPath: app.deletingLastPathComponent().path) || !fm.isWritableFile(atPath: app.path) {
+            return L("Der Ordner mit AgentBar ist nicht beschreibbar.", "The folder containing AgentBar isn’t writable.") + " " + move
+        }
+        return nil
+    }
+
     /// Gültige (ad-hoc-)Code-Signatur – die Echtheit sichert die Ed25519-Prüfung oben.
-    private static func verifySignature(_ app: URL) throws {
+    nonisolated private static func verifySignature(_ app: URL) throws {
         var code: SecStaticCode?
         guard SecStaticCodeCreateWithPath(app as CFURL, [], &code) == errSecSuccess, let code else { throw Fail(L("Signatur nicht lesbar", "Can’t read signature")) }
         let flags = SecCSFlags(rawValue: kSecCSCheckAllArchitectures | kSecCSStrictValidate | kSecCSCheckNestedCode)
@@ -155,7 +180,7 @@ final class Updater: ObservableObject {
 
     // MARK: Hilfen
 
-    private static func run(_ tool: String, _ args: [String]) -> Bool {
+    nonisolated private static func run(_ tool: String, _ args: [String]) -> Bool {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: tool)
         p.arguments = args
@@ -184,5 +209,5 @@ final class Updater: ObservableObject {
         return false
     }
 
-    private struct Fail: Error { let text: String; init(_ t: String) { text = t } }
+    private struct Fail: Error, Sendable { let text: String; init(_ t: String) { text = t } }
 }
