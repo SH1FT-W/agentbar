@@ -35,10 +35,13 @@
 
 - **Status in Echtzeit** – arbeitet, braucht dich, fertig, Fehler oder Pause, für jede Claude-Code-Sitzung (Terminal, Claude-App, Cowork, Xcode). Subagenten erscheinen als Helfer ihrer Sitzung.
 - **Präzise Erkennung (optional)** – mit Claude-Code-Hooks weiß AgentBar *genau*, wann ein Agent auf deine Freigabe wartet, statt es aus Pausen zu schätzen.
-- **Kontingent-Ringe** – dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
+- **Kontingent-Ringe** – dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch, dazu eine Prognose, wie lange das 5-Stunden-Fenster beim aktuellen Tempo reicht. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
+- **Heute & letzte 7 Tage** – Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Balkendiagramm und deine Top-Projekte von heute. Lokal aus den Sitzungsprotokollen von Claude Code berechnet.
+- **Kontext auf einen Blick** – jede Zeile zeigt Tokens und einen kleinen Kontext-Balken, der orange wird, wenn das Kontextfenster fast voll ist.
 - **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
 - **Direkt zur Sitzung** – ein Klick auf eine Sitzung (im Menü oder im Büro) holt ihren Terminal-Tab nach vorn.
-- **Mitteilungen**, wenn ein Agent dich braucht, fertig ist oder scheitert, dazu eine Kontingent-Warnung und ein Hinweis, sobald eine neue AgentBar-Version da ist.
+- **Mitteilungen**, wenn ein Agent dich braucht (mit seiner konkreten Frage), fertig ist oder scheitert, wenn sein Kontext fast voll ist oder er zu hängen scheint, dazu eine Kontingent-Warnung und ein Hinweis auf neue AgentBar-Versionen. Mit Knöpfen „Zur Sitzung“ und „1 Std. stumm“ sowie optionalen Ruhezeiten.
+- **Tastatur und VoiceOver** – ↑/↓ wählen, Return springt zur Sitzung, Leertaste klappt auf, ⌘R lädt neu; jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.
 - **Deine anderen Macs** (optional) – koppel deine Macs per Code, dann erscheinen Sitzungen der anderen im Menü und im Büro, markiert mit einem kleinen Geräte-Symbol. Gefunden wird per Bonjour im lokalen Netzwerk, jede Nachricht ist mit dem Code verschlüsselt.
 - **Wach bleiben** – aus, immer oder nur, solange Agenten arbeiten.
 - **Updates** über GitHub-Releases, geprüft per Ed25519-Signatur (Schlüssel fest in der App), Bundle-ID, Version und Code-Signatur.
@@ -73,7 +76,7 @@
 - **Präzise Erkennung:** im Menü bei *Präzise Erkennung* auf **Einrichten** klicken (oder *Einstellungen → Präzise Erkennung*). AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (eine Sicherung landet in `settings.json.agentbar-backup`). Jeder Hook hängt nur eine Statuszeile an `~/Library/Application Support/AgentBar/hooks.log` an – kein Netzwerk, keine Prompts oder Dateiinhalte. Gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen jederzeit wieder entfernen.
 - **Kontingent-Ringe:** AgentBar liest den Login von Claude Code aus dem Schlüsselbund (`Claude Code-credentials`) über das `security`-Werkzeug. Falls macOS fragt: erlauben. Das Token geht nur an `api.anthropic.com`.
 - **Zum Terminal springen:** Beim ersten Klick auf eine Sitzung fragt macOS, ob AgentBar das Terminal steuern darf – das dient nur dazu, den richtigen Tab auszuwählen.
-- **Beim Anmelden starten:** im Menü einschalten.
+- **Beim Anmelden starten:** in *Einstellungen → Allgemein* einschalten.
 
 ### Tastenkürzel
 
