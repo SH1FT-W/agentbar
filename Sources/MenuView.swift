@@ -111,9 +111,10 @@ struct MenuView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 1) {
-                summaryText.font(.system(size: 13, weight: .semibold))
+                Text("AgentBar").font(.system(size: 13, weight: .semibold))
+                (summaryText + Text(detailLine)).font(.system(size: 11)).foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.85)
                     .contentTransition(.opacity)
-                Text(detailLine).font(.system(size: 11)).foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
             Spacer(minLength: 6)
@@ -146,17 +147,17 @@ struct MenuView: View {
         case (true, true): return Text(working + " · ") + waitText
         case (true, false): return Text(working)
         case (false, true): return waitText
-        default: return Text(monitor.visible.isEmpty ? "AgentBar" : L("Alles ruhig", "All quiet"))
+        default: return Text(monitor.visible.isEmpty ? "" : L("Alles ruhig", "All quiet"))
         }
     }
 
-    /// Zweite Kopfzeile: Anzahl Sitzungen, ggf. auf wie vielen Macs.
+    /// Rest der zweiten Kopfzeile: „ · 6 Sitzungen · 2 Macs“ (inkl. diesem).
     private var detailLine: String {
         let list = monitor.visible
         guard !list.isEmpty else { return L("Bereit", "Ready") }
         let n = list.count == 1 ? L("1 Sitzung", "1 session") : L("\(list.count) Sitzungen", "\(list.count) sessions")
         let macs = Set(list.compactMap(\.device)).count
-        return macs == 0 ? n : n + " · " + (macs == 1 ? L("1 weiterer Mac", "1 other Mac") : L("\(macs) weitere Macs", "\(macs) other Macs"))
+        return " · " + (macs == 0 ? n : n + " · " + L("\(macs + 1) Macs", "\(macs + 1) Macs"))
     }
 
     // MARK: Liste

@@ -56,6 +56,7 @@ struct SnapMenu {
 
         let store = AppStore()
         // Statistik: 7 Tage Demo-Verbrauch, heute mit Top-Projekten
+        store.monitor.stats.publish = { _ in }   // echte Statistik nie in Demo-Bildern
         store.stats.days = (0..<7).reversed().map { off in
             let day = StatsStore.key(Calendar.current.date(byAdding: .day, value: -off, to: now)!)
             let m = [1.7, 1.2, 2.1, 0.0, 0.9, 1.4, 0.6][off]

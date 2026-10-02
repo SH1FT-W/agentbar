@@ -98,7 +98,7 @@ struct Snap {
         store.monitor.inject(demo)
         try? await Task.sleep(nanoseconds: 3_000_000_000)
         for (name, dark) in [("light", false), ("dark", true)] {
-            shot(AnyView(MenuView(expanded: "1").environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater)), "build/menu-\(name).png", dark)
+            shot(AnyView(MenuView(expanded: "1").environmentObject(store).environmentObject(store.monitor).environmentObject(store.quota).environmentObject(store.updater).environmentObject(store.stats)), "build/menu-\(name).png", dark)
         }
     }
 
