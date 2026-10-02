@@ -1,5 +1,4 @@
 import SwiftUI
-import ServiceManagement
 
 enum SettingsWindow {
     private static var window: NSWindow?
@@ -51,8 +50,6 @@ struct SettingsView: View {
     @AppStorage(Prefs.peersEnabled) private var peersEnabled = false
     @AppStorage(Prefs.peerCode) private var peerCode = ""
     @AppStorage(Prefs.keepAwake) private var keepAwake = KeepAwakeMode.off.rawValue
-    // TODO(2.0-merge): durch store.loginItemEnabled / store.setLoginItem(_:) (Paket A) ersetzen.
-    @State private var loginItem = SMAppService.mainApp.status == .enabled
     @State private var codeInput = ""
     @State private var codeInvalid = false
     @State private var copied = false
@@ -79,7 +76,7 @@ struct SettingsView: View {
             }
 
             Section(L("Allgemein", "General")) {
-                Toggle(isOn: Binding(get: { loginItem }, set: { _ in toggleLoginItem() })) {
+                Toggle(isOn: Binding(get: { store.loginItemEnabled }, set: { store.setLoginItem($0) })) {
                     SettingLabel(L("Beim Anmelden starten", "Launch at login"), "power", .gray)
                 }
                 Picker(selection: $keepAwake) {
@@ -90,7 +87,9 @@ struct SettingsView: View {
                 }
                 .onChange(of: keepAwake) { store.updateKeepAwake() }
                 LabeledContent {
-                    // TODO(2.0-merge): store.hotKeyProblem (Paket A) hier als orangen Hinweis zeigen, falls ⌃⌥A belegt ist.
+                    if let problem = store.hotKeyProblem {
+                        Text(problem).font(.caption).foregroundStyle(.orange).lineLimit(2).multilineTextAlignment(.trailing)
+                    }
                     KeyCap(text: "⌃⌥A")
                 } label: {
                     SettingLabel(L("Büro ein- und ausblenden", "Show or hide Office"), "keyboard", .gray)
@@ -281,14 +280,6 @@ extension SettingsView {
         NSPasteboard.general.setString(text, forType: .string)
     }
 
-    private func toggleLoginItem() {
-        do {
-            if loginItem { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
-        } catch {
-            store.message = L("Anmeldeobjekt", "Login item") + ": \(error.localizedDescription)"
-        }
-        loginItem = SMAppService.mainApp.status == .enabled
-    }
     private func applyCode() {
         guard let c = PeerCode.normalize(codeInput) else { codeInvalid = true; return }
         codeInvalid = false

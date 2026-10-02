@@ -370,9 +370,7 @@ struct SessionRow: View {
         let s = session
         switch s.status {
         case .working: return s.activity.isEmpty ? L("Arbeitet …", "Working…") : s.activity
-        // TODO(2.0-merge): s.waitingReason (Paket A) bevorzugen, z. B. „Möchte git push ausführen“ / „Hat eine Frage“.
-        // Kein „Freigabe:“-Präfix mehr – Fragen und Pläne sind keine Freigaben; Farbe + Symbol zeigen den Zustand.
-        case .waiting: return s.activity.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : s.activity
+        case .waiting: return s.waitingReason ?? (s.activity.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : s.activity)
         default: return "\(s.status.label) · \(ago(s.lastActivity))"
         }
     }

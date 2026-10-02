@@ -283,33 +283,6 @@ struct MenuBarLabel: View {
 }
 
 /// Monochromes Template-Symbol wie die System-Extras in macOS 26/27; Zustand als kleines Abzeichen.
-enum MenuBarIcon {
-    static func make(waiting: Bool, working: Bool) -> NSImage {
-        let cfg = NSImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-        let name = waiting ? "hand.raised.fill" : "sparkles"
-        guard let sym = NSImage(systemSymbolName: name, accessibilityDescription: "AgentBar")?
-            .withSymbolConfiguration(cfg) else { return NSImage() }
-        let badge = working && !waiting
-        let size = NSSize(width: sym.size.width + (badge ? 3 : 0), height: max(sym.size.height, 16))
-        let img = NSImage(size: size, flipped: false) { _ in
-            let y = (size.height - sym.size.height) / 2
-            sym.draw(in: NSRect(x: 0, y: y, width: sym.size.width, height: sym.size.height),
-                     from: .zero, operation: .sourceOver, fraction: 1)
-            if badge {
-                let d: CGFloat = 6.5
-                let dot = NSRect(x: size.width - d, y: size.height - d - 0.5, width: d, height: d)
-                NSGraphicsContext.current?.compositingOperation = .clear
-                NSBezierPath(ovalIn: dot.insetBy(dx: -1.5, dy: -1.5)).fill()
-                NSGraphicsContext.current?.compositingOperation = .sourceOver
-                NSColor.black.setFill()
-                NSBezierPath(ovalIn: dot).fill()
-            }
-            return true
-        }
-        img.isTemplate = true
-        return img
-    }
-}
 
 enum AppInfo {
     static var version: String {

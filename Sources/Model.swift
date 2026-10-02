@@ -77,8 +77,11 @@ struct TokenTally: Equatable {
 /// Anders als das Original: Cache-Lesen kostet 10 %, Cache-Schreiben 125 % – sonst sind die Werte um ein Vielfaches zu hoch.
 enum Pricing {
     private static let table: [(match: String, input: Double, output: Double)] = [
+        ("fable", 10, 50), ("mythos", 10, 50),
+        ("opus-5-5", 4, 20), ("opus-5", 5, 25),
         ("opus-4-0", 15, 75), ("opus-4-1", 15, 75), ("claude-opus-4-2", 15, 75),
         ("opus-4", 5, 25),              // Opus 4.5 und neuer
+        ("sonnet-5", 2, 10),            // Sonnet 5 und 5.5
         ("sonnet", 3, 15),
         ("haiku-4", 1, 5), ("haiku", 0.8, 4),
     ]
