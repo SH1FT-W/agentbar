@@ -15,6 +15,7 @@ struct AgentBarApp: App {
                 .environmentObject(delegate.store.monitor)
                 .environmentObject(delegate.store.quota)
                 .environmentObject(delegate.store.updater)
+                .environmentObject(delegate.store.stats)
         } label: {
             MenuBarLabel().environmentObject(delegate.store.monitor).environmentObject(delegate.store.quota)
         }
@@ -43,13 +44,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate {
     /// Diagnose: `AgentBar.app/Contents/MacOS/AgentBar --dump` listet die erkannten Sitzungen und beendet sich.
     func dump() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [self] in
-            for s in store.monitor.sessions {
-                print("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.displayName) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | ctx \(s.contextFill.map { "\(Int(($0 * 100).rounded())) % / \(s.contextWindowText)" } ?? "–") | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
-            }
-            print(L("Kontingent", "Usage") + ": \(store.quota.session?.percent ?? -1) / \(store.quota.weekly?.percent ?? -1) \(store.quota.plan ?? "") \(store.quota.problem ?? "")")
-            exit(0)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [self] in print(store.diagnostics()); exit(0) }
+    }
+}
+
+extension AppStore {
+    /// Diagnose-Text (wie --dump) – auch für „Diagnose kopieren“ in den Einstellungen. Ohne Pfade/Namen außer Projektnamen.
+    func diagnostics() -> String {
+        var out = ["AgentBar \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") · macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"]
+        for s in monitor.sessions {
+            out.append("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | ctx \(s.contextFill.map { "\(Int(($0 * 100).rounded())) % / \(s.contextWindowText)" } ?? "–") | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
         }
+        out.append(L("Kontingent", "Usage") + ": \(quota.session?.percent ?? -1) / \(quota.weekly?.percent ?? -1) \(quota.plan ?? "") \(quota.problem ?? "")")
+        return out.joined(separator: "\n")
     }
 }
 
@@ -62,6 +69,7 @@ final class AppStore: ObservableObject {
     let keepAwake = KeepAwake()
     let updater = Updater()
     let peers = PeerHub()
+    let stats = StatsStore()
     private var peerWatch: AnyCancellable?
     lazy var office = OfficeWindowController(store: self)
     private var hotKey: HotKey?

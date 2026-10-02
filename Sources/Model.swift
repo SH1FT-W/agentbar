@@ -181,6 +181,50 @@ struct AgentSession: Identifiable, Equatable {
         return c.isEmpty ? nil : c.reduce(0, +)
     }
     var workingHelpers: Int { subagents.filter(\.working).count }
+    /// Kontext fast voll (≥ 85 %) – Warnung in Zeile, Büro und Mitteilung.
+    var contextWarning: Bool { (contextFill ?? 0) >= 0.85 }
+}
+
+// MARK: - Statistik & Prognose (2.0)
+
+/// Verbrauch eines Kalendertags (lokale Zeit), aus den Usage-Zeilen aller Sitzungen dieses Macs.
+struct DayStats: Codable, Equatable, Identifiable {
+    var day: String                       // "yyyy-MM-dd"
+    var tokens = TokenCount()
+    var cost: Double = 0                  // API-Gegenwert in USD (nur bekannte Modelle)
+    var byProject: [String: Int] = [:]    // Projektname → Tokens
+    var byModel: [String: Int] = [:]      // shortModel → Tokens
+    var sessions = 0
+    var id: String { day }
+}
+
+struct TokenCount: Codable, Equatable {
+    var input = 0, cacheWrite = 0, cacheRead = 0, output = 0
+    var total: Int { input + cacheWrite + cacheRead + output }
+}
+
+/// Wird von SessionMonitor gefüllt (Paket A), von Menü/Büro nur gelesen.
+@MainActor
+final class StatsStore: ObservableObject {
+    /// Letzte 30 Tage, ältester zuerst, Tage ohne Verbrauch fehlen.
+    @Published var days: [DayStats] = []
+    var today: DayStats? { days.last { $0.day == StatsStore.key(Date()) } }
+    func last(_ n: Int) -> [DayStats] {
+        (0..<n).reversed().map { off in
+            let k = StatsStore.key(Calendar.current.date(byAdding: .day, value: -off, to: Date())!)
+            return days.first { $0.day == k } ?? DayStats(day: k)
+        }
+    }
+    static func key(_ d: Date) -> String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
+    }
+}
+
+/// Hochrechnung für das 5-Stunden-Fenster aus den letzten Kontingent-Abrufen.
+struct QuotaForecast: Equatable {
+    var percentPerHour: Double
+    var exhaustsAt: Date?                 // nil = reicht bis zum Reset
 }
 
 // MARK: - Einstellungen
@@ -215,6 +259,12 @@ enum Prefs {
     static let quotaEnabled = "quotaEnabled"
     static let peersEnabled = "peersEnabled"
     static let peerCode = "peerCode"
+    static let notifyContext = "notifyContext"
+    static let notifyStalled = "notifyStalled"     // „hängt?“ – working ohne Ereignis > 10 Min.
+    static let quietHours = "quietHours"           // Ruhezeiten an/aus
+    static let quietFrom = "quietFrom"             // Stunde 0…23
+    static let quietTo = "quietTo"
+    static let notifyPeers = "notifyPeers"         // Mitteilungen auch für andere Macs
 
     static func register() {
         UserDefaults.standard.register(defaults: [
@@ -223,6 +273,7 @@ enum Prefs {
             showCount: true, showQuota: false, visibleHours: 2.0,
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,
             keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true, peersEnabled: false,
+            notifyContext: true, notifyStalled: false, quietHours: false, quietFrom: 22, quietTo: 7, notifyPeers: false,
         ])
     }
 }

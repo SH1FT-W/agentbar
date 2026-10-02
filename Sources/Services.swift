@@ -99,6 +99,8 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var problem: String?
     @Published private(set) var lastFetch: Date?
     @Published private(set) var loading = false
+    /// Prognose fürs 5-Stunden-Fenster (Paket A füllt sie), nil = zu wenig Daten.
+    @Published private(set) var forecast: QuotaForecast?
     var onThreshold: ((Double) -> Void)?
 
     private var timer: Timer?

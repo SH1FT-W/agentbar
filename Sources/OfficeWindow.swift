@@ -21,6 +21,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
             let root = OfficeView(model: model, load: load)
                 .environmentObject(store.monitor)
                 .environmentObject(store.quota)
+                .environmentObject(store.stats)
             let host = NSHostingView(rootView: root)
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 540),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
