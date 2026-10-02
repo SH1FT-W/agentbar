@@ -1416,10 +1416,9 @@ struct OfficeScene {
             if a.place == .stand(0) || a.place == .stand(1) { maxWidth = 110 }
             if a.place == .stand(0) { nameX -= 10 }
         case .sofa:
-            // Sofaplätze liegen nur 76 pt auseinander: mittleres Schild tiefer, alle in der Breite begrenzt
-            let middle = abs(a.point.x - OfficeModel.sofaSeat(1).0.x) < 1
-            nameY = middle ? 538 : 516
-            maxWidth = 130
+            // Sofaplätze liegen nur 76 pt auseinander: alle Schilder auf einer Linie, schmal genug, dass sie sich nicht berühren
+            nameY = 516
+            maxWidth = 72
         default: nameY = a.point.y + 22 * s
         }
         let icon: String, tint: Color
