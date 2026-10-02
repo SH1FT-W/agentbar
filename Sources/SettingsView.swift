@@ -1,4 +1,5 @@
 import SwiftUI
+import ServiceManagement
 
 enum SettingsWindow {
     private static var window: NSWindow?
@@ -6,9 +7,12 @@ enum SettingsWindow {
     @MainActor static func show(_ store: AppStore) {
         if window == nil {
             let host = NSHostingController(rootView: SettingsView().environmentObject(store))
+            // Nur Mindestgröße vom Inhalt – die Höhe ist frei veränderbar, das Formular scrollt
+            host.sizingOptions = [.minSize]
             let w = NSWindow(contentViewController: host)
             w.title = L("AgentBar-Einstellungen", "AgentBar Settings")
-            w.styleMask = [.titled, .closable, .fullSizeContentView]
+            w.styleMask = [.titled, .closable, .resizable, .fullSizeContentView]
+            w.setContentSize(NSSize(width: 500, height: 680))
             w.titlebarAppearsTransparent = true
             w.titleVisibility = .hidden
             w.isReleasedWhenClosed = false
@@ -20,8 +24,8 @@ enum SettingsWindow {
     }
 }
 
-/// Aufbau wie die Systemeinstellungen in macOS 26/27: Kopf mit App-Symbol, darunter gruppierte Abschnitte,
-/// jede Zeile mit farbigem Symbol-Plättchen.
+/// Aufbau wie die Systemeinstellungen in macOS 26/27: kompakter Kopf, darunter gruppierte Abschnitte,
+/// jede Zeile mit farbigem Symbol-Plättchen. Das Fenster ist in der Höhe veränderbar, das Formular scrollt.
 struct SettingsView: View {
     @EnvironmentObject var store: AppStore
     @AppStorage(Prefs.notifyWaiting) private var notifyWaiting = true
@@ -29,6 +33,12 @@ struct SettingsView: View {
     @AppStorage(Prefs.notifyError) private var notifyError = true
     @AppStorage(Prefs.notifyQuota) private var notifyQuota = true
     @AppStorage(Prefs.notifyUpdate) private var notifyUpdate = true
+    @AppStorage(Prefs.notifyContext) private var notifyContext = true
+    @AppStorage(Prefs.notifyStalled) private var notifyStalled = false
+    @AppStorage(Prefs.quietHours) private var quietHours = false
+    @AppStorage(Prefs.quietFrom) private var quietFrom = 22
+    @AppStorage(Prefs.quietTo) private var quietTo = 7
+    @AppStorage(Prefs.notifyPeers) private var notifyPeers = false
     @AppStorage(Prefs.quotaThreshold) private var threshold = 80.0
     @AppStorage(Prefs.notifyWhenFrontmost) private var whenFront = false
     @AppStorage(Prefs.showCount) private var showCount = true
@@ -40,33 +50,65 @@ struct SettingsView: View {
     @AppStorage(Prefs.quotaEnabled) private var quotaEnabled = true
     @AppStorage(Prefs.peersEnabled) private var peersEnabled = false
     @AppStorage(Prefs.peerCode) private var peerCode = ""
+    @AppStorage(Prefs.keepAwake) private var keepAwake = KeepAwakeMode.off.rawValue
+    // TODO(2.0-merge): durch store.loginItemEnabled / store.setLoginItem(_:) (Paket A) ersetzen.
+    @State private var loginItem = SMAppService.mainApp.status == .enabled
     @State private var codeInput = ""
     @State private var codeInvalid = false
-    var height: CGFloat = 700
+    @State private var copied = false
+    /// Feste Höhe nur für Snapshots (ganzes Formular auf einem Bild); nil = Fenster bestimmt die Höhe.
+    var height: CGFloat? = nil
 
     var body: some View {
         Form {
             Section {
-                HStack(spacing: 12) {
-                    // Eigenes Plättchen statt App-Symbol (AgentBar hat keins) – wie die Kopf-Symbole der Systemeinstellungen
+                HStack(spacing: 10) {
+                    // Eigenes Plättchen statt App-Symbol – wie die Kopf-Symbole der Systemeinstellungen
                     ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentColor.gradient)
-                        Image(systemName: "sparkles").font(.system(size: 24, weight: .medium)).foregroundStyle(.white)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.gradient)
+                        Image(systemName: "sparkles").font(.system(size: 17, weight: .medium)).foregroundStyle(.white)
                     }
-                    .frame(width: 48, height: 48)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("AgentBar").font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("AgentBar").font(.system(size: 13, weight: .semibold))
                         Text(L("Deine Claude-Agenten im Blick – direkt in der Menüleiste.", "Keep an eye on your Claude agents – right in the menu bar."))
-                            .font(.system(size: 12)).foregroundStyle(.secondary)
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 4)
+            }
+
+            Section(L("Allgemein", "General")) {
+                Toggle(isOn: Binding(get: { loginItem }, set: { _ in toggleLoginItem() })) {
+                    SettingLabel(L("Beim Anmelden starten", "Launch at login"), "power", .gray)
+                }
+                Picker(selection: $keepAwake) {
+                    ForEach(KeepAwakeMode.allCases) { Text($0.label).tag($0.rawValue) }
+                } label: {
+                    SettingLabel(L("Wach bleiben", "Keep awake"), "cup.and.saucer.fill", .brown,
+                                 note: L("Verhindert den Ruhezustand des Macs.", "Keeps your Mac from sleeping."))
+                }
+                .onChange(of: keepAwake) { store.updateKeepAwake() }
+                LabeledContent {
+                    // TODO(2.0-merge): store.hotKeyProblem (Paket A) hier als orangen Hinweis zeigen, falls ⌃⌥A belegt ist.
+                    KeyCap(text: "⌃⌥A")
+                } label: {
+                    SettingLabel(L("Büro ein- und ausblenden", "Show or hide Office"), "keyboard", .gray)
+                }
             }
 
             Section(L("Mitteilungen", "Notifications")) {
                 Toggle(isOn: $notifyWaiting) { SettingLabel(L("Wenn ein Agent dich braucht", "When an agent needs you"), "hand.raised.fill", .orange) }
                 Toggle(isOn: $notifyDone) { SettingLabel(L("Wenn ein Agent fertig ist", "When an agent is done"), "checkmark", .green) }
                 Toggle(isOn: $notifyError) { SettingLabel(L("Bei Fehlern", "On errors"), "exclamationmark", .red) }
+                Toggle(isOn: $notifyContext) {
+                    SettingLabel(L("Kontext fast voll", "Context almost full"), "text.line.last.and.arrowtriangle.forward", .orange,
+                                 note: L("Ab 85 % des Kontextfensters.", "At 85% of the context window."))
+                }
+                Toggle(isOn: $notifyStalled) {
+                    SettingLabel(L("Agent hängt vielleicht", "Agent may be stuck"), "hourglass", .yellow,
+                                 note: L("Arbeitet seit 10 Minuten ohne neues Lebenszeichen.", "Working for 10 minutes without any new activity."))
+                }
                 Toggle(isOn: $notifyQuota) { SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink) }
                 if notifyQuota {
                     LabeledContent {
@@ -84,6 +126,21 @@ struct SettingsView: View {
                     SettingLabel(L("Auch im Vordergrund", "Even when in front"), "macwindow", .gray,
                                  note: L("Auch melden, wenn die Sitzung gerade sichtbar ist.", "Also notify when the session is visible."))
                 }
+                Toggle(isOn: $quietHours) {
+                    SettingLabel(L("Ruhezeiten", "Quiet hours"), "moon.fill", .indigo,
+                                 note: L("In dieser Zeit keine Mitteilungen.", "No notifications during this time."))
+                }
+                if quietHours {
+                    LabeledContent {
+                        HStack(spacing: 6) {
+                            hourPicker($quietFrom)
+                            Text(L("bis", "to")).foregroundStyle(.secondary)
+                            hourPicker($quietTo)
+                        }
+                    } label: {
+                        SettingLabel(L("Von", "From"), nil, .clear)
+                    }
+                }
             }
 
             Section(L("Menüleiste", "Menu Bar")) {
@@ -100,11 +157,12 @@ struct SettingsView: View {
                 } label: {
                     SettingLabel(L("Ruhende Sitzungen zeigen", "Show idle sessions for"), "clock", .indigo)
                 }
-                .onChange(of: hours) { _ in store.monitor.rescan() }
+                .onChange(of: hours) { store.monitor.rescan() }
                 Toggle(isOn: $quotaEnabled) {
                     SettingLabel(L("Kontingent abrufen", "Fetch usage"), "chart.pie.fill", .pink,
                                  note: L("Liest dein Nutzungs-Kontingent bei Anthropic.", "Reads your usage limits from Anthropic."))
                 }
+                .onChange(of: quotaEnabled) { _, on in if on { Task { await store.quota.refresh() } } }
                 LabeledContent {
                     Button(store.hooksInstalled ? L("Entfernen", "Remove") : L("Einrichten", "Set Up")) { store.setHooks(!store.hooksInstalled) }
                 } label: {
@@ -125,20 +183,23 @@ struct SettingsView: View {
                     SettingLabel(L("Andere Macs zeigen", "Show other Macs"), "laptopcomputer", .teal,
                                  note: L("Sitzungen deiner anderen Macs im selben Netzwerk.", "Sessions from your other Macs on the same network."))
                 }
-                .onChange(of: peersEnabled) { on in
+                .onChange(of: peersEnabled) { _, on in
                     if on, PeerCode.normalize(peerCode) == nil { peerCode = PeerCode.generate() }
                     store.peers.configure()
                 }
                 if peersEnabled {
+                    Toggle(isOn: $notifyPeers) {
+                        SettingLabel(L("Mitteilungen anderer Macs", "Notifications from other Macs"), "bell.badge.fill", .red,
+                                     note: L("Auch melden, wenn dort ein Agent dich braucht oder fertig ist.", "Also notify when an agent there needs you or is done."))
+                    }
                     LabeledContent {
                         HStack(spacing: 8) {
                             Text(peerCode).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
-                            Button { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(peerCode, forType: .string) } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .help(L("Kopieren", "Copy"))
+                            Button { copy(peerCode) } label: { Image(systemName: "doc.on.doc") }
+                                .help(L("Kopieren", "Copy")).accessibilityLabel(L("Kopieren", "Copy"))
                             Button { peerCode = PeerCode.generate(); store.peers.configure() } label: { Image(systemName: "arrow.clockwise") }
                                 .help(L("Neuen Code erzeugen – alle anderen Macs brauchen ihn dann auch", "New code – all other Macs need it too"))
+                                .accessibilityLabel(L("Neuen Code erzeugen", "New code"))
                         }
                         .buttonStyle(.borderless)
                     } label: {
@@ -173,11 +234,11 @@ struct SettingsView: View {
 
             Section(L("Büro", "Office")) {
                 Toggle(isOn: $floating) { SettingLabel(L("Immer im Vordergrund", "Always on top"), "pin.fill", .orange) }
-                    .onChange(of: floating) { _ in store.office.applyPrefs() }
+                    .onChange(of: floating) { store.office.applyPrefs() }
                 LabeledContent {
                     HStack(spacing: 10) {
                         Slider(value: $opacity, in: 0.4...1).frame(width: 150)
-                            .onChange(of: opacity) { _ in store.office.applyPrefs() }
+                            .onChange(of: opacity) { store.office.applyPrefs() }
                         Text(percentText(Int((opacity * 100).rounded()))).monospacedDigit().foregroundStyle(.secondary)
                             .frame(width: 44, alignment: .trailing)
                     }
@@ -188,19 +249,46 @@ struct SettingsView: View {
             }
 
             Section {
+                VersionRow(updater: store.updater)
                 LabeledContent {
-                    Text(AppInfo.version).foregroundStyle(.secondary).monospacedDigit()
+                    Button(copied ? L("Kopiert", "Copied") : L("Diagnose kopieren", "Copy Diagnostics")) {
+                        copy(store.diagnostics())
+                        copied = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { copied = false }
+                    }
                 } label: {
-                    SettingLabel("Version", "info", .gray)
+                    SettingLabel(L("Diagnose", "Diagnostics"), "stethoscope", .gray,
+                                 note: L("Für Fehlerberichte – enthält Projektnamen, keine Pfade.", "For bug reports – includes project names, no paths."))
                 }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: height)
+        .frame(width: 500)
+        .frame(minHeight: height ?? 420, idealHeight: height ?? 680, maxHeight: height ?? .infinity)
+    }
+
+    private func hourPicker(_ value: Binding<Int>) -> some View {
+        Picker("", selection: value) {
+            ForEach(0..<24, id: \.self) { h in Text(String(format: "%02d:00", h)).tag(h) }
+        }
+        .labelsHidden().fixedSize()
     }
 }
 
 extension SettingsView {
+    private func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    private func toggleLoginItem() {
+        do {
+            if loginItem { try SMAppService.mainApp.unregister() } else { try SMAppService.mainApp.register() }
+        } catch {
+            store.message = L("Anmeldeobjekt", "Login item") + ": \(error.localizedDescription)"
+        }
+        loginItem = SMAppService.mainApp.status == .enabled
+    }
     private func applyCode() {
         guard let c = PeerCode.normalize(codeInput) else { codeInvalid = true; return }
         codeInvalid = false
@@ -216,7 +304,7 @@ private struct PeerStatus: View {
 
     var body: some View {
         let names = hub.peers.values.map(\.name).sorted()
-        Text(hub.problem ?? (names.isEmpty ? L("Suche andere Macs …", "Looking for other Macs …") : names.joined(separator: ", ")))
+        Text(hub.problem ?? (names.isEmpty ? L("Suche andere Macs …", "Looking for other Macs…") : names.joined(separator: ", ")))
             .foregroundStyle(hub.problem == nil ? Color.secondary : Color.orange).multilineTextAlignment(.trailing)
     }
 }
@@ -247,5 +335,70 @@ struct SettingLabel: View {
                 if let note { Text(note).font(.system(size: 11)).foregroundStyle(.secondary) }
             }
         }
+    }
+}
+
+/// Version mit „Nach Updates suchen“; bei einem Update aufklappbare Neuerungen.
+private struct VersionRow: View {
+    @ObservedObject var updater: Updater
+    @State private var showNotes = false
+
+    var body: some View {
+        LabeledContent {
+            HStack(spacing: 8) {
+                status
+                action
+            }
+        } label: {
+            SettingLabel("Version \(AppInfo.version)", "info", .gray)
+        }
+        if case .available(_, let notes) = updater.state, !notes.isEmpty {
+            DisclosureGroup(L("Was ist neu?", "What’s New?"), isExpanded: $showNotes) {
+                Text(notes).font(.system(size: 12)).foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder private var status: some View {
+        switch updater.state {
+        case .checking:
+            ProgressView().controlSize(.small)
+        case .upToDate:
+            Text(L("Aktuell", "Up to date")).foregroundStyle(.secondary)
+        case .installing(let text):
+            ProgressView().controlSize(.small)
+            Text(text).foregroundStyle(.secondary)
+        case .failed(let msg):
+            Text(msg).foregroundStyle(.orange).lineLimit(2).multilineTextAlignment(.trailing)
+        case .available, .idle:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder private var action: some View {
+        switch updater.state {
+        case .available(let v, _):
+            Button(L("Auf \(v) aktualisieren", "Update to \(v)")) { Task { await updater.install() } }
+                .buttonStyle(.borderedProminent)
+        case .installing, .checking:
+            EmptyView()
+        default:
+            Button(L("Nach Updates suchen", "Check for Updates")) { Task { await updater.check() } }
+        }
+    }
+}
+
+/// Tastenkürzel als Tastenkappe (nur Anzeige).
+private struct KeyCap: View {
+    let text: String
+    var body: some View {
+        Text(text).font(.system(size: 12, weight: .medium)).monospaced()
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color.primary.opacity(0.07)))
+            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
+            .accessibilityLabel("Control-Option-A")
     }
 }
