@@ -44,7 +44,8 @@ enum PeerCode {
     }
 }
 
-/// Was über das Netz geht: nur Anzeige-Daten, keine Pfade außerhalb des Home-Ordners (~), keine Protokolle.
+/// Was über das Netz geht: nur Anzeige-Daten, keine Protokolle. Arbeitsordner im Home-Ordner relativ zu ~,
+/// alle anderen nur mit ihrem letzten Pfadteil (Projektname).
 private struct Envelope: Codable {
     var v = 1
     var from: String
@@ -61,6 +62,7 @@ private struct Envelope: Codable {
         var ctx, window: Int
         var tokens: [String: [Int]]
         var helpers: [Helper]
+        var q: String?            // Fragetext (ab 2.0; ältere Versionen ignorieren/fehlen → nil)
     }
     struct Helper: Codable {
         var id, type, description, activity: String
@@ -72,12 +74,14 @@ private struct Envelope: Codable {
 private extension AgentSession {
     var wire: Envelope.Wire {
         let home = NSHomeDirectory()
-        return .init(id: id, cwd: cwd.hasPrefix(home) ? "~" + cwd.dropFirst(home.count) : cwd, model: model, mode: permissionMode,
+        let path = cwd == home || cwd.hasPrefix(home + "/") ? "~" + cwd.dropFirst(home.count) : URL(fileURLWithPath: cwd).lastPathComponent
+        return .init(id: id, cwd: path, model: model, mode: permissionMode,
                      activity: activity, tool: tool, lastText: String(lastText.prefix(300)), source: source.rawValue, title: title,
                      status: status.rawValue, last: lastActivity.timeIntervalSince1970, ctx: contextUsed, window: contextWindow,
                      tokens: tokens.mapValues { [$0.input, $0.cacheWrite, $0.cacheRead, $0.output] },
                      helpers: subagents.prefix(12).map { .init(id: $0.id, type: $0.type, description: $0.description, activity: $0.activity,
-                                                               working: $0.working, last: $0.lastActivity.timeIntervalSince1970) })
+                                                               working: $0.working, last: $0.lastActivity.timeIntervalSince1970) },
+                     q: question.map { String($0.prefix(200)) })
     }
 
     init?(_ w: Envelope.Wire, device: String, laptop: Bool) {
@@ -90,7 +94,7 @@ private extension AgentSession {
                   subagents: w.helpers.map { SubAgent(id: $0.id, type: $0.type, description: $0.description, working: $0.working,
                                                       activity: $0.activity, lastActivity: Date(timeIntervalSince1970: $0.last)) },
                   hostBundle: nil, tty: nil, usesHooks: false, contextUsed: w.ctx, contextWindow: w.window,
-                  device: device, deviceIsLaptop: laptop)
+                  device: device, deviceIsLaptop: laptop, question: w.q.map { String($0.prefix(200)) })
     }
 }
 
@@ -123,6 +127,10 @@ final class PeerHub: ObservableObject {
     private var local: [AgentSession] = []
     private var pending = false
     private var timer: Timer?
+    private var group: String?
+    private var restartDelay: TimeInterval = 2          // Backoff nach Ausfall von Listener/Browser (bis 60 s)
+    private var restartPending = false
+    static let maxLinks = 8
     private let name = Host.current().localizedName ?? "Mac"
     private let laptop = PeerHub.hasBattery()
 
@@ -147,6 +155,28 @@ final class PeerHub: ObservableObject {
         start(group: PeerCode.group(want))
     }
 
+    /// Netzwechsel/Ruhezustand: Listener und Browser neu aufsetzen, Code bleibt.
+    func restart() {
+        guard let code, let key = sealKey else { return }
+        stop()
+        self.code = code
+        sealKey = key
+        start(group: PeerCode.group(code))
+    }
+
+    /// Nach einem Ausfall mit wachsender Pause neu starten.
+    private func scheduleRestart() {
+        guard !restartPending, code != nil else { return }
+        restartPending = true
+        let delay = restartDelay
+        restartDelay = min(restartDelay * 2, 60)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            restartPending = false
+            restart()
+        }
+    }
+
     /// Eigene Sitzungen haben sich geändert → gebündelt an alle schicken.
     func update(local sessions: [AgentSession]) {
         local = sessions.filter { $0.device == nil }
@@ -162,17 +192,25 @@ final class PeerHub: ObservableObject {
 
     private func start(group: String) {
         problem = nil
+        self.group = group
         do {
             let l = try NWListener(using: .tcp)
             l.service = NWListener.Service(name: myID, type: Self.service, txtRecord: NWTXTRecord(["g": group, "i": myID]))
             l.newConnectionHandler = { [weak self] c in DispatchQueue.main.async { self?.adopt(c, peer: nil) } }
             l.stateUpdateHandler = { [weak self] st in
-                if case .failed(let e) = st { DispatchQueue.main.async { self?.problem = e.localizedDescription } }
+                DispatchQueue.main.async {
+                    switch st {
+                    case .failed(let e): self?.problem = e.localizedDescription; self?.scheduleRestart()
+                    case .ready: self?.restartDelay = 2
+                    default: break
+                    }
+                }
             }
             l.start(queue: .main)
             listener = l
         } catch {
             problem = error.localizedDescription
+            scheduleRestart()
             return
         }
         let b = NWBrowser(for: .bonjourWithTXTRecord(type: Self.service, domain: nil), using: .tcp)
@@ -182,7 +220,7 @@ final class PeerHub: ObservableObject {
         b.stateUpdateHandler = { [weak self] st in
             DispatchQueue.main.async {
                 switch st {
-                case .failed(let e): self?.problem = e.localizedDescription
+                case .failed(let e): self?.problem = e.localizedDescription; self?.scheduleRestart()
                 case .waiting(let e): self?.problem = L("Lokales Netzwerk nicht erlaubt", "Local network not allowed") + " (\(e.localizedDescription))"
                 case .ready: self?.problem = nil
                 default: break
@@ -198,6 +236,7 @@ final class PeerHub: ObservableObject {
 
     private func stop() {
         timer?.invalidate(); timer = nil
+        group = nil
         listener?.cancel(); listener = nil
         browser?.cancel(); browser = nil
         for l in links.values { l.cancel() }
@@ -218,11 +257,13 @@ final class PeerHub: ObservableObject {
     }
 
     private func adopt(_ c: NWConnection, peer: String?) {
+        // Obergrenze gegen Fluten im lokalen Netz
+        guard links.count < Self.maxLinks else { c.cancel(); return }
         let link = PeerLink(c)
         let key = ObjectIdentifier(link)
         links[key] = link
         if let peer { outgoing[peer] = key }
-        link.onMessage = { [weak self] data in self?.received(data) }
+        link.onMessage = { [weak self] data in self?.received(data) ?? false }
         link.onReady = { [weak self, weak link] in if let link { self?.send(to: link) } }
         link.onClose = { [weak self] in
             guard let self else { return }
@@ -250,24 +291,26 @@ final class PeerHub: ObservableObject {
 
     private func send(to link: PeerLink) {
         guard let sealKey else { return }
-        let env = Envelope(from: myID, name: name, laptop: laptop, sent: Date().timeIntervalSince1970, sessions: local.map(\.wire))
+        let env = Envelope(from: myID, name: name, laptop: laptop, sent: Date().timeIntervalSince1970, sessions: local.prefix(40).map(\.wire))
         guard let json = try? JSONEncoder().encode(env), let box = try? ChaChaPoly.seal(json, using: sealKey) else { return }
         link.send(box.combined)
     }
 
-    private func received(_ data: Data) {
+    /// false = nicht entschlüsselbar/lesbar → Verbindung wird geschlossen.
+    private func received(_ data: Data) -> Bool {
         guard let sealKey, let box = try? ChaChaPoly.SealedBox(combined: data),
               let json = try? ChaChaPoly.open(box, using: sealKey),
               let env = try? JSONDecoder().decode(Envelope.self, from: json),
-              env.v == 1, env.from != myID else { return }
+              env.v == 1, env.from != myID else { return false }
         // Nur frische Nachrichten, und nie ältere nach neueren (gegen Wiedereinspielen)
         let now = Date().timeIntervalSince1970
-        guard abs(now - env.sent) < 120, env.sent > (peers[env.from]?.lastSent ?? 0) else { return }
+        guard abs(now - env.sent) < 120, env.sent > (peers[env.from]?.lastSent ?? 0) else { return true }
         let name = String(env.name.prefix(40))
         let list = env.sessions.prefix(40).compactMap { AgentSession($0, device: name, laptop: env.laptop) }
         let changed = peers[env.from]?.sessions != list || peers[env.from]?.name != name
         peers[env.from] = Peer(id: env.from, name: name, laptop: env.laptop, sessions: list, lastSeen: Date(), lastSent: env.sent)
         if changed { publish() }
+        return true
     }
 
     private func publish() {
@@ -289,14 +332,21 @@ final class PeerHub: ObservableObject {
 private final class PeerLink {
     private let c: NWConnection
     private(set) var ready = false
-    var onMessage: ((Data) -> Void)?
+    private var trusted = false               // erste gültige Nachricht empfangen
+    var onMessage: ((Data) -> Bool)?
     var onReady: (() -> Void)?
     var onClose: (() -> Void)?
-    private static let maxFrame = 2_000_000
+    private static let maxFrame = 512_000      // 40 Sitzungen passen locker hinein
+    private static let handshakeTimeout: TimeInterval = 10
 
     init(_ c: NWConnection) { self.c = c }
 
     func start() {
+        // Wer nach 10 s nichts Gültiges geschickt hat, fliegt raus
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.handshakeTimeout) { [weak self] in
+            guard let self, !self.trusted else { return }
+            self.close()
+        }
         c.stateUpdateHandler = { [weak self] st in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -348,7 +398,9 @@ private final class PeerLink {
             DispatchQueue.main.async {
                 guard let self else { return }
                 guard err == nil, let data, data.count == n else { self.close(); return }
-                self.onMessage?(data)
+                // Nicht entschlüsselbar → sofort schließen
+                guard self.onMessage?(data) == true else { self.close(); return }
+                self.trusted = true
                 if done { self.close() } else { self.readLength() }
             }
         }

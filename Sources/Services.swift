@@ -105,6 +105,9 @@ final class QuotaMonitor: ObservableObject {
 
     private var timer: Timer?
     private var notifiedWindow: Date?
+    /// Stützpunkte (Zeit, Prozent) im aktuellen 5-Stunden-Fenster – für die Prognose, über Neustarts gemerkt
+    private var points: [(t: Double, p: Double)] = []
+    private var pointsWindow: Double = 0
     /// Nach HTTP 429 bis hierhin nicht mehr fragen (Anthropic drosselt den Endpunkt)
     private var blockedUntil: Date?
     private var backoff: TimeInterval = 600
@@ -158,6 +161,7 @@ final class QuotaMonitor: ObservableObject {
                 plan = Self.planName(acc)
             }
             save()
+            addPoint()
             checkThreshold()
         } catch {
             let e = error as NSError
@@ -198,6 +202,47 @@ final class QuotaMonitor: ObservableObject {
         plan = d.string(forKey: "quotaCache.plan")
         let t = d.double(forKey: "quotaCache.time")
         lastFetch = t > 0 ? Date(timeIntervalSince1970: t) : nil
+        if let m = d.dictionary(forKey: "quotaCache.points"), let w = m["w"] as? Double,
+           let ts = m["t"] as? [Double], let ps = m["p"] as? [Double], ts.count == ps.count {
+            pointsWindow = w
+            points = zip(ts, ps).map { (t: $0, p: $1) }
+        }
+        updateForecast()
+    }
+
+    // MARK: Prognose
+
+    private func addPoint() {
+        guard let s = session, let r = s.resetsAt else { return }
+        let w = (r.timeIntervalSince1970 / 60).rounded() * 60
+        if w != pointsWindow { points = []; pointsWindow = w }
+        points.append((t: Date().timeIntervalSince1970, p: s.percent))
+        points = Array(points.suffix(60))
+        if !readOnlyRun {
+            UserDefaults.standard.set(["w": w, "t": points.map(\.t), "p": points.map(\.p)], forKey: "quotaCache.points")
+        }
+        updateForecast()
+    }
+
+    /// Steigung der letzten 2 Std. im Fenster (kleinste Quadrate). Mindestens 2 Punkte mit ≥ 20 Min. Abstand, sonst nil.
+    private func updateForecast() {
+        guard let s = session, let reset = s.resetsAt, reset > Date(),
+              (reset.timeIntervalSince1970 / 60).rounded() * 60 == pointsWindow else { forecast = nil; return }
+        let from = max(reset.timeIntervalSince1970 - 5 * 3600, (points.last?.t ?? 0) - 2 * 3600)
+        let pts = points.filter { $0.t >= from }
+        guard pts.count >= 2, let a = pts.first, let b = pts.last, b.t - a.t >= 1200 else { forecast = nil; return }
+        let n = Double(pts.count)
+        let mt = pts.reduce(0) { $0 + $1.t } / n, mp = pts.reduce(0) { $0 + $1.p } / n
+        let den = pts.reduce(0) { $0 + ($1.t - mt) * ($1.t - mt) }
+        let slope = den > 0 ? pts.reduce(0) { $0 + ($1.t - mt) * ($1.p - mp) } / den : 0   // Prozent je Sekunde
+        let perHour = max(0, slope * 3600)
+        var exhausts: Date?
+        if slope > 0 {
+            let at = Date(timeIntervalSince1970: b.t + max(0, 100 - b.p) / slope)
+            if at < reset { exhausts = at }
+        }
+        let next = QuotaForecast(percentPerHour: perHour, exhaustsAt: exhausts)
+        if next != forecast { forecast = next }
     }
 
     private func checkThreshold() {
@@ -281,22 +326,44 @@ func resetText(_ date: Date?) -> String {
 
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     var onOpen: ((String) -> Void)?
+    /// „1 Std. stumm“ für eine Sitzung
+    var onMute: ((String) -> Void)?
+
+    static let sessionCategory = "session"
 
     override init() {
         super.init()
         guard Bundle.main.bundleIdentifier != nil else { return }   // ohne App-Bundle (Snapshot) stürzt UNUserNotificationCenter ab
         let c = UNUserNotificationCenter.current()
         c.delegate = self
+        c.setNotificationCategories([UNNotificationCategory(identifier: Self.sessionCategory, actions: [
+            UNNotificationAction(identifier: "open", title: L("Zur Sitzung", "Go to session"), options: [.foreground]),
+            UNNotificationAction(identifier: "mute", title: L("1 Std. stumm", "Mute for 1 hour"), options: []),
+        ], intentIdentifiers: [], options: [])])
         c.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
+    /// Ruhezeiten (Stunden, über Mitternacht möglich: 22 → 7 = 22:00 bis 6:59). Von = Bis gilt als aus.
+    static func quietNow(_ date: Date = Date()) -> Bool {
+        let d = UserDefaults.standard
+        guard d.bool(forKey: Prefs.quietHours) else { return false }
+        let from = d.integer(forKey: Prefs.quietFrom), to = d.integer(forKey: Prefs.quietTo)
+        let h = Calendar.current.component(.hour, from: date)
+        if from == to { return false }
+        return from < to ? (h >= from && h < to) : (h >= from || h < to)
+    }
+
     func post(title: String, body: String, sessionId: String?, sound: Bool = true) {
-        guard Bundle.main.bundleIdentifier != nil else { return }
+        guard Bundle.main.bundleIdentifier != nil, !Self.quietNow() else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         if sound { content.sound = .default }
-        if let sessionId { content.userInfo = ["session": sessionId]; content.threadIdentifier = sessionId }
+        if let sessionId {
+            content.userInfo = ["session": sessionId]
+            content.threadIdentifier = sessionId
+            content.categoryIdentifier = Self.sessionCategory
+        }
         let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(req)
     }
@@ -309,7 +376,11 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         if let id = response.notification.request.content.userInfo["session"] as? String {
-            DispatchQueue.main.async { self.onOpen?(id) }
+            switch response.actionIdentifier {
+            case "mute": DispatchQueue.main.async { self.onMute?(id) }
+            case UNNotificationDismissActionIdentifier: break
+            default: DispatchQueue.main.async { self.onOpen?(id) }
+            }
         }
         completionHandler()
     }
@@ -340,6 +411,8 @@ final class KeepAwake {
 final class HotKey {
     private var ref: EventHotKeyRef?
     private static var action: (() -> Void)?
+    /// Hinweistext, falls ⌃⌥A schon belegt ist (sonst nil)
+    private(set) var problem: String?
 
     init(action: @escaping () -> Void) {
         HotKey.action = action
@@ -350,7 +423,11 @@ final class HotKey {
         }, 1, &spec, nil, nil)
         let id = EventHotKeyID(signature: OSType(0x4147_4254), id: 1)   // "AGBT"
         let status = RegisterEventHotKey(UInt32(kVK_ANSI_A), UInt32(optionKey | controlKey), id, GetApplicationEventTarget(), 0, &ref)
-        if status != noErr { NSLog(L("AgentBar: Tastenkürzel ⌃⌥A ist belegt", "AgentBar: shortcut ⌃⌥A is taken") + " (\(status))") }
+        if status != noErr {
+            problem = L("Tastenkürzel ⌃⌥A ist schon belegt – das Büro öffnest du über das Menü.",
+                        "Shortcut ⌃⌥A is already taken – open the office from the menu instead.")
+            NSLog("AgentBar: hot key ⌃⌥A unavailable (\(status))")
+        }
     }
 }
 

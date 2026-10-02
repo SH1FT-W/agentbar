@@ -2,29 +2,39 @@ import Foundation
 import CoreServices
 import Darwin
 
+/// `--dump` (und das Snapshot-Werkzeug) liest nur: keine Log-Rotation, keine gespeicherte Statistik, keine Kontingent-Stützpunkte.
+#if SNAPSHOT
+let readOnlyRun = true
+#else
+let readOnlyRun = CommandLine.arguments.contains("--dump")
+#endif
+
 /// Liest die Sitzungs-Protokolle von Claude Code (JSONL) und – falls eingerichtet – die Hook-Ereignisse
 /// und macht daraus eine Liste von Agenten mit Status. Alles Datei-IO läuft auf einer eigenen Queue.
 @MainActor
 final class SessionMonitor: ObservableObject {
     @Published fileprivate(set) var sessions: [AgentSession] = []
-    /// Sitzungen anderer Macs (über PeerHub) – nur zur Anzeige, ohne Mitteilungen.
-    @Published var remote: [AgentSession] = []
+    /// Sitzungen anderer Macs (über PeerHub) – nur zur Anzeige.
+    @Published var remote: [AgentSession] = [] {
+        didSet { stats.exclude(Set(remote.map(\.id))) }
+    }
     @Published private(set) var hooksSeen = false
     /// Wird bei jedem Statuswechsel einer Hauptsitzung aufgerufen (für Mitteilungen).
     var onTransition: ((AgentSession, AgentStatus) -> Void)?
+    /// Nach jeder Auswertung mit der ganzen Liste (Kontext-/Hängt-Hinweise).
+    var onUpdate: (([AgentSession]) -> Void)?
+    /// Tagesstatistik (eigene Queue); AppStore hängt `publish` an den StatsStore.
+    let stats = StatsCollector()
 
     private let core = MonitorCore()
-    private var tick: Timer?
 
     init() {
+        core.stats = stats
         core.publish = { [weak self] list, hooks in
             Task { @MainActor in self?.apply(list, hooks: hooks) }
         }
         core.start()
-        // Zeitabhängige Übergänge (arbeitet → wartet, fertig → Pause) auch ohne neue Dateien
-        tick = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            self?.core.recompute()
-        }
+        // Zeitabhängige Übergänge (arbeitet → wartet, fertig → Pause) plant der Kern selbst: 2 s bei aktiven Sitzungen, sonst 15 s
     }
 
     func rescan() { core.fullScan() }
@@ -34,11 +44,14 @@ final class SessionMonitor: ObservableObject {
     private func apply(_ list: [AgentSession], hooks: Bool) {
         if hooksSeen != hooks { hooksSeen = hooks }
         let first = previous.isEmpty && sessions.isEmpty
+        var next: [String: AgentStatus] = [:]
         for s in list {
             if let old = previous[s.id], old != s.status, !first { onTransition?(s, old) }
-            previous[s.id] = s.status
+            next[s.id] = s.status
         }
+        previous = next      // verschwundene Sitzungen vergessen
         if list != sessions { sessions = list }
+        onUpdate?(list)
     }
 
     /// Eigene und fremde Sitzungen. Liegt ~/.claude in einer geteilten Cloud, kann eine fremde Sitzung auch
@@ -80,6 +93,8 @@ private final class FileState {
     var toolName = ""
     var toolActivity = ""
     var toolTime: Date?
+    var afterTool = false                    // letzte Zeile ist ein Werkzeug-Ergebnis → letzte Tätigkeit bleibt stehen
+    var question: String?                    // Fragetext eines offenen AskUserQuestion
     var thinking = false
     var interrupted = false
     var apiError = false
@@ -92,14 +107,26 @@ private final class FileState {
     var contextMax = 0                       // größter je gesehener Kontext bzw. preTokens vor dem Zusammenfassen
     var projectVotes: [String: Int] = [:]   // Projektordner → Häufigkeit (Arbeitsordner + bearbeitete Dateien)
     var lastText = ""
-    var usage: [String: (model: String, tally: TokenTally)] = [:]   // je message.id – Claude schreibt pro Inhaltsblock eine Zeile mit derselben usage
+    // Je message.id – Claude schreibt pro Inhaltsblock eine Zeile mit derselben usage. Nur die letzten Nachrichten
+    // merken (nur die können noch Zeilen bekommen), die Summe bleibt in `tokens`.
+    private var usage: [String: (model: String, tally: TokenTally)] = [:]
+    private var usageOrder: [String] = []
     private(set) var tokens: [String: TokenTally] = [:]             // laufende Summe je Modell
 
     func setUsage(_ id: String, model: String, _ t: TokenTally) {
         if let old = usage[id] { tokens[old.model] = (tokens[old.model] ?? TokenTally()) - old.tally }
+        else {
+            usageOrder.append(id)
+            if usageOrder.count > 32 { usage[usageOrder.removeFirst()] = nil }
+        }
         usage[id] = (model, t)
         tokens[model] = (tokens[model] ?? TokenTally()) + t
     }
+
+    /// Datei neu geschrieben → Summen von vorn.
+    func resetTokens() { usage = [:]; usageOrder = []; tokens = [:] }
+    /// Sitzung beendet → nur noch die Summen behalten.
+    func trim() { usage = [:]; usageOrder = [] }
 }
 
 private struct HookState {
@@ -108,6 +135,7 @@ private struct HookState {
     var notification = ""
     var activity = ""
     var tool = ""
+    var lastTool = ""              // Werkzeug des letzten PreToolUse (bleibt nach PostToolUse stehen)
     var bundle: String?
     var tty: String?
     var cwd: String?
@@ -120,13 +148,17 @@ private struct HookState {
 
 private final class MonitorCore: @unchecked Sendable {
     var publish: (([AgentSession], Bool) -> Void)?
+    var stats: StatsCollector?
 
     private let queue = DispatchQueue(label: "agentbar.monitor", qos: .utility)
     private var stream: FSEventStreamRef?
     private var files: [String: FileState] = [:]          // Pfad → Zustand
     private var hooks: [String: HookState] = [:]          // session_id → letzter Hook
     private var hookOffset: UInt64 = 0
-    private var registryCache: [pid_t: String] = [:]         // ~/.claude/sessions: pid → Sitzung (falls iCloud die Datei auslagert)
+    private var registryEntries: [pid_t: (stamp: Date, sid: String)] = [:]   // ~/.claude/sessions: pid → Sitzung (auch falls iCloud die Datei auslagert)
+    private var procCache: (time: Date, registered: Set<pid_t>, unregistered: [Date])?
+    private var tickItem: DispatchWorkItem?
+    private var busy = true                                   // aktive Sitzungen → kurzer Takt
     private var desktopMeta: [String: (title: String, open: Bool)] = [:]
     private var lastFullScan = Date.distantPast
     private var pendingPaths = Set<String>()
@@ -157,17 +189,28 @@ private final class MonitorCore: @unchecked Sendable {
             // Nur für den eigenen Benutzer lesbar (ältere Versionen legten die Datei mit 0644 an)
             try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: Paths.support.path)
             try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Paths.hookLog.path)
-            try? FileManager.default.removeItem(at: Paths.support.appendingPathComponent("hooks.old.log"))
+            if !readOnlyRun {
+                try? FileManager.default.removeItem(at: Paths.support.appendingPathComponent("hooks.old.log"))
+                try? FileManager.default.removeItem(at: Self.rotatedLog)   // Rest einer unterbrochenen Rotation
+            }
             fullScan(sync: true)
             startEvents()
+            stats?.start(roots: roots.map(\.0))
         }
     }
 
     func fullScan() { queue.async { [self] in fullScan(sync: true) } }
-    func recompute() {
-        queue.async { [self] in
-            if Date().timeIntervalSince(lastFullScan) > 60 { fullScan(sync: true) } else { emit() }
+
+    /// Eigener Takt: 2 s, solange etwas arbeitet oder wartet, sonst 15 s. Den Ordner-Vollscan (neue Wurzeln,
+    /// verpasste Ereignisse, iCloud) nur jede Minute bei Betrieb, sonst alle 5 Minuten.
+    private func scheduleTick() {
+        tickItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            if Date().timeIntervalSince(lastFullScan) > (busy ? 60 : 300) { fullScan(sync: true) } else { emit() }
         }
+        tickItem = item
+        queue.asyncAfter(deadline: .now() + (busy ? 2 : 15), execute: item)
     }
 
     // MARK: FSEvents
@@ -204,6 +247,7 @@ private final class MonitorCore: @unchecked Sendable {
                 if p == Paths.hookLog.path { readHooks(skipPartialFirstLine: false); dirty = true }
                 else if p.hasSuffix(".jsonl") {
                     let url = URL(fileURLWithPath: p)
+                    stats?.touched(url)
                     // Nur aktuelle, lokal vorhandene Dateien – sonst lädt iCloud ausgelagerte Alt-Sitzungen herunter
                     if files[p] != nil || (mtime(url) > scanCutoff && isLocal(url)), track(url) { dirty = true }
                 }
@@ -269,6 +313,10 @@ private final class MonitorCore: @unchecked Sendable {
         }
         if ProcessInfo.processInfo.environment["AGENTBAR_DEBUG"] != nil { FileHandle.standardError.write("scan roots=\(roots.map(\.0.path)) alive=\(alive.count) files=\(files.count)\n".data(using: .utf8)!) }
         for key in files.keys where !alive.contains(key) { files.removeValue(forKey: key) }
+        // Hook-Stände verschwundener Sitzungen vergessen (neue Sitzungen ohne Datei bleiben eine Stunde)
+        let live = Set(files.values.map { $0.isSubagent ? ($0.parentId ?? "") : $0.sessionId })
+        let stale = Date().addingTimeInterval(-3600)
+        hooks = hooks.filter { live.contains($0.key) || $0.value.time > stale }
         emit()
     }
 
@@ -301,16 +349,15 @@ private final class MonitorCore: @unchecked Sendable {
             } else {
                 st.sessionId = url.deletingPathExtension().lastPathComponent
             }
-            // Riesige Protokolle (100 MB+) nur ab den letzten 8 MB lesen – Status und Titel stehen am Ende,
-            // Token-Summen zählen dann ab dort.
-            let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? UInt64) ?? 0
-            if size > Self.tailLimit { st.offset = size - Self.tailLimit; st.skipPartial = true }
             files[path] = st
         }
         return readNewLines(url, st)
     }
 
+    /// Riesige Protokolle (100 MB+) nur ab den letzten 8 MB lesen – Status und Titel stehen am Ende,
+    /// Token-Summen zählen dann ab dort. Gilt auch nach Neuschreiben und bei großen Zuwächsen.
     static let tailLimit: UInt64 = 8_000_000
+    static let blockSize = 1 << 20
 
     private func loadAgentMeta(_ url: URL, _ st: FileState) {
         let meta = url.deletingPathExtension().appendingPathExtension("meta.json")
@@ -338,19 +385,29 @@ private final class MonitorCore: @unchecked Sendable {
         guard let fh = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? fh.close() }
         let size = (try? fh.seekToEnd()) ?? 0
-        if size < st.offset { st.offset = 0 }             // Datei neu geschrieben
+        if size < st.offset { st.offset = 0; st.skipPartial = false; st.resetTokens() }   // Datei neu geschrieben
         guard size > st.offset else { return false }
+        if size - st.offset > Self.tailLimit { st.offset = size - Self.tailLimit; st.skipPartial = true }
         try? fh.seek(toOffset: st.offset)
-        guard let data = try? fh.readToEnd(), let nl = data.lastIndex(of: 0x0A) else { return false }
-        let complete = data[data.startIndex...nl]
-        st.offset += UInt64(complete.count)
         var changed = false
-        var lines = complete.split(separator: 0x0A)
-        if st.skipPartial, !lines.isEmpty { lines.removeFirst(); st.skipPartial = false }
-        for line in lines where !line.isEmpty {
-            guard let j = try? JSONSerialization.jsonObject(with: Data(line)) as? [String: Any] else { continue }
-            process(j, st)
-            changed = true
+        var carry = Data()
+        var pos = st.offset
+        // Blockweise lesen, damit ein großer Zuwachs nicht auf einmal im Speicher liegt
+        while pos < size {
+            guard let block = try? fh.read(upToCount: Int(min(UInt64(Self.blockSize), size - pos))), !block.isEmpty else { break }
+            pos += UInt64(block.count)
+            carry.append(block)
+            guard let nl = carry.lastIndex(of: 0x0A) else { continue }
+            let complete = carry[carry.startIndex...nl]
+            st.offset += UInt64(complete.count)
+            for line in complete.split(separator: 0x0A) where !line.isEmpty {
+                if st.skipPartial { st.skipPartial = false; continue }   // angeschnittene erste Zeile
+                guard jsonlRelevant(line),
+                      let j = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+                process(j, st)
+                changed = true
+            }
+            carry.removeSubrange(carry.startIndex...nl)
         }
         return changed
     }
@@ -402,6 +459,9 @@ private final class MonitorCore: @unchecked Sendable {
             st.lastType = "user"
             st.toolPending = false
             st.toolTime = nil
+            st.question = nil
+            // Werkzeug-Ergebnis: Claude macht mit derselben Aufgabe weiter; neue Eingabe: alte Tätigkeit ist vorbei
+            st.afterTool = content.contains { $0["type"] as? String == "tool_result" }
             st.thinking = false
             st.apiError = false
             let texts = content.compactMap { $0["text"] as? String } + [msg["content"] as? String].compactMap { $0 }
@@ -445,8 +505,10 @@ private final class MonitorCore: @unchecked Sendable {
         if let tool = content.last(where: { $0["type"] as? String == "tool_use" }) {
             st.toolPending = true
             st.toolName = tool["name"] as? String ?? ""
-            st.toolActivity = describeTool(st.toolName, tool["input"] as? [String: Any] ?? [:])
+            let input = tool["input"] as? [String: Any] ?? [:]
+            st.toolActivity = describeTool(st.toolName, input)
             st.toolTime = ts
+            st.question = st.toolName == "AskUserQuestion" ? questionText(input) : nil
         } else if kinds.contains("text") {
             st.toolPending = false
         }
@@ -479,23 +541,44 @@ private final class MonitorCore: @unchecked Sendable {
 
     // MARK: Hooks
 
+    static let rotatedLog = Paths.support.appendingPathComponent("hooks.1.log")
+
     private func readHooks(skipPartialFirstLine: Bool) {
-        guard let fh = try? FileHandle(forReadingFrom: Paths.hookLog) else { return }
+        if hookOffset > 0, ((try? FileManager.default.attributesOfItem(atPath: Paths.hookLog.path)[.size] as? UInt64) ?? 0) < hookOffset {
+            hookOffset = 0     // Datei neu angelegt
+        }
+        hookOffset = readHookLines(Paths.hookLog, from: hookOffset, skipPartialFirstLine: skipPartialFirstLine)
+        // Log klein halten: atomar wegbenennen – Hooks legen sofort eine neue Datei an, Nachzügler, die die alte
+        // noch offen hatten, landen in hooks.1.log und werden gleich und nach 2 s nachgelesen, dann erst gelöscht.
+        guard hookOffset > 1_000_000, !readOnlyRun, rename(Paths.hookLog.path, Self.rotatedLog.path) == 0 else { return }
+        let rest = readHookLines(Self.rotatedLog, from: hookOffset, skipPartialFirstLine: false)
+        hookOffset = 0
+        queue.asyncAfter(deadline: .now() + 2) { [self] in
+            _ = readHookLines(Self.rotatedLog, from: rest, skipPartialFirstLine: false, includePartial: true)
+            try? FileManager.default.removeItem(at: Self.rotatedLog)
+            emit()
+        }
+    }
+
+    /// Liest vollständige Zeilen ab `offset` und gibt die neue Position zurück.
+    private func readHookLines(_ url: URL, from offset: UInt64, skipPartialFirstLine: Bool, includePartial: Bool = false) -> UInt64 {
+        guard let fh = try? FileHandle(forReadingFrom: url) else { return offset }
         defer { try? fh.close() }
         let size = (try? fh.seekToEnd()) ?? 0
-        if size < hookOffset { hookOffset = 0 }
-        guard size > hookOffset else { return }
-        try? fh.seek(toOffset: hookOffset)
-        guard var data = try? fh.readToEnd(), let nl = data.lastIndex(of: 0x0A) else { return }
-        data = data[data.startIndex...nl]
-        hookOffset += UInt64(data.count)
-        // Log klein halten: der Stand steckt jetzt in `hooks`, die Datei darf weg (der Hook legt sie neu an)
-        if hookOffset > 1_000_000, hookOffset == size {
-            try? FileManager.default.removeItem(at: Paths.hookLog)
-            hookOffset = 0
+        guard size > offset else { return offset }
+        try? fh.seek(toOffset: offset)
+        guard var data = try? fh.readToEnd() else { return offset }
+        if !includePartial {
+            guard let nl = data.lastIndex(of: 0x0A) else { return offset }
+            data = data[data.startIndex...nl]
         }
         var lines = data.split(separator: 0x0A)
         if skipPartialFirstLine, !lines.isEmpty { lines.removeFirst() }
+        processHookLines(lines)
+        return offset + UInt64(data.count)
+    }
+
+    private func processHookLines(_ lines: [Data]) {
         for line in lines {
             // Format: <epoch>\t<bundle-id>\t<tty>\t[<pid>\t]<json, evtl. auf 4 KB gekürzt>
             let parts = line.split(separator: 0x09, maxSplits: 4, omittingEmptySubsequences: false)
@@ -524,13 +607,17 @@ private final class MonitorCore: @unchecked Sendable {
                 h.notification = ""
             }
             h.tool = event == "PreToolUse" ? (j["tool_name"] as? String ?? "") : ""
+            if event == "PreToolUse" { h.lastTool = h.tool }
             if event == "PreToolUse", let tool = j["tool_name"] as? String {
                 // Seit dem schlanken Hook stehen file_path/description direkt auf oberster Ebene
                 h.activity = describeTool(tool, (j["tool_input"] as? [String: Any]) ?? j)
             } else if event == "UserPromptSubmit" {
-                h.activity = L("Denkt nach …", "Thinking …")
+                h.activity = L("Denkt nach …", "Thinking…")
+                h.lastTool = "thinking"
             }
             hooks[sid] = h
+            // Beendet: nur noch die Summen behalten
+            if h.ended { for st in files.values where st.sessionId == sid || st.parentId == sid { st.trim() } }
         }
     }
 
@@ -559,28 +646,36 @@ private final class MonitorCore: @unchecked Sendable {
     /// lokaler claude-Prozesse ohne Anmeldung (ältere Versionen).
     private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date]) {
         let fm = FileManager.default
-        var ids = Set<String>(), pids = Set<pid_t>(), complete = true
-        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: nil) else { return ([], false, []) }
-        var seen: [pid_t: String] = [:]
+        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return ([], false, []) }
+        var seen: [pid_t: (stamp: Date, sid: String)] = [:]
+        var pids = Set<pid_t>(), complete = true
         for f in items where f.pathExtension == "json" {
             guard let pid = pid_t(f.deletingPathExtension().lastPathComponent) else { continue }
             pids.insert(pid)
+            let stamp = mtime(f)
+            // Unveränderte Anmeldung nicht neu lesen
+            if let old = registryEntries[pid], old.stamp == stamp { seen[pid] = old; continue }
             if isLocal(f), let d = try? Data(contentsOf: f),
                let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let sid = j["sessionId"] as? String {
-                seen[pid] = sid
-            } else if let sid = registryCache[pid] {
+                seen[pid] = (stamp, sid)
+            } else if let old = registryEntries[pid] {
                 // iCloud hat die Datei ausgelagert – letzte bekannte Sitzung nehmen, im Hintergrund nachladen
-                seen[pid] = sid
+                seen[pid] = old
                 try? fm.startDownloadingUbiquitousItem(at: f)
             } else {
                 complete = false
                 try? fm.startDownloadingUbiquitousItem(at: f)
             }
         }
-        registryCache = seen
-        ids = Set(seen.values)
+        registryEntries = seen
+        // Prozessliste (alle PIDs, Pfade, Eltern) ist teuer: nur alle 15 s oder wenn sich die Anmeldungen ändern
+        let now = Date()
+        if let c = procCache, c.registered == pids, now.timeIntervalSince(c.time) < 15 {
+            return (Set(seen.values.map(\.sid)), complete, c.unregistered)
+        }
         let unregistered = claudePids().filter { !pids.contains($0) }.compactMap(processStart)
-        return (ids, complete, unregistered)
+        procCache = (now, pids, unregistered)
+        return (Set(seen.values.map(\.sid)), complete, unregistered)
     }
 
     /// Nicht angemeldete Sitzungen, die noch laufen dürften: je alter Prozess die eine Sitzung, deren Datei kurz nach
@@ -708,8 +803,9 @@ private final class MonitorCore: @unchecked Sendable {
                now.timeIntervalSince(st.lastEvent) > 30 { continue }   // kurze Schonfrist für den Start
             let hooksActive = h != nil
             var status = heuristicStatus(st, now: now, hooksActive: hooksActive)
-            var activity = st.thinking ? L("Denkt nach …", "Thinking …") : (st.toolPending ? st.toolActivity : "")
-            var tool = st.thinking ? "thinking" : (st.toolPending ? st.toolName : "")
+            // Nach einem Werkzeug-Ergebnis bleibt die letzte Tätigkeit stehen, bis Claude die nächste beginnt
+            var activity = st.thinking ? L("Denkt nach …", "Thinking…") : (st.toolPending || st.afterTool ? st.toolActivity : "")
+            var tool = st.thinking ? "thinking" : (st.toolPending || st.afterTool ? st.toolName : "")
             if let h, h.time.addingTimeInterval(1.5) >= st.lastEvent {
                 // Hook ist das jüngste Signal → genauer als die Schätzung
                 let hookAge = now.timeIntervalSince(h.time)
@@ -732,11 +828,12 @@ private final class MonitorCore: @unchecked Sendable {
                     status = hookAge > 1800 ? .idle : .working
                     if h.event == "PreToolUse" { activity = h.activity; tool = h.tool }
                     if h.event == "UserPromptSubmit" { activity = h.activity; tool = "thinking" }
+                    if h.event == "PostToolUse", !h.activity.isEmpty, !st.thinking { activity = h.activity; tool = h.lastTool }
                     if h.event == "PreToolUse", Self.askTools.contains(h.tool) { status = .waiting }
                 }
             }
             if status != .working && status != .waiting { activity = "" }
-            if status == .working && activity.isEmpty { activity = L("Arbeitet …", "Working …") }
+            if status == .working && activity.isEmpty { activity = L("Arbeitet …", "Working…") }
 
             let helpers = (subs[sid] ?? []).map { a -> SubAgent in
                 let age = now.timeIntervalSince(a.lastEvent)
@@ -744,13 +841,16 @@ private final class MonitorCore: @unchecked Sendable {
                 let working = !finished && age < 180
                 return SubAgent(id: a.sessionId, type: a.agentType.isEmpty ? L("Helfer", "Helper") : a.agentType,
                                 description: a.agentDescription, working: working,
-                                activity: working ? (a.thinking ? L("Denkt nach …", "Thinking …") : a.toolActivity) : L("Fertig", "Done"),
+                                activity: working ? (a.thinking ? L("Denkt nach …", "Thinking…") : a.toolActivity) : L("Fertig", "Done"),
                                 lastActivity: a.lastEvent)
             }
             .filter { $0.working || now.timeIntervalSince($0.lastActivity) < 600 }
             .sorted { $0.lastActivity > $1.lastActivity }
-            // Wartet die Hauptsitzung nur auf ihre Helfer, gilt sie als arbeitend
-            if status == .done || status == .idle, helpers.contains(where: \.working), st.toolName == "Agent" || st.toolName == "Task" {
+            // Wartet die Hauptsitzung nur auf ihre Helfer, gilt sie als arbeitend – auch mit Hooks, solange der letzte
+            // Schritt das Delegieren war
+            let delegating = ["Agent", "Task"].contains(tool) || ["SubagentStart", "SubagentStop"].contains(h?.event ?? "")
+            if helpers.contains(where: \.working),
+               ((status == .done || status == .idle) && (st.toolName == "Agent" || st.toolName == "Task")) || (status == .working && delegating) {
                 status = .working
                 let n = helpers.filter(\.working).count
                 activity = L("Wartet auf \(n) Helfer", n == 1 ? "Waiting for 1 helper" : "Waiting for \(n) helpers")
@@ -774,13 +874,16 @@ private final class MonitorCore: @unchecked Sendable {
                 tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive,
                 contextUsed: st.contextUsed,
                 contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || Self.millionByDefault(st.model)
-                                                    || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0))
+                                                    || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0,
+                question: status == .waiting ? st.question : nil))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0
             return ra != rb ? ra < rb : a.lastActivity > b.lastActivity
         }
         publish?(out, !hooks.isEmpty)
+        busy = out.contains { $0.status == .working || $0.status == .waiting || $0.workingHelpers > 0 }
+        scheduleTick()
     }
 
     // MARK: Claude-App-Metadaten
@@ -834,6 +937,20 @@ private func parseDate(_ s: String) -> Date? { isoFrac.date(from: s) ?? isoPlain
 /// "-Users-name-projekt" → "/Users/name/projekt" (verlustbehaftet, nur Notlösung ohne cwd)
 private func decodeProjectDir(_ dir: String) -> String { dir.replacingOccurrences(of: "-", with: "/") }
 
+/// Schnelle Vorauswahl per Byte-Suche: nur Zeilen der Typen, die der Monitor auswertet, kommen in den JSON-Parser
+/// (Anhänge, Datei-Snapshots usw. sind oft groß und hier egal).
+private let jsonlNeedles: [Data] = ["assistant", "user", "system", "ai-title", "custom-title", "permission-mode"]
+    .map { Data("\"type\":\"\($0)\"".utf8) }
+private func jsonlRelevant(_ line: Data) -> Bool { jsonlNeedles.contains { line.range(of: $0) != nil } }
+
+/// Erste Frage eines AskUserQuestion-Aufrufs (gekürzt).
+private func questionText(_ input: [String: Any]) -> String? {
+    let q = ((input["questions"] as? [[String: Any]])?.first?["question"] as? String) ?? (input["question"] as? String)
+    guard let q, !q.isEmpty else { return nil }
+    let flat = q.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
+    return flat.count > 200 ? String(flat.prefix(199)) + "…" : flat
+}
+
 private func preview(_ text: String) -> String {
     let flat = text.replacingOccurrences(of: "\n", with: " ")
         .replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "`", with: "")
@@ -850,7 +967,7 @@ func describeTool(_ name: String, _ input: [String: Any]) -> String {
     case "Bash":
         if let d = input["description"] as? String, !d.isEmpty { return d }
         let cmd = (input["command"] as? String ?? "").split(separator: "\n").first.map(String.init) ?? ""
-        return "Terminal: " + String(cmd.prefix(40))
+        return cmd.isEmpty ? "Terminal" : "Terminal: " + String(cmd.prefix(40))
     case "Edit", "MultiEdit": return L("Bearbeitet \(file())", "Editing \(file())")
     case "Write": return L("Schreibt \(file())", "Writing \(file())")
     case "Read": return L("Liest \(file())", "Reading \(file())")

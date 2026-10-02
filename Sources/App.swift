@@ -44,7 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate {
     /// Diagnose: `AgentBar.app/Contents/MacOS/AgentBar --dump` listet die erkannten Sitzungen und beendet sich.
     func dump() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [self] in print(store.diagnostics()); exit(0) }
+        // Wartezeit für Tests überschreibbar (z. B. bis der Statistik-Scan durch ist): AGENTBAR_DUMP_WAIT=20
+        let wait = Double(ProcessInfo.processInfo.environment["AGENTBAR_DUMP_WAIT"] ?? "") ?? 4
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [self] in print(store.diagnostics()); exit(0) }
     }
 }
 
@@ -56,6 +58,14 @@ extension AppStore {
             out.append("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | ctx \(s.contextFill.map { "\(Int(($0 * 100).rounded())) % / \(s.contextWindowText)" } ?? "–") | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
         }
         out.append(L("Kontingent", "Usage") + ": \(quota.session?.percent ?? -1) / \(quota.weekly?.percent ?? -1) \(quota.plan ?? "") \(quota.problem ?? "")")
+        if let f = quota.forecast {
+            out.append(L("Prognose", "Forecast") + ": \(String(format: "%.1f", f.percentPerHour)) %/h, " + (f.exhaustsAt.map { L("leer um", "runs out at") + " \($0.formatted(date: .omitted, time: .shortened))" } ?? L("reicht bis zum Reset", "lasts until reset")))
+        }
+        if let t = stats.today {
+            out.append(L("Heute", "Today") + ": \(formatTokens(t.tokens.total)) · \(formatMoney(t.cost)) · \(t.sessions) " + L("Sitzungen", "sessions") + " · " + t.byModel.sorted { $0.value > $1.value }.map { "\($0.key) \(formatTokens($0.value))" }.joined(separator: ", "))
+        }
+        out.append(L("Statistik", "Stats") + ": \(stats.days.count) " + L("Tage", "days") + ", " + formatTokens(stats.days.reduce(0) { $0 + $1.tokens.total }))
+        if let p = hotKeyProblem { out.append(p) }
         return out.joined(separator: "\n")
     }
 }
@@ -76,10 +86,29 @@ final class AppStore: ObservableObject {
     private var awakeTimer: Timer?
     @Published var hooksInstalled = Hooks.installed
     @Published var message: String?
+    /// Hinweis, wenn das globale Tastenkürzel nicht registriert werden konnte (sonst nil).
+    @Published private(set) var hotKeyProblem: String?
+    /// „Bei Anmeldung öffnen“ – wird beim Aktivwerden neu gelesen; ändern über `setLoginItem(_:)`.
+    @Published private(set) var loginItemEnabled = SMAppService.mainApp.status == .enabled
+
+    private var mutedUntil: [String: Date] = [:]        // Sitzung → stumm bis („1 Std. stumm“)
+    private var contextWarned = Set<String>()
+    private var stalledWarned: [String: Date] = [:]     // Sitzung → letzte Aktivität, für die schon gewarnt wurde
+    private var hintsPrimed = false
+    private var remoteStatus: [String: AgentStatus] = [:]
+    private var observers: [NSObjectProtocol] = []
 
     init() {
         monitor.onTransition = { [weak self] s, old in self?.transition(s, from: old) }
-        peers.onChange = { [weak self] list in self?.monitor.remote = list }
+        monitor.onUpdate = { [weak self] list in self?.checkHints(list) }
+        monitor.stats.publish = { [weak self] days in
+            MainActor.assumeIsolated { if self?.stats.days != days { self?.stats.days = days } }
+        }
+        peers.onChange = { [weak self] list in
+            self?.monitor.remote = list
+            self?.remoteTransitions(list)
+        }
+        notifier.onMute = { [weak self] id in self?.mutedUntil[id] = Date().addingTimeInterval(3600) }
         peerWatch = monitor.$sessions.sink { [weak self] list in self?.peers.update(local: list) }
         notifier.onOpen = { [weak self] id in
             guard let s = self?.monitor.sessions.first(where: { $0.id == id }) else { return }
@@ -99,7 +128,19 @@ final class AppStore: ObservableObject {
     }
 
     func launched() {
-        hotKey = HotKey { [weak self] in self?.office.toggle() }
+        let key = HotKey { [weak self] in self?.office.toggle() }
+        hotKey = key
+        hotKeyProblem = key.problem
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshLoginItem() }
+        })
+        // Nach dem Ruhezustand: Ordner neu einlesen, Netz-Dienste für andere Macs neu starten
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.monitor.rescan()
+                self?.peers.restart()
+            }
+        })
         awakeTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.updateKeepAwake() }
         }
@@ -123,19 +164,102 @@ final class AppStore: ObservableObject {
         hooksInstalled = Hooks.installed
     }
 
+    func refreshLoginItem() {
+        let on = SMAppService.mainApp.status == .enabled
+        if on != loginItemEnabled { loginItemEnabled = on }
+    }
+
+    func setLoginItem(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+        } catch {
+            message = L("Anmeldeobjekt", "Login item") + ": \(error.localizedDescription)"
+        }
+        refreshLoginItem()
+    }
+
+    // MARK: Mitteilungen
+
+    /// Stummgeschaltet, App im Vordergrund oder (bei geteiltem ~/.claude) Sitzung eines anderen Macs → nichts melden.
+    private func shouldNotify(_ s: AgentSession) -> Bool {
+        if let until = mutedUntil[s.id] {
+            if until > Date() { return false }
+            mutedUntil[s.id] = nil
+        }
+        if s.device == nil, monitor.remote.contains(where: { $0.id == s.id }) { return false }
+        if !UserDefaults.standard.bool(forKey: Prefs.notifyWhenFrontmost), let b = s.hostBundle,
+           NSWorkspace.shared.frontmostApplication?.bundleIdentifier == b { return false }
+        return true
+    }
+
+    private func title(_ s: AgentSession) -> String { s.device.map { "\(s.displayName) · \($0)" } ?? s.displayName }
+
     private func transition(_ s: AgentSession, from old: AgentStatus) {
         let d = UserDefaults.standard
-        if !d.bool(forKey: Prefs.notifyWhenFrontmost), let b = s.hostBundle,
-           NSWorkspace.shared.frontmostApplication?.bundleIdentifier == b { return }
+        guard shouldNotify(s) else { return }
+        let name = title(s)
         switch s.status {
         case .waiting where d.bool(forKey: Prefs.notifyWaiting):
-            notifier.post(title: L("\(s.displayName) braucht dich", "\(s.displayName) needs you"), body: s.activity.isEmpty ? L("Wartet auf deine Freigabe.", "Waiting for your approval.") : s.activity, sessionId: s.id)
+            // Bei einer Frage steht der echte Fragetext in der Mitteilung
+            if let q = s.question {
+                notifier.post(title: L("\(name) hat eine Frage", "\(name) has a question"), body: q, sessionId: s.id)
+            } else {
+                notifier.post(title: L("\(name) braucht dich", "\(name) needs you"),
+                              body: s.activity.isEmpty ? L("Wartet auf deine Freigabe.", "Waiting for your approval.") : s.waitingReason ?? s.activity, sessionId: s.id)
+            }
         case .done where old == .working && d.bool(forKey: Prefs.notifyDone):
-            notifier.post(title: L("\(s.displayName) ist fertig", "\(s.displayName) is done"), body: s.lastText.isEmpty ? s.project : s.lastText, sessionId: s.id)
+            notifier.post(title: L("\(name) ist fertig", "\(name) is done"), body: s.lastText.isEmpty ? s.project : s.lastText, sessionId: s.id)
         case .error where d.bool(forKey: Prefs.notifyError):
-            notifier.post(title: L("\(s.displayName): Fehler", "\(s.displayName): Error"), body: L("Die Sitzung ist auf einen Fehler gelaufen.", "The session ran into an error."), sessionId: s.id)
+            notifier.post(title: L("\(name): Fehler", "\(name): Error"), body: L("Die Sitzung ist auf einen Fehler gelaufen.", "The session ran into an error."), sessionId: s.id)
         default: break
         }
+    }
+
+    /// Statuswechsel anderer Macs – nur mit Prefs.notifyPeers.
+    private func remoteTransitions(_ list: [AgentSession]) {
+        let on = UserDefaults.standard.bool(forKey: Prefs.notifyPeers)
+        var next: [String: AgentStatus] = [:]
+        for s in list {
+            if on, let old = remoteStatus[s.id], old != s.status { transition(s, from: old) }
+            next[s.id] = s.status
+        }
+        remoteStatus = next
+    }
+
+    /// Kontext-Warnung (einmal je Sitzung ab 85 %, nach dem Zusammenfassen wieder scharf) und „Hängt?“-Hinweis
+    /// (arbeitet seit über 10 Min. ohne jedes Ereignis, keine Helfer aktiv).
+    private func checkHints(_ list: [AgentSession]) {
+        let d = UserDefaults.standard
+        let now = Date()
+        let primed = hintsPrimed       // beim Start schon volle Sitzungen nicht melden
+        hintsPrimed = true
+        for s in list {
+            if s.contextWarning {
+                if contextWarned.insert(s.id).inserted, primed, d.bool(forKey: Prefs.notifyContext), shouldNotify(s) {
+                    let pct = percentText(Int(((s.contextFill ?? 0) * 100).rounded()))
+                    notifier.post(title: L("\(title(s)): Kontext fast voll", "\(title(s)): context almost full"),
+                                  body: L("\(pct) von \(s.contextWindowText) belegt – bald wird zusammengefasst.",
+                                          "\(pct) of \(s.contextWindowText) used – it will be compacted soon."),
+                                  sessionId: s.id, sound: false)
+                }
+            } else if (s.contextFill ?? 1) < 0.5 {
+                contextWarned.remove(s.id)
+            }
+            if s.status == .working, s.workingHelpers == 0, now.timeIntervalSince(s.lastActivity) > 600,
+               stalledWarned[s.id] != s.lastActivity {
+                stalledWarned[s.id] = s.lastActivity
+                if primed, d.bool(forKey: Prefs.notifyStalled), shouldNotify(s) {
+                    let mins = Int(now.timeIntervalSince(s.lastActivity) / 60)
+                    notifier.post(title: L("\(title(s)) hängt?", "\(title(s)) stuck?"),
+                                  body: L("Seit \(mins) Min. kein Lebenszeichen", "No sign of life for \(mins) min") + (s.activity.isEmpty ? "" : " – \(s.activity)"),
+                                  sessionId: s.id)
+                }
+            }
+        }
+        let ids = Set(list.map(\.id))
+        contextWarned.formIntersection(ids)
+        stalledWarned = stalledWarned.filter { ids.contains($0.key) }
+        mutedUntil = mutedUntil.filter { $0.value > now }
     }
 }
 
