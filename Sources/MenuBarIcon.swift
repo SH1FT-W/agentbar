@@ -1,28 +1,21 @@
 import AppKit
 
-/// Menüleisten-Symbol (Vorlagenbild, färbt sich mit der Menüleiste): Kopf hinter einem Laptop wie im App-Icon.
-/// Ruhe = Funkeln auf dem Bildschirm, arbeitet = zusätzlich Punkt oben rechts, braucht dich = „!“ statt Funkeln.
+/// Menüleisten-Symbol (Vorlagenbild, färbt sich mit der Menüleiste): Clawd als Silhouette.
+/// Ruhe = Augen zu, arbeitet = Augen offen, braucht dich = winkt mit dem rechten Arm.
 enum MenuBarIcon {
     static func make(waiting: Bool, working: Bool) -> NSImage {
-        let badge = working && !waiting
-        let size = NSSize(width: badge ? 21 : 18, height: 18)
-        let img = NSImage(size: size, flipped: false) { _ in
-            NSColor.black.setFill(); NSColor.black.setStroke()
-            NSBezierPath(ovalIn: NSRect(x: 5.9, y: 10.8, width: 6.2, height: 6.2)).fill()             // Kopf
-            clear(NSBezierPath(roundedRect: NSRect(x: 1.2, y: 1.8, width: 15.6, height: 10.4), xRadius: 2.6, yRadius: 2.6))
-            let lid = NSBezierPath(roundedRect: NSRect(x: 2.7, y: 3.3, width: 12.6, height: 7.6), xRadius: 1.6, yRadius: 1.6)
-            lid.lineWidth = 1.5; lid.stroke()
-            NSBezierPath(roundedRect: NSRect(x: 0, y: 0.4, width: 18, height: 1.5), xRadius: 0.75, yRadius: 0.75).fill()   // Unterteil
-            if waiting {
-                NSBezierPath(roundedRect: NSRect(x: 8.25, y: 6.2, width: 1.5, height: 3.4), xRadius: 0.75, yRadius: 0.75).fill()
-                NSBezierPath(ovalIn: NSRect(x: 8.25, y: 4.4, width: 1.5, height: 1.5)).fill()
+        let img = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.black.setFill()
+            let t = NSAffineTransform(); t.translateX(by: 0, yBy: 0.5); t.concat()   // optische Mitte wie die Nachbarsymbole
+            rr(2.9, 4.6, 12.2, 9.4, 1.3).fill()                                          // Körper
+            for x: CGFloat in [3.7, 5.8, 11.0, 13.1] { rr(x, 2.2, 1.2, 3.0, 0.45).fill() } // Beine
+            rr(0.8, 8.0, 2.8, 2.6, 0.8).fill()                                           // linker Arm
+            if waiting { rr(14.6, 9.0, 2.6, 7.4, 0.9).fill() }                           // winkt
+            else { rr(14.4, 8.0, 2.8, 2.6, 0.8).fill() }
+            if working || waiting {
+                clear(rr(5.7, 8.6, 1.5, 3.6, 0.6)); clear(rr(10.8, 8.6, 1.5, 3.6, 0.6))  // Augen offen
             } else {
-                sparkle(CGPoint(x: 9, y: 7.1), 2.5).fill()
-            }
-            if badge {
-                let dot = NSRect(x: size.width - 6.5, y: size.height - 6.5, width: 6.5, height: 6.5)
-                clear(NSBezierPath(ovalIn: dot.insetBy(dx: -1.5, dy: -1.5)))
-                NSBezierPath(ovalIn: dot).fill()
+                clear(rr(5.0, 9.8, 2.8, 1.25, 0.6)); clear(rr(10.2, 9.8, 2.8, 1.25, 0.6)) // Augen zu
             }
             return true
         }
@@ -31,21 +24,13 @@ enum MenuBarIcon {
         return img
     }
 
+    private static func rr(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> NSBezierPath {
+        NSBezierPath(roundedRect: NSRect(x: x, y: y, width: w, height: h), xRadius: r, yRadius: r)
+    }
+
     private static func clear(_ path: NSBezierPath) {
         NSGraphicsContext.current?.compositingOperation = .clear
         path.fill()
         NSGraphicsContext.current?.compositingOperation = .sourceOver
-    }
-
-    /// Vierzackiger Stern mit nach innen gewölbten Kanten (wie im App-Icon).
-    private static func sparkle(_ c: CGPoint, _ r: CGFloat) -> NSBezierPath {
-        let p = NSBezierPath(), k = r * 0.28
-        p.move(to: CGPoint(x: c.x, y: c.y + r))
-        p.curve(to: CGPoint(x: c.x + r, y: c.y), controlPoint1: CGPoint(x: c.x + k * 0.3, y: c.y + k), controlPoint2: CGPoint(x: c.x + k, y: c.y + k * 0.3))
-        p.curve(to: CGPoint(x: c.x, y: c.y - r), controlPoint1: CGPoint(x: c.x + k, y: c.y - k * 0.3), controlPoint2: CGPoint(x: c.x + k * 0.3, y: c.y - k))
-        p.curve(to: CGPoint(x: c.x - r, y: c.y), controlPoint1: CGPoint(x: c.x - k * 0.3, y: c.y - k), controlPoint2: CGPoint(x: c.x - k, y: c.y - k * 0.3))
-        p.curve(to: CGPoint(x: c.x, y: c.y + r), controlPoint1: CGPoint(x: c.x - k, y: c.y + k * 0.3), controlPoint2: CGPoint(x: c.x - k * 0.3, y: c.y + k))
-        p.close()
-        return p
     }
 }
