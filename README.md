@@ -44,7 +44,7 @@
 - **Keyboard and VoiceOver** – ↑/↓ to select, Return to jump to the session, Space to expand, ⌘R to reload; every row and ring has a proper accessibility label.
 - **Your other Macs** (optional) – pair your Macs with a code and sessions running on the others show up in the menu and in the office, marked with a small device symbol. Discovery via Bonjour on your local network, every message encrypted with the pairing code.
 - **Keep awake** – off, always, or only while agents are working.
-- **Updates** via GitHub Releases, verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
+- **Updates** via GitHub Releases – a small window at launch offers Install Now, Later or Skip (it never steals keyboard focus) – verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
 
 <p align="center">
   <img src="docs/screenshots/en/office-night.jpg" alt="The office at night" width="800">
