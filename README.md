@@ -39,7 +39,7 @@
 - **Today & last 7 days** – tokens, API-equivalent cost and sessions per day, a 7-day bar chart and your top projects today. Computed locally from Claude Code's session logs.
 - **Context at a glance** – every row shows tokens and a small context bar that turns orange when the context window is almost full.
 - **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
-- **Jump to the session** – click a session (in the menu or the office) to bring its Terminal tab to the front.
+- **Jump to the session** – click a figure in the office, or use “Go to Session” (or Return) in the menu, to bring its Terminal tab to the front.
 - **Notifications** when an agent needs you (with the actual question it asks), finishes or fails, when its context is almost full or it seems stuck, plus a usage warning and a heads-up when a new AgentBar version is out. Actions to jump to the session or mute it for an hour, and optional quiet hours.
 - **Keyboard and VoiceOver** – ↑/↓ to select, Return to jump to the session, Space to expand, ⌘R to reload; every row and ring has a proper accessibility label.
 - **Your other Macs** (optional) – pair your Macs with a code and sessions running on the others show up in the menu and in the office, marked with a small device symbol. Discovery via Bonjour on your local network, every message encrypted with the pairing code.
@@ -68,14 +68,14 @@
      xattr -dr com.apple.quarantine /Applications/AgentBar.app
      ```
    You only need to do this once. Later updates via the built-in update button install without this prompt – they are verified with an Ed25519 signature instead.
-4. Launch it – a ✦ icon appears in the menu bar. There is no Dock icon.
+4. Launch it – a small Clawd icon appears in the menu bar. There is no Dock icon.
 
 ### First run
 
 - **Notifications:** macOS asks once whether AgentBar may send notifications.
 - **Precise detection:** click **Set up** on the *Precise detection* card in the dropdown (or *Settings → Precise detection*). AgentBar adds small hook commands to `~/.claude/settings.json` (a backup is written to `settings.json.agentbar-backup`). Each hook appends one line to `~/Library/Application Support/AgentBar/hooks.log` – no network, no AgentBar process involved. Applies to Claude sessions started afterwards. You can remove the hooks again at any time from the settings.
 - **Usage rings:** AgentBar reads Claude Code's login from the keychain (`Claude Code-credentials`) via the `security` tool. If macOS asks, allow it. The token is sent only to `api.anthropic.com`.
-- **Jump to Terminal:** the first time you click a session, macOS asks whether AgentBar may control Terminal – this is used only to select the right tab.
+- **Jump to Terminal:** the first time you jump to a session, macOS asks whether AgentBar may control Terminal – this is used only to select the right tab.
 - **Launch at login:** toggle *Launch at login* in *Settings → General*.
 
 ### Shortcuts

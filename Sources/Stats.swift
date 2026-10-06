@@ -105,7 +105,9 @@ final class StatsCollector: @unchecked Sendable {
     @discardableResult
     private func ingest(_ url: URL, tail: UInt64) -> UInt64 {
         let path = url.path
-        guard let sid = sessionId(url), let fh = try? FileHandle(forReadingFrom: url) else { return 0 }
+        // Nur lokale Dateien aus dem Statistik-Zeitraum (iCloud schreibt alte Dateien gern neu)
+        guard isLocal(url), files[path] != nil || created(path) > Date().addingTimeInterval(-Double(Self.keepDays) * 86400),
+              let sid = sessionId(url), let fh = try? FileHandle(forReadingFrom: url) else { return 0 }
         defer { try? fh.close() }
         let size = (try? fh.seekToEnd()) ?? 0
         var p = files[path] ?? FileProgress(born: created(path).timeIntervalSince1970)

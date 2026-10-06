@@ -39,7 +39,7 @@
 - **Heute & letzte 7 Tage** – Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Balkendiagramm und deine Top-Projekte von heute. Lokal aus den Sitzungsprotokollen von Claude Code berechnet.
 - **Kontext auf einen Blick** – jede Zeile zeigt Tokens und einen kleinen Kontext-Balken, der orange wird, wenn das Kontextfenster fast voll ist.
 - **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
-- **Direkt zur Sitzung** – ein Klick auf eine Sitzung (im Menü oder im Büro) holt ihren Terminal-Tab nach vorn.
+- **Direkt zur Sitzung** – ein Klick auf eine Figur im Büro oder „Zur Sitzung“ (bzw. Return) im Menü holt ihren Terminal-Tab nach vorn.
 - **Mitteilungen**, wenn ein Agent dich braucht (mit seiner konkreten Frage), fertig ist oder scheitert, wenn sein Kontext fast voll ist oder er zu hängen scheint, dazu eine Kontingent-Warnung und ein Hinweis auf neue AgentBar-Versionen. Mit Knöpfen „Zur Sitzung“ und „1 Std. stumm“ sowie optionalen Ruhezeiten.
 - **Tastatur und VoiceOver** – ↑/↓ wählen, Return springt zur Sitzung, Leertaste klappt auf, ⌘R lädt neu; jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.
 - **Deine anderen Macs** (optional) – koppel deine Macs per Code, dann erscheinen Sitzungen der anderen im Menü und im Büro, markiert mit einem kleinen Geräte-Symbol. Gefunden wird per Bonjour im lokalen Netzwerk, jede Nachricht ist mit dem Code verschlüsselt.
@@ -68,14 +68,14 @@
      xattr -dr com.apple.quarantine /Applications/AgentBar.app
      ```
    Das ist nur einmal nötig. Spätere Updates über den eingebauten Update-Button kommen ohne diese Abfrage aus – sie werden stattdessen per Ed25519-Signatur geprüft.
-4. Starten – oben in der Menüleiste erscheint ein ✦-Symbol. Ein Dock-Symbol gibt es nicht.
+4. Starten – oben in der Menüleiste erscheint ein kleines Clawd-Symbol. Ein Dock-Symbol gibt es nicht.
 
 ### Erster Start
 
 - **Mitteilungen:** macOS fragt einmal, ob AgentBar Mitteilungen senden darf.
 - **Präzise Erkennung:** im Menü bei *Präzise Erkennung* auf **Einrichten** klicken (oder *Einstellungen → Präzise Erkennung*). AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (eine Sicherung landet in `settings.json.agentbar-backup`). Jeder Hook hängt nur eine Statuszeile an `~/Library/Application Support/AgentBar/hooks.log` an – kein Netzwerk, keine Prompts oder Dateiinhalte. Gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen jederzeit wieder entfernen.
 - **Kontingent-Ringe:** AgentBar liest den Login von Claude Code aus dem Schlüsselbund (`Claude Code-credentials`) über das `security`-Werkzeug. Falls macOS fragt: erlauben. Das Token geht nur an `api.anthropic.com`.
-- **Zum Terminal springen:** Beim ersten Klick auf eine Sitzung fragt macOS, ob AgentBar das Terminal steuern darf – das dient nur dazu, den richtigen Tab auszuwählen.
+- **Zum Terminal springen:** Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar das Terminal steuern darf – das dient nur dazu, den richtigen Tab auszuwählen.
 - **Beim Anmelden starten:** in *Einstellungen → Allgemein* einschalten.
 
 ### Tastenkürzel

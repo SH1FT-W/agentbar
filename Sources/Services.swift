@@ -45,8 +45,7 @@ enum Hooks {
             // Sicherung nur einmal: das ist der Stand vor AgentBar
             let backup = url.deletingLastPathComponent().appendingPathComponent("settings.json.agentbar-backup")
             if !fm.fileExists(atPath: backup.path) {
-                try d.write(to: backup)
-                try fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: backup.path)
+                try writePrivately(d, to: backup, perms: 0o600)
             }
         }
         var hooks = root["hooks"] as? [String: Any] ?? [:]
@@ -78,8 +77,21 @@ enum Hooks {
         if let stamp, let now = try? fm.attributesOfItem(atPath: url.path)[.modificationDate] as? Date, now != stamp {
             throw NSError(domain: "AgentBar", code: 2, userInfo: [NSLocalizedDescriptionKey: L("settings.json wurde gerade geändert – bitte nochmal versuchen", "settings.json was just changed – please try again")])
         }
-        try out.write(to: url, options: .atomic)
-        try fm.setAttributes([.posixPermissions: perms ?? 0o600], ofItemAtPath: url.path)
+        try writePrivately(out, to: url, perms: (perms as? NSNumber)?.int16Value ?? 0o600)
+    }
+
+    /// Atomar ersetzen, ohne dass die Datei kurz für andere lesbar ist (settings.json kann Schlüssel enthalten):
+    /// Hilfsdatei gleich mit den richtigen Rechten anlegen, dann per rename() austauschen.
+    private static func writePrivately(_ data: Data, to url: URL, perms: Int16) throws {
+        let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).agentbar-tmp")
+        try? FileManager.default.removeItem(at: tmp)
+        guard FileManager.default.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: perms]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        guard rename(tmp.path, url.path) == 0 else {
+            try? FileManager.default.removeItem(at: tmp)
+            throw CocoaError(.fileWriteUnknown)
+        }
     }
 }
 
@@ -128,6 +140,16 @@ final class QuotaMonitor: ObservableObject {
         }
         // Gespeicherter Stand ist frisch genug (z. B. nach Neustart/Update) → nicht sofort fragen
         if lastFetch.map({ Date().timeIntervalSince($0) > Self.interval }) ?? true { Task { await refresh() } }
+    }
+
+    /// Was angezeigt wird: nichts bei ausgeschaltetem Abruf, und ein abgelaufenes Fenster nicht als aktuellen Stand.
+    var shownSession: QuotaWindow? { shown(session) }
+    var shownWeekly: QuotaWindow? { shown(weekly) }
+
+    private func shown(_ w: QuotaWindow?) -> QuotaWindow? {
+        guard UserDefaults.standard.bool(forKey: Prefs.quotaEnabled), let w else { return nil }
+        if let r = w.resetsAt, r < Date() { return nil }
+        return w
     }
 
     func refreshIfStale() {
@@ -322,6 +344,17 @@ func resetText(_ date: Date?) -> String {
     return L("neu am", "Resets") + " \(f.string(from: date))"
 }
 
+/// Ganzer Satz für Mitteilungen: „Neues Kontingent in 1:20 Std.“
+func freshWindowText(_ date: Date) -> String {
+    let s = Int(date.timeIntervalSinceNow)
+    if s <= 0 { return L("Gleich gibt es neues Kontingent.", "A fresh window starts any moment.") }
+    if s < 3600 { return L("Neues Kontingent in \(s / 60) Min.", "Fresh window in \(s / 60) min.") }
+    let hm = "\(s / 3600):\(String(format: "%02d", (s % 3600) / 60))"
+    if s < 86400 { return L("Neues Kontingent in \(hm) Std.", "Fresh window in \(hm) h.") }
+    let f = DateFormatter(); f.locale = Lang.locale; f.dateFormat = L("EEEE, HH:mm", "EEEE h:mm a")
+    return L("Neues Kontingent am \(f.string(from: date)).", "Fresh window on \(f.string(from: date)).")
+}
+
 // MARK: - Mitteilungen
 
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
@@ -337,7 +370,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         let c = UNUserNotificationCenter.current()
         c.delegate = self
         c.setNotificationCategories([UNNotificationCategory(identifier: Self.sessionCategory, actions: [
-            UNNotificationAction(identifier: "open", title: L("Zur Sitzung", "Go to session"), options: [.foreground]),
+            UNNotificationAction(identifier: "open", title: L("Zur Sitzung", "Go to Session"), options: [.foreground]),
             UNNotificationAction(identifier: "mute", title: L("1 Std. stumm", "Mute for 1 hour"), options: []),
         ], intentIdentifiers: [], options: [])])
         c.requestAuthorization(options: [.alert, .sound]) { _, _ in }

@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import CryptoKit
+import CommonCrypto
 import IOKit.ps
 
 // MARK: - Andere Macs im lokalen Netz
@@ -34,13 +35,22 @@ enum PeerCode {
         }.joined(separator: "-")
     }
 
-    static func key(_ code: String, _ purpose: String) -> SymmetricKey {
-        HKDF<SHA256>.deriveKey(inputKeyMaterial: SymmetricKey(data: Data(code.utf8)), salt: Data("agentbar-peers-v1".utf8),
-                               info: Data(purpose.utf8), outputByteCount: 32)
+    /// Einmal gestreckter Grundschlüssel (PBKDF2, ~0,1 s) – macht Durchprobieren des Codes teuer,
+    /// falls jemand im WLAN eine verschlüsselte Nachricht mitschneidet.
+    static func master(_ code: String) -> SymmetricKey {
+        let salt = Array("agentbar-peers-v2".utf8)
+        var out = [UInt8](repeating: 0, count: 32)
+        _ = CCKeyDerivationPBKDF(CCPBKDFAlgorithm(kCCPBKDF2), code, code.utf8.count, salt, salt.count,
+                                 CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256), 600_000, &out, out.count)
+        return SymmetricKey(data: out)
     }
 
-    static func group(_ code: String) -> String {
-        key(code, "group").withUnsafeBytes { Data($0).prefix(6).map { String(format: "%02x", $0) }.joined() }
+    static func key(_ master: SymmetricKey, _ purpose: String) -> SymmetricKey {
+        HKDF<SHA256>.deriveKey(inputKeyMaterial: master, info: Data(purpose.utf8), outputByteCount: 32)
+    }
+
+    static func group(_ master: SymmetricKey) -> String {
+        key(master, "group").withUnsafeBytes { Data($0).prefix(6).map { String(format: "%02x", $0) }.joined() }
     }
 }
 
@@ -128,17 +138,18 @@ final class PeerHub: ObservableObject {
     private var pending = false
     private var timer: Timer?
     private var group: String?
+    private var groupTag: String?                       // aus dem Code abgeleitet, für restart()
     private var restartDelay: TimeInterval = 2          // Backoff nach Ausfall von Listener/Browser (bis 60 s)
     private var restartPending = false
     static let maxLinks = 8
+    static let maxUntrusted = 3                          // noch nicht bestätigte Verbindungen (gegen Blockieren ohne Code)
     private let name = Host.current().localizedName ?? "Mac"
     private let laptop = PeerHub.hasBattery()
 
     init(id: String? = nil) {
-        let d = UserDefaults.standard
-        if let id { myID = id } else if let id = d.string(forKey: "peerInstanceID") { myID = id } else {
-            myID = UUID().uuidString.lowercased(); d.set(myID, forKey: "peerInstanceID")
-        }
+        // Je Start neu gewürfelt – so ist ein Mac nicht über Netze und Neustarts hinweg wiedererkennbar
+        myID = id ?? UUID().uuidString.lowercased()
+        UserDefaults.standard.removeObject(forKey: "peerInstanceID")
     }
 
     var enabled: Bool { listener != nil }
@@ -151,17 +162,20 @@ final class PeerHub: ObservableObject {
         stop()
         guard let want else { return }
         code = want
-        sealKey = PeerCode.key(want, "seal")
-        start(group: PeerCode.group(want))
+        let master = PeerCode.master(want)
+        sealKey = PeerCode.key(master, "seal")
+        groupTag = PeerCode.group(master)
+        start(group: groupTag!)
     }
 
     /// Netzwechsel/Ruhezustand: Listener und Browser neu aufsetzen, Code bleibt.
     func restart() {
-        guard let code, let key = sealKey else { return }
+        guard let code, let key = sealKey, let tag = groupTag else { return }
         stop()
         self.code = code
         sealKey = key
-        start(group: PeerCode.group(code))
+        groupTag = tag
+        start(group: tag)
     }
 
     /// Nach einem Ausfall mit wachsender Pause neu starten.
@@ -241,7 +255,7 @@ final class PeerHub: ObservableObject {
         browser?.cancel(); browser = nil
         for l in links.values { l.cancel() }
         links = [:]; outgoing = [:]; lastResults = []
-        code = nil; sealKey = nil
+        code = nil; sealKey = nil; groupTag = nil
         if !peers.isEmpty { peers = [:]; publish() }
     }
 
@@ -258,8 +272,9 @@ final class PeerHub: ObservableObject {
 
     private func adopt(_ c: NWConnection, peer: String?) {
         // Obergrenze gegen Fluten im lokalen Netz
-        guard links.count < Self.maxLinks else { c.cancel(); return }
-        let link = PeerLink(c)
+        guard links.count < Self.maxLinks, links.values.filter({ !$0.isTrusted }).count < Self.maxUntrusted else { c.cancel(); return }
+        // Eingehende Verbindungen schicken erst, wenn die Gegenseite den Code bewiesen hat
+        let link = PeerLink(c, speaksFirst: peer != nil)
         let key = ObjectIdentifier(link)
         links[key] = link
         if let peer { outgoing[peer] = key }
@@ -286,7 +301,7 @@ final class PeerHub: ObservableObject {
     // MARK: Nachrichten
 
     private func broadcast() {
-        for l in links.values where l.ready { send(to: l) }
+        for l in links.values where l.canSend { send(to: l) }
     }
 
     private func send(to link: PeerLink) {
@@ -333,16 +348,19 @@ private final class PeerLink {
     private let c: NWConnection
     private(set) var ready = false
     private var trusted = false               // erste gültige Nachricht empfangen
+    private let speaksFirst: Bool             // nur wer die Verbindung aufbaut, sendet sofort
+    var isTrusted: Bool { trusted }
+    var canSend: Bool { ready && (speaksFirst || trusted) }
     var onMessage: ((Data) -> Bool)?
     var onReady: (() -> Void)?
     var onClose: (() -> Void)?
     private static let maxFrame = 512_000      // 40 Sitzungen passen locker hinein
-    private static let handshakeTimeout: TimeInterval = 10
+    private static let handshakeTimeout: TimeInterval = 5
 
-    init(_ c: NWConnection) { self.c = c }
+    init(_ c: NWConnection, speaksFirst: Bool) { self.c = c; self.speaksFirst = speaksFirst }
 
     func start() {
-        // Wer nach 10 s nichts Gültiges geschickt hat, fliegt raus
+        // Wer nach 5 s nichts Gültiges geschickt hat, fliegt raus
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.handshakeTimeout) { [weak self] in
             guard let self, !self.trusted else { return }
             self.close()
@@ -351,7 +369,7 @@ private final class PeerLink {
             DispatchQueue.main.async {
                 guard let self else { return }
                 switch st {
-                case .ready: self.ready = true; self.onReady?(); self.readLength()
+                case .ready: self.ready = true; if self.speaksFirst { self.onReady?() }; self.readLength()
                 case .failed, .cancelled: self.close()
                 case .waiting: self.c.cancel()
                 default: break
@@ -400,7 +418,10 @@ private final class PeerLink {
                 guard err == nil, let data, data.count == n else { self.close(); return }
                 // Nicht entschlüsselbar → sofort schließen
                 guard self.onMessage?(data) == true else { self.close(); return }
-                self.trusted = true
+                if !self.trusted {
+                    self.trusted = true
+                    if !self.speaksFirst { self.onReady?() }   // jetzt antworten
+                }
                 if done { self.close() } else { self.readLength() }
             }
         }

@@ -1442,7 +1442,7 @@ struct OfficeScene {
             g.scaleBy(x: 1, y: h / w)
             g.fill(circle(.zero, w / 2), with: glow(.zero, w / 2, st == .waiting ? rgb(0xFF9500) : tint, 0.35 * (1 - k)))
         }
-        tag(&ctx, String(a.session.label.prefix(21)), icon: icon, tint: hover ? .white : tint,
+        tag(&ctx, a.session.label.count > 21 ? a.session.label.prefix(20) + "…" : a.session.label, icon: icon, tint: hover ? .white : tint,
             at: P(nameX, nameY), size: size, fill: fill, text: text,
             device: a.session.device == nil ? nil : a.session.deviceSymbol,
             warning: a.session.contextWarning ? (hover || st == .waiting ? Color.white : rgb(0xFF9F0A)) : nil, maxWidth: maxWidth)

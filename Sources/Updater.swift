@@ -82,7 +82,9 @@ final class Updater: ObservableObject {
     // MARK: Installieren
 
     func install() async {
+        // Nur einmal gleichzeitig (Menü und Einstellungen haben beide einen Knopf)
         guard let release else { return }
+        if case .installing = state { return }
         // Ziel muss ersetzbar sein – sonst endet jeder Versuch in derselben Schleife (z. B. Start aus „Downloads“ mit
         // App-Translocation oder von einem schreibgeschützten Volume)
         if let problem = Self.targetProblem(Bundle.main.bundleURL) {
@@ -90,8 +92,8 @@ final class Updater: ObservableObject {
             return
         }
         state = .installing(L("Lade v\(release.version) …", "Downloading v\(release.version)…"))
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("AgentBar-Update-\(UUID().uuidString)")
         do {
-            let work = FileManager.default.temporaryDirectory.appendingPathComponent("AgentBar-Update-\(UUID().uuidString)")
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
             let zipData = try await Self.download(release.zip)
             let sigText = String(decoding: try await Self.download(release.signature), as: UTF8.self)
@@ -125,6 +127,7 @@ final class Updater: ObservableObject {
             try launchSwapScript(newApp: newApp, work: work)
             NSApp.terminate(nil)
         } catch {
+            try? FileManager.default.removeItem(at: work)
             let msg = (error as? Fail)?.text ?? error.localizedDescription
             state = .failed(L("Update fehlgeschlagen", "Update failed") + ": \(msg)")
         }

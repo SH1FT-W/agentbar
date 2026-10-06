@@ -117,7 +117,8 @@ final class AppStore: ObservableObject {
         quota.onThreshold = { [weak self] pct in
             guard UserDefaults.standard.bool(forKey: Prefs.notifyQuota) else { return }
             self?.notifier.post(title: L("Kontingent bei", "Usage at") + " " + percentText(Int(pct)),
-                                body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.") + " \(resetText(self?.quota.session?.resetsAt)).",
+                                body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.")
+                                    + (self?.quota.session?.resetsAt.map { " " + freshWindowText($0) } ?? ""),
                                 sessionId: nil)
         }
         updater.onFound = { [weak self] version in
@@ -277,8 +278,13 @@ struct MenuBarLabel: View {
             Image(nsImage: MenuBarIcon.make(waiting: waiting > 0, working: working > 0))
             // Zahl zeigt, wer dich braucht – sonst, wie viele arbeiten
             if showCount, waiting + working > 0 { Text("\(waiting > 0 ? waiting : working)").monospacedDigit() }
-            if showQuota, let s = quota.session { Text(percentText(Int(s.percent.rounded()))).monospacedDigit() }
+            if showQuota, let s = quota.shownSession { Text(percentText(Int(s.percent.rounded()))).monospacedDigit() }
         }
+        // VoiceOver: das Symbol allein verrät den Zustand nicht
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(["AgentBar",
+                             waiting > 0 ? L("\(waiting) braucht dich", "\(waiting) need you") : nil,
+                             working > 0 ? L("\(working) arbeiten", "\(working) working") : nil].compactMap { $0 }.joined(separator: ", "))
     }
 }
 

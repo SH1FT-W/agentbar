@@ -377,7 +377,9 @@ struct OfficeView: View {
             // Verdeckt oder im Dock: gar nicht zeichnen
             TimelineView(.animation(minimumInterval: fast ? 1 / 30 : 1 / 10, paused: !visibility.visible)) { tl in
                 let now = tl.date.timeIntervalSinceReferenceDate
-                let (actors, overflow) = model.actors(for: Array(monitor.visible.prefix(12)), now: now)
+                let (actors, seatless) = model.actors(for: Array(monitor.visible.prefix(12)), now: now)
+                // Ab der 13. Sitzung gibt es keinen Platz mehr – die zählen auch zum „Nebenraum“
+                let overflow = seatless + max(0, monitor.visible.count - 12)
                 let k = fit
                 let dark = scheme == .dark
                 let lightsOn = OfficeScene.lightsOn(date: tl.date, dark: dark, daylight: daylight)
@@ -387,7 +389,7 @@ struct OfficeView: View {
                                          scale: fit * displayScale, now: now)
                 let scene = OfficeScene(time: now, date: tl.date, dark: dark, daylight: daylight,
                                         actors: actors, overflow: overflow, hovered: hovered,
-                                        session: quota.session?.percent, weekly: quota.weekly?.percent,
+                                        session: quota.shownSession?.percent, weekly: quota.shownWeekly?.percent,
                                         plan: quota.plan, cpu: load.cpu, vacuum: vacuum,
                                         working: monitor.workingCount, waiting: monitor.waitingCount,
                                         forecast: quota.forecast, todayTokens: stats.today?.tokens.total, backdrop: bg)

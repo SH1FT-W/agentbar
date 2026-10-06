@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 enum SettingsWindow {
     private static var window: NSWindow?
@@ -52,6 +53,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.keepAwake) private var keepAwake = KeepAwakeMode.off.rawValue
     @State private var codeInput = ""
     @State private var codeInvalid = false
+    @State private var notificationsDenied = false
     @State private var copied = false
     /// Feste Höhe nur für Snapshots (ganzes Formular auf einem Bild); nil = Fenster bestimmt die Höhe.
     var height: CGFloat? = nil
@@ -97,6 +99,14 @@ struct SettingsView: View {
             }
 
             Section(L("Mitteilungen", "Notifications")) {
+                if notificationsDenied {
+                    LabeledContent {
+                        Button(L("Öffnen …", "Open…")) { openSettings("com.apple.Notifications-Settings.extension?id=\(Bundle.main.bundleIdentifier ?? "")") }
+                    } label: {
+                        SettingLabel(L("In macOS ausgeschaltet", "Turned off in macOS"), "bell.slash.fill", .orange,
+                                     note: L("AgentBar darf keine Mitteilungen zeigen – in den Systemeinstellungen erlauben.", "AgentBar isn’t allowed to show notifications – allow it in System Settings."))
+                    }
+                }
                 Toggle(isOn: $notifyWaiting) { SettingLabel(L("Wenn ein Agent dich braucht", "When an agent needs you"), "hand.raised.fill", .orange) }
                 Toggle(isOn: $notifyDone) { SettingLabel(L("Wenn ein Agent fertig ist", "When an agent is done"), "checkmark", .green) }
                 Toggle(isOn: $notifyError) { SettingLabel(L("Bei Fehlern", "On errors"), "exclamationmark", .red) }
@@ -109,7 +119,8 @@ struct SettingsView: View {
                                  note: L("Arbeitet seit 10 Minuten ohne neues Lebenszeichen.", "Working for 10 minutes without any new activity."))
                 }
                 Toggle(isOn: $notifyQuota) { SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink) }
-                if notifyQuota {
+                    .disabled(!quotaEnabled)
+                if notifyQuota, quotaEnabled {
                     LabeledContent {
                         HStack(spacing: 10) {
                             Slider(value: $threshold, in: 50...95, step: 5).frame(width: 150)
@@ -144,7 +155,16 @@ struct SettingsView: View {
 
             Section(L("Menüleiste", "Menu Bar")) {
                 Toggle(isOn: $showCount) { SettingLabel(L("Anzahl aktiver Agenten", "Number of active agents"), "number", .blue) }
-                Toggle(isOn: $showQuota) { SettingLabel(L("5-Stunden-Kontingent in %", "5-hour usage in %"), "percent", .blue) }
+            }
+
+            Section(L("Kontingent", "Usage")) {
+                Toggle(isOn: $quotaEnabled) {
+                    SettingLabel(L("Kontingent abrufen", "Fetch usage"), "chart.pie.fill", .pink,
+                                 note: L("Liest dein Nutzungs-Kontingent bei Anthropic.", "Reads your usage limits from Anthropic."))
+                }
+                .onChange(of: quotaEnabled) { _, on in if on { Task { await store.quota.refresh() } } }
+                Toggle(isOn: $showQuota) { SettingLabel(L("5-Stunden-Kontingent in der Menüleiste", "5-hour usage in the menu bar"), "percent", .blue) }
+                    .disabled(!quotaEnabled)
             }
 
             Section {
@@ -154,14 +174,9 @@ struct SettingsView: View {
                     Text(L("8 Stunden", "8 hours")).tag(8.0)
                     Text(L("24 Stunden", "24 hours")).tag(24.0)
                 } label: {
-                    SettingLabel(L("Ruhende Sitzungen zeigen", "Show idle sessions for"), "clock", .indigo)
+                    SettingLabel(L("Ruhende Sitzungen zeigen für", "Show idle sessions for"), "clock", .indigo)
                 }
                 .onChange(of: hours) { store.monitor.rescan() }
-                Toggle(isOn: $quotaEnabled) {
-                    SettingLabel(L("Kontingent abrufen", "Fetch usage"), "chart.pie.fill", .pink,
-                                 note: L("Liest dein Nutzungs-Kontingent bei Anthropic.", "Reads your usage limits from Anthropic."))
-                }
-                .onChange(of: quotaEnabled) { _, on in if on { Task { await store.quota.refresh() } } }
                 LabeledContent {
                     Button(store.hooksInstalled ? L("Entfernen", "Remove") : L("Einrichten", "Set Up")) { store.setHooks(!store.hooksInstalled) }
                 } label: {
@@ -213,13 +228,13 @@ struct SettingsView: View {
                             Button(L("Übernehmen", "Use"), action: applyCode).disabled(codeInput.isEmpty)
                         }
                     } label: {
-                        SettingLabel(L("Code eines anderen Macs", "Code from another Mac"), "keyboard", .gray,
+                        SettingLabel(L("Code eingeben", "Enter code"), "keyboard", .gray,
                                      note: codeInvalid ? L("Ungültiger Code – 12 Zeichen, z. B. ABCD-EFGH-JKLM.", "Invalid code – 12 characters, e.g. ABCD-EFGH-JKLM.") : nil)
                     }
                     LabeledContent {
                         PeerStatus(hub: store.peers)
                     } label: {
-                        SettingLabel(L("Verbunden", "Connected"), "wifi", .green)
+                        SettingLabel(L("Status", "Status"), "wifi", .green)
                     }
                 }
             } header: {
@@ -257,11 +272,18 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingLabel(L("Diagnose", "Diagnostics"), "stethoscope", .gray,
-                                 note: L("Für Fehlerberichte – enthält Projektnamen, keine Pfade.", "For bug reports – includes project names, no paths."))
+                                 note: L("Für Fehlerberichte – enthält Projektnamen und letzte Tätigkeit.", "For bug reports – includes project names and the latest activity."))
                 }
             }
         }
         .formStyle(.grouped)
+        .task {
+            #if !SNAPSHOT
+            // Bei jedem Öffnen nachsehen – wer Mitteilungen in macOS abgelehnt hat, erfährt sonst nie, warum nichts kommt
+            let s = await UNUserNotificationCenter.current().notificationSettings()
+            notificationsDenied = s.authorizationStatus == .denied
+            #endif
+        }
         .frame(width: 500)
         .frame(minHeight: height ?? 420, idealHeight: height ?? 680, maxHeight: height ?? .infinity)
     }
@@ -272,6 +294,11 @@ struct SettingsView: View {
         }
         .labelsHidden().fixedSize()
     }
+}
+
+/// Bereich der Systemeinstellungen öffnen (z. B. "com.apple.preference.security?Privacy_LocalNetwork").
+func openSettings(_ pane: String) {
+    if let url = URL(string: "x-apple.systempreferences:" + pane) { NSWorkspace.shared.open(url) }
 }
 
 extension SettingsView {
@@ -295,8 +322,16 @@ private struct PeerStatus: View {
 
     var body: some View {
         let names = hub.peers.values.map(\.name).sorted()
-        Text(hub.problem ?? (names.isEmpty ? L("Suche andere Macs …", "Looking for other Macs…") : names.joined(separator: ", ")))
-            .foregroundStyle(hub.problem == nil ? Color.secondary : Color.orange).multilineTextAlignment(.trailing)
+        if let p = hub.problem {
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(p).foregroundStyle(.orange).multilineTextAlignment(.trailing)
+                Button(L("Lokales Netzwerk erlauben …", "Allow Local Network…")) { openSettings("com.apple.preference.security?Privacy_LocalNetwork") }
+            }
+        } else {
+            Text(names.isEmpty ? L("Nicht verbunden – suche …", "Not connected – searching…")
+                               : L("Verbunden mit ", "Connected to ") + names.joined(separator: ", "))
+                .foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+        }
     }
 }
 

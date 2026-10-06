@@ -198,7 +198,7 @@ struct AgentSession: Identifiable, Equatable {
         case "ExitPlanMode": return L("Plan prüfen", "Review the plan")
         default:
             let what = activity.isEmpty ? tool : activity
-            return what.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : L("Freigabe", "Approve") + ": " + what
+            return what.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : L("Freigabe", "Approve") + " · " + what
         }
     }
 }
@@ -282,6 +282,7 @@ enum Prefs {
     static let quietHours = "quietHours"           // Ruhezeiten an/aus
     static let quietFrom = "quietFrom"             // Stunde 0…23
     static let quietTo = "quietTo"
+    static let hookHintDismissed = "hookHintDismissed" // Karte „Präzise Erkennung“ im Menü weggeklickt
     static let notifyPeers = "notifyPeers"         // Mitteilungen auch für andere Macs
 
     static func register() {

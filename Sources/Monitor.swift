@@ -247,9 +247,11 @@ private final class MonitorCore: @unchecked Sendable {
                 if p == Paths.hookLog.path { readHooks(skipPartialFirstLine: false); dirty = true }
                 else if p.hasSuffix(".jsonl") {
                     let url = URL(fileURLWithPath: p)
+                    // Ausgelagerte iCloud-Dateien nicht anfassen – Lesen würde einen Download auslösen
+                    guard isLocal(url) else { continue }
                     stats?.touched(url)
-                    // Nur aktuelle, lokal vorhandene Dateien – sonst lädt iCloud ausgelagerte Alt-Sitzungen herunter
-                    if files[p] != nil || (mtime(url) > scanCutoff && isLocal(url)), track(url) { dirty = true }
+                    // Nur aktuelle Dateien – sonst tauchen alte Sitzungen wieder auf
+                    if files[p] != nil || mtime(url) > scanCutoff, track(url) { dirty = true }
                 }
                 else if p.hasPrefix(Paths.desktopMeta.path) && p.hasSuffix(".json") { loadDesktopMeta(); dirty = true }
             }

@@ -24,6 +24,7 @@ struct MenuView: View {
     /// Menüfenster sichtbar? Steuert die Animationen – geschlossen läuft nichts weiter.
     @State private var visible = true
     @FocusState private var focused: Bool
+    @AppStorage(Prefs.hookHintDismissed) private var hookHintDismissed = false
 
     init(expanded: String? = nil) { _expanded = State(initialValue: expanded) }
 
@@ -37,7 +38,7 @@ struct MenuView: View {
                 Notice(text: msg) { withAnimation(.snappy(duration: 0.2)) { store.message = nil } }
                     .padding(.horizontal, MenuMetrics.inset).padding(.bottom, 8)
             }
-            if !store.hooksInstalled {
+            if !store.hooksInstalled, !hookHintDismissed {
                 HookHint().padding(.horizontal, 10).padding(.bottom, 8)
             }
 
@@ -57,7 +58,8 @@ struct MenuView: View {
                         }
                         .padding(.horizontal, MenuMetrics.rowInset)
                     }
-                    .scrollIndicators(.never)
+                    // Ab acht Zeilen wird gescrollt – dann soll man auch sehen, dass weiter unten noch etwas kommt
+                    .scrollIndicators(list.count > 7 ? .automatic : .never)
                     // Bis sieben Zeilen wächst die Liste mit (auch aufgeklappt), darüber wird gescrollt
                     .frame(maxHeight: expanded == nil ? 330 : 560)
                     .fixedSize(horizontal: false, vertical: list.count <= 7)
@@ -276,6 +278,7 @@ struct EmptyAgents: View {
 /// Hinweis, solange die Claude-Code-Hooks fehlen – als ruhige Karte im Stil der Kontrollzentrum-Module.
 struct HookHint: View {
     @EnvironmentObject var store: AppStore
+    @AppStorage(Prefs.hookHintDismissed) private var dismissed = false
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
@@ -289,9 +292,14 @@ struct HookHint: View {
                 Text(L("Mit Hooks weiß AgentBar sofort, wann Claude auf dich wartet – statt zu raten.", "With hooks, AgentBar knows right away when Claude is waiting for you – no guessing."))
                     .font(.system(size: 11)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button(L("Einrichten", "Set Up")) { store.setHooks(true) }
-                    .controlSize(.small).glassProminentButton()
-                    .padding(.top, 6)
+                HStack(spacing: 8) {
+                    Button(L("Einrichten", "Set Up")) { store.setHooks(true) }
+                        .controlSize(.small).glassProminentButton()
+                    // Wer keine Hooks will, soll die Karte loswerden – Einrichten geht weiter in den Einstellungen
+                    Button(L("Nicht jetzt", "Not Now")) { withAnimation(.snappy(duration: 0.2)) { dismissed = true } }
+                        .controlSize(.small).buttonStyle(.borderless).foregroundStyle(.secondary)
+                }
+                .padding(.top, 6)
             }
             Spacer(minLength: 0)
         }
@@ -498,7 +506,7 @@ struct QuotaSection: View {
         #if SNAPSHOT
         if let d = demo { return d }
         #endif
-        return QuotaValues(session: quota.session, weekly: quota.weekly, plan: quota.plan, problem: quota.problem, forecast: quota.forecast)
+        return QuotaValues(session: quota.shownSession, weekly: quota.shownWeekly, plan: quota.plan, problem: quota.problem, forecast: quota.forecast)
     }
 
     static func isVisible(_ enabled: Bool) -> Bool {
