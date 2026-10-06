@@ -23,21 +23,28 @@ final class Updater: ObservableObject {
     private var timer: Timer?
     /// Meldet eine neu gefundene Version (je Version nur einmal, auch über Neustarts hinweg).
     var onFound: ((String) -> Void)?
+    /// Beim Start gefunden und nicht übersprungen → Fenster mit „Jetzt installieren / Später“ zeigen.
+    var onLaunchFound: ((String) -> Void)?
 
     struct Release { let version: String; let zip: URL; let signature: URL }
 
     init() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
-            Task { await self?.check(silent: true) }
+        // Kurz nach dem Start nachsehen – findet sich etwas, fragt ein Fenster statt nur einer Mitteilung
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+            Task { await self?.check(silent: true, launch: true) }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.check(silent: true) }
         }
     }
 
+    #if SNAPSHOT
+    func demo(_ s: State) { state = s }
+    #endif
+
     // MARK: Prüfen
 
-    func check(silent: Bool = false) async {
+    func check(silent: Bool = false, launch: Bool = false) async {
         if case .installing = state { return }
         if case .available = state, silent { return }
         state = .checking
@@ -65,8 +72,14 @@ final class Updater: ObservableObject {
             if Self.isNewer(tag, than: AppInfo.version) {
                 release = Release(version: tag, zip: zip, signature: sig)
                 state = .available(version: tag, notes: (json["body"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
-                if UserDefaults.standard.string(forKey: "updateNotified") != tag {
-                    UserDefaults.standard.set(tag, forKey: "updateNotified")
+                let d = UserDefaults.standard
+                if d.string(forKey: Prefs.updateSkipped) == tag {
+                    // Übersprungen: weder Fenster noch Mitteilung, im Menü bleibt der Eintrag
+                } else if launch {
+                    d.set(tag, forKey: "updateNotified")
+                    onLaunchFound?(tag)
+                } else if d.string(forKey: "updateNotified") != tag {
+                    d.set(tag, forKey: "updateNotified")
                     onFound?(tag)
                 }
             } else {

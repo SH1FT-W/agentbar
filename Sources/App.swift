@@ -82,6 +82,7 @@ final class AppStore: ObservableObject {
     let stats = StatsStore()
     private var peerWatch: AnyCancellable?
     lazy var office = OfficeWindowController(store: self)
+    private let updatePrompt = UpdatePromptController()
     private var hotKey: HotKey?
     private var awakeTimer: Timer?
     @Published var hooksInstalled = Hooks.installed
@@ -120,6 +121,10 @@ final class AppStore: ObservableObject {
                                 body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.")
                                     + (self?.quota.session?.resetsAt.map { " " + freshWindowText($0) } ?? ""),
                                 sessionId: nil)
+        }
+        updater.onLaunchFound = { [weak self] _ in
+            guard let self, UserDefaults.standard.bool(forKey: Prefs.notifyUpdate) else { return }
+            self.updatePrompt.show(self.updater)
         }
         updater.onFound = { [weak self] version in
             guard UserDefaults.standard.bool(forKey: Prefs.notifyUpdate) else { return }

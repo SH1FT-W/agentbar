@@ -282,6 +282,7 @@ enum Prefs {
     static let quietHours = "quietHours"           // Ruhezeiten an/aus
     static let quietFrom = "quietFrom"             // Stunde 0…23
     static let quietTo = "quietTo"
+    static let updateSkipped = "updateSkipped"         // „Diese Version überspringen“ im Update-Fenster
     static let hookHintDismissed = "hookHintDismissed" // Karte „Präzise Erkennung“ im Menü weggeklickt
     static let notifyPeers = "notifyPeers"         // Mitteilungen auch für andere Macs
 
