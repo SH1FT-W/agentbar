@@ -76,7 +76,7 @@
 <script>
   (function () {
     var saved = null;
-    try { saved = localStorage.getItem("agentbar-lang"); } catch (e) {}
+    try { saved = localStorage.getItem("sh1ftw-lang"); } catch (e) {}
     var pref = saved || ((navigator.languages && navigator.languages[0]) || navigator.language || "en");
     document.documentElement.lang = /^de/i.test(pref) ? "de" : "en";
   })();
@@ -234,7 +234,7 @@
     }
     document.querySelectorAll(".lang button").forEach(function (b) {
       b.addEventListener("click", function () {
-        try { localStorage.setItem("agentbar-lang", b.dataset.l); } catch (e) {}
+        try { localStorage.setItem("sh1ftw-lang", b.dataset.l); } catch (e) {}
         apply(b.dataset.l);
       });
     });
