@@ -48,6 +48,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.officeOpacity) private var opacity = 1.0
     @AppStorage(Prefs.officeDaylight) private var daylight = true
     @AppStorage(Prefs.weatherEnabled) private var weatherEnabled = false
+    @AppStorage(Prefs.officeFestive) private var festive = true
     @AppStorage(Prefs.weatherPlace) private var weatherPlace = ""
     @State private var placeInput = ""
     @State private var placeSearching = false
@@ -265,6 +266,10 @@ struct SettingsView: View {
                     SettingLabel(L("Deckkraft", "Opacity"), "circle.lefthalf.filled", .gray)
                 }
                 Toggle(isOn: $daylight) { SettingLabel(L("Himmel folgt der Tageszeit", "Sky follows time of day"), "sun.horizon.fill", .cyan) }
+                Toggle(isOn: $festive) {
+                    SettingLabel(L("Feiertags-Deko", "Holiday decorations"), "gift.fill", .red,
+                                 note: L("Advent, Weihnachten, Silvester: das Büro schmückt sich selbst", "Advent, Christmas, New Year’s Eve: the office decorates itself"))
+                }
                 LabeledContent {
                     HStack(spacing: 8) {
                         if weatherPlace.isEmpty {

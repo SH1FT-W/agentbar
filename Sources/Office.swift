@@ -365,6 +365,7 @@ struct OfficeView: View {
     @Environment(\.displayScale) private var displayScale
     @AppStorage(Prefs.officeDaylight) private var daylight = true
     @AppStorage(Prefs.weatherEnabled) private var weatherEnabled = false
+    @AppStorage(Prefs.officeFestive) private var festiveOn = true
     @State private var hovered: String?
     /// 30 fps nur, solange sich etwas bewegt (Laufen, Tippen, Melden, Saugroboter fährt) – sonst 10 fps.
     @State private var fast = true
@@ -388,10 +389,11 @@ struct OfficeView: View {
                 let w = weatherEnabled ? weather.shown : Weather.fake
                 // Tageslauf nach echtem Sonnenauf-/-untergang (statisch, weil auch Saugroboter und Hintergrund-Cache ihn brauchen)
                 let _ = OfficeScene.sunTimes = w?.sunTimes
+                let fest = festiveOn ? Festive.at(Festive.fakeDate ?? tl.date) : .none
                 let lightsOn = OfficeScene.lightsOn(date: tl.date, dark: dark, daylight: daylight)
                 let vacuum = load.vacuum(at: now, dock: lightsOn)
                 // Regen und Schnee brauchen die flüssige Bildrate, sonst springen die Striche
-                let moving = model.animating || vacuum.spur < OfficeScene.vacuumSpurLength || (w.map { $0.raining || $0.kind == .snow } ?? false)
+                let moving = model.animating || vacuum.spur < OfficeScene.vacuumSpurLength || (w.map { $0.raining || $0.kind == .snow } ?? false) || fest.animated
                 let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: tl.date, dark: dark, daylight: daylight),
                                          scale: fit * displayScale, now: now, weather: w)
                 let scene = OfficeScene(time: now, date: tl.date, dark: dark, daylight: daylight,
@@ -399,7 +401,7 @@ struct OfficeView: View {
                                         session: quota.shownSession?.percent, weekly: quota.shownWeekly?.percent,
                                         plan: quota.plan, cpu: load.cpu, vacuum: vacuum,
                                         working: monitor.workingCount, waiting: monitor.waitingCount,
-                                        forecast: quota.forecast, todayTokens: stats.today?.tokens.total, backdrop: bg, weather: w)
+                                        forecast: quota.forecast, todayTokens: stats.today?.tokens.total, backdrop: bg, weather: w, festive: fest)
                 ZStack(alignment: .topLeading) {
                     Canvas { ctx, size in
                         ctx.scaleBy(x: size.width / OfficeScene.size.width, y: size.height / OfficeScene.size.height)

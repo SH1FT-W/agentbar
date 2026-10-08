@@ -289,6 +289,7 @@ enum Prefs {
     static let weatherPlace = "weatherPlace"       // Anzeigename des Orts
     static let weatherLat = "weatherLat"
     static let weatherLon = "weatherLon"
+    static let officeFestive = "officeFestive"     // Deko zu Feiertagen und Jahreszeiten
     static let weatherCache = "weatherCache"       // letztes Wetter (JSON), damit es nach dem Start sofort da ist
 
     static func register() {
@@ -299,7 +300,7 @@ enum Prefs {
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,
             keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true, peersEnabled: false,
             notifyContext: true, notifyStalled: false, quietHours: false, quietFrom: 22, quietTo: 7, notifyPeers: false,
-            weatherEnabled: false,
+            weatherEnabled: false, officeFestive: true,
         ])
     }
 }

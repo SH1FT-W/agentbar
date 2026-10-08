@@ -37,18 +37,38 @@ struct Snap {
         if CommandLine.arguments.contains("--bench") { bench(demo, cached: !CommandLine.arguments.contains("--nocache")); return }
         let backdrop = OfficeBackdrop()
         let forecast = QuotaForecast(percentPerHour: 9, exhaustsAt: cal.date(bySettingHour: 16, minute: 40, second: 0, of: now))
-        func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil, weather: Weather? = Weather.fake) {
+        func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil, weather: Weather? = Weather.fake, festive: Festive = .none) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
             let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t, weather: weather)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
                                     hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
                                     vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1,
-                                    forecast: forecast, todayTokens: 12_400_000, backdrop: bg, weather: weather)
+                                    forecast: forecast, todayTokens: 12_400_000, backdrop: bg, weather: weather, festive: festive)
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") ? "build/\(name).png" : "build/office-\(name).png"))
+                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") || name.hasPrefix("festive-") ? "build/\(name).png" : "build/office-\(name).png"))
             }
+        }
+        // ./build.sh snapshot --festive → build/festive-*.png (Advent bis Neujahr)
+        if CommandLine.arguments.contains("--festive") {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+            let shots: [(String, String, Bool, String?)] = [
+                ("1-advent", "2026-11-30 10:30", false, nil), ("2-nikolaus", "2026-12-06 17:40", false, "cloudy"),
+                ("3-advent3", "2026-12-14 21:00", true, nil), ("4-heiligabend", "2026-12-24 19:00", true, "snow"),
+                ("4-heiligabend-tag", "2026-12-24 12:00", false, "snow"),
+                ("5-silvester", "2026-12-31 23:58", true, "clear"), ("6-neujahr", "2027-01-01 10:30", false, "partly"),
+            ]
+            OfficeScene.sunTimes = (8.3, 16.4)     // Mitteleuropa im Dezember
+            for (name, ds, dark, wk) in shots {
+                let d = f.date(from: ds)!
+                var t = d.timeIntervalSinceReferenceDate
+                let fest = Festive.compute(d, cal: cal)
+                if fest.fireworks >= 1 { t += 1.4 }
+                render("festive-\(name)", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) }, festive: fest)
+            }
+            print("Festbilder in build/")
+            return
         }
         // ./build.sh snapshot --weather → build/weather-<art>-<tag|nacht>.png (Vergleichsbilder fürs Wetter)
         if CommandLine.arguments.contains("--weather") {

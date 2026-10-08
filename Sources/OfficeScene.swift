@@ -41,6 +41,8 @@ struct OfficeScene {
     /// Wie trüb es draußen ist (0 = klar) und wie viel Schnee liegt – vorab aus weather
     let gloom: Double
     let snow: Double
+    /// Feiertags-Deko (Advent, Weihnachten, Silvester …)
+    let festive: Festive
 
     /// Stunde (Kommazahl), Tageslicht 0…1 und Abendröte – einmal je Bild statt bei jedem Zugriff.
     let hour: Double
@@ -51,13 +53,14 @@ struct OfficeScene {
     init(time: Double, date: Date, dark: Bool, daylight: Bool, actors: [Actor], overflow: Int, hovered: String?,
          session: Double?, weekly: Double?, plan: String?, cpu: Double, vacuum: VacuumState, working: Int, waiting: Int,
          forecast: QuotaForecast? = nil, todayTokens: Int? = nil, backdrop: OfficeBackdrop.Images? = nil, fixedDayness: Double? = nil,
-         weather: Weather? = nil) {
+         weather: Weather? = nil, festive: Festive = .none) {
         self.time = time; self.date = date; self.dark = dark; self.daylight = daylight
         self.actors = actors; self.overflow = overflow; self.hovered = hovered
         self.session = session; self.weekly = weekly; self.plan = plan; self.cpu = cpu; self.vacuum = vacuum
         self.working = working; self.waiting = waiting
         self.forecast = forecast; self.todayTokens = todayTokens; self.backdrop = backdrop
         self.weather = weather
+        self.festive = festive
         gloom = weather?.gloom ?? 0
         snow = weather?.snowCover ?? 0
         let h = Self.hour(date: date, dark: dark, daylight: daylight)
@@ -133,6 +136,8 @@ struct OfficeScene {
         }
         drawGlass(&ctx)
         drawSunlight(&ctx)
+        drawConfetti(&ctx)
+        drawBunting(&ctx)
 
         // Tiefensortiert: Tischgruppen, Lounge, Pflanzen, Laufende, Saugroboter
         var items: [(CGFloat, (inout GraphicsContext) -> Void)] = []
@@ -150,7 +155,8 @@ struct OfficeScene {
         }
         items.append((400, { c in drawFloorLamp(&c) }))
         items.append((492, { c in drawSofa(&c, actors: seated["sofa"] ?? []) }))
-        items.append((452, { c in drawFig(&c, at: CGPoint(x: 712, y: 452), scale: 0.95) }))
+        if festive.tree { items.append((452, { c in drawTree(&c, at: Self.treeBase) })) }
+        else { items.append((452, { c in drawFig(&c, at: CGPoint(x: 712, y: 452), scale: 0.95) })) }
         items.append((474, { c in drawSnakePlant(&c, at: CGPoint(x: 44, y: 474), scale: 1.0) }))
         items.append((566, { c in drawCoffeeTable(&c) }))
         for a in seated["stand"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
@@ -161,6 +167,7 @@ struct OfficeScene {
         for (_, f) in items.sorted(by: { $0.0 < $1.0 }) { f(&ctx) }
 
         drawLighting(&ctx, seated: seated)
+        drawDecoGlow(&ctx)
         if let f = lightning() { ctx.fill(Path(CGRect(origin: .zero, size: Self.size)), with: .color(rgb(0xE8EEFF, 0.10 * f.strength))) }
         drawDisplay(&ctx)
         for a in actors { drawLabels(&ctx, a) }
@@ -175,30 +182,30 @@ struct OfficeScene {
 
     // MARK: Hilfen
 
-    private func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
-    private func oval(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> Path { Path(ellipseIn: CGRect(x: x, y: y, width: w, height: h)) }
-    private func circle(_ c: CGPoint, _ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)) }
-    private func rounded(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> Path {
+    func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x, y: y) }
+    func oval(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat) -> Path { Path(ellipseIn: CGRect(x: x, y: y, width: w, height: h)) }
+    func circle(_ c: CGPoint, _ r: CGFloat) -> Path { Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)) }
+    func rounded(_ x: CGFloat, _ y: CGFloat, _ w: CGFloat, _ h: CGFloat, _ r: CGFloat) -> Path {
         Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: min(r, w / 2, h / 2), style: .continuous)
     }
-    private func vgrad(_ colors: [Color], _ y0: CGFloat, _ y1: CGFloat) -> GraphicsContext.Shading {
+    func vgrad(_ colors: [Color], _ y0: CGFloat, _ y1: CGFloat) -> GraphicsContext.Shading {
         .linearGradient(Gradient(colors: colors), startPoint: P(0, y0), endPoint: P(0, y1))
     }
-    private func glow(_ c: CGPoint, _ r: CGFloat, _ color: Color, _ o: Double) -> GraphicsContext.Shading {
+    func glow(_ c: CGPoint, _ r: CGFloat, _ color: Color, _ o: Double) -> GraphicsContext.Shading {
         .radialGradient(Gradient(colors: [color.opacity(o), color.opacity(o * 0.35), color.opacity(0)]), center: c, startRadius: 0, endRadius: r)
     }
-    private func blob(_ ctx: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat, _ color: Color, _ o: Double) {
+    func blob(_ ctx: inout GraphicsContext, _ c: CGPoint, _ r: CGFloat, _ color: Color, _ o: Double) {
         ctx.fill(circle(c, r), with: glow(c, r, color, o))
     }
     /// Weicher Bodenschatten (Radialverlauf statt Blur-Filter)
-    private func shadow(_ ctx: inout GraphicsContext, _ r: CGRect, _ o: Double = 0.12) {
+    func shadow(_ ctx: inout GraphicsContext, _ r: CGRect, _ o: Double = 0.12) {
         ctx.fill(Path(ellipseIn: r), with: .radialGradient(Gradient(colors: [.black.opacity(o), .black.opacity(o * 0.4), .clear]),
                                                           center: P(r.midX, r.midY), startRadius: 0, endRadius: r.width / 2))
     }
     /// Farbmischung (0 = a, 1 = b) – Komponenten je Farbe gecacht, statt bei jedem Aufruf über NSColor zu wandeln.
-    private func mix(_ a: Color, _ b: Color, _ t: Double) -> Color { ColorMath.mix(a, b, t) }
-    private func darker(_ c: Color, _ t: Double) -> Color { mix(c, .black, t) }
-    private func lighter(_ c: Color, _ t: Double) -> Color { mix(c, .white, t) }
+    func mix(_ a: Color, _ b: Color, _ t: Double) -> Color { ColorMath.mix(a, b, t) }
+    func darker(_ c: Color, _ t: Double) -> Color { mix(c, .black, t) }
+    func lighter(_ c: Color, _ t: Double) -> Color { mix(c, .white, t) }
 
     // MARK: Raum
 
@@ -239,6 +246,7 @@ struct OfficeScene {
             c.clip(to: Path(g))
             c.fill(Path(g), with: vgrad([sky.0, sky.1], g.minY, g.minY + 250))
             drawSkyObjects(&c, g)
+            drawFireworks(&c, g)
             let flash = lightning()
             if let f = flash { drawBolt(&c, g, f) }
             if let b = backdrop {
@@ -301,6 +309,7 @@ struct OfficeScene {
                 ctx.fill(p, with: .color(white.opacity(0.92)))
             }
         }
+        drawWindowDeco(&ctx)
     }
 
     // MARK: Wetter
@@ -336,7 +345,7 @@ struct OfficeScene {
         ctx.stroke(p, with: .color(.white.opacity(f.strength)), lineWidth: 1.6)
     }
 
-    private func wrap(_ v: CGFloat, _ m: CGFloat) -> CGFloat { let r = v.truncatingRemainder(dividingBy: m); return r < 0 ? r + m : r }
+    func wrap(_ v: CGFloat, _ m: CGFloat) -> CGFloat { let r = v.truncatingRemainder(dividingBy: m); return r < 0 ? r + m : r }
 
     /// Regen als schräge Striche, Schnee als taumelnde Flocken – eine Path je Art, damit es bei 30 fps billig bleibt.
     private func drawPrecipitation(_ ctx: inout GraphicsContext, _ g: CGRect, _ w: Weather) {
@@ -812,6 +821,11 @@ struct OfficeScene {
         case .lamp: lamp(&ctx, P(x + 50 * s, top - 7 * s), s)
         case .books: books(&ctx, P(x - 46 * s, top - 6 * s), s)
         }
+        // Nikolaus: Stiefel auf der freien Tischseite
+        if festive.boots {
+            let right = deskProp(index) == .plant || deskProp(index) == .books
+            drawBoot(&ctx, at: P(x + (right ? 42 : -46) * s, top - 5 * s), s)
+        }
     }
 
     /// Bürostuhl: Rückenlehne hinter der Figur, Gasfeder und Fünfsternfuß unter dem Tisch.
@@ -969,7 +983,10 @@ struct OfficeScene {
         ctx.fill(oval(c.x - 26, c.y + 25, 52, 8), with: .color(alu))
         ctx.fill(oval(c.x - 64, c.y - 7, 128, 19), with: .color(darker(oak, 0.12)))
         ctx.fill(oval(c.x - 64, c.y - 11, 128, 19), with: .linearGradient(Gradient(colors: [lighter(oak, 0.25), oak]), startPoint: P(0, c.y - 11), endPoint: P(0, c.y + 8)))
-        // Bücher, Vase mit Zweig, Schale
+        // Bücher, Vase mit Zweig, Schale – im Advent steht dort der Kranz
+        if festive.wreath {
+            drawWreath(&ctx, at: Self.wreathCenter)
+        } else {
         shadow(&ctx, CGRect(x: c.x - 44, y: c.y - 6, width: 40, height: 6), 0.2)
         ctx.fill(rounded(c.x - 42, c.y - 9, 34, 5, 1), with: .color(rgb(0xE9E2D6)))
         ctx.fill(rounded(c.x - 39, c.y - 13.5, 29, 4.5, 1), with: .color(rgb(0x8193AA)))
@@ -979,6 +996,7 @@ struct OfficeScene {
             ctx.fill(oval(c.x + dx - 2, c.y + dy - 3, 5, 6), with: .color(rgb(0x7FA36E)))
         }
         ctx.fill(rounded(c.x - 3, c.y - 18, 10, 13, 4), with: .linearGradient(Gradient(colors: [rgb(0xEDEFF2, 0.95), rgb(0xBFC8D0, 0.9)]), startPoint: P(c.x - 3, 0), endPoint: P(c.x + 7, 0)))
+        }
         ctx.fill(oval(c.x + 16, c.y - 12, 30, 9), with: .color(dark ? rgb(0xDADADF) : .white))
         for (dx, col) in [(22.0, 0xE8B04A), (30.0, 0xD9674F), (37.0, 0x9CBF5A)] as [(CGFloat, Int)] {
             ctx.fill(circle(P(c.x + dx, c.y - 13), 3.8), with: .color(rgb(col)))
@@ -1037,7 +1055,7 @@ struct OfficeScene {
     }
 
     /// Hinterer Teil des Topfs: Innenwand und Erde – wird VOR den Blättern gezeichnet, damit sie aus der Erde wachsen.
-    private func potBack(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat) {
+    func potBack(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat) {
         let light = dark ? rgb(0xD9D9DE) : .white
         let top = oval(r.minX, r.minY - rim / 2, r.width, rim)
         ctx.fill(top, with: .color(darker(light, 0.18)))                                   // Innenwand hinten
@@ -1046,7 +1064,7 @@ struct OfficeScene {
     }
 
     /// Vorderer Teil: Topfkörper ab der Randmitte plus helle Vorderkante – verdeckt die Blattansätze.
-    private func potFront(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat, corner: CGFloat) {
+    func potFront(_ ctx: inout GraphicsContext, _ r: CGRect, _ s: CGFloat, rim: CGFloat, corner: CGFloat) {
         let light = dark ? rgb(0xD9D9DE) : .white
         var body = Path()
         body.move(to: P(r.minX, r.minY))
@@ -1121,6 +1139,7 @@ struct OfficeScene {
         ctx.fill(oval(x - 5.5, y - 14.2, 11, 4.6), with: .color(rgb(0xE8E9EC)))
         let led = cpu > 0.6 && !docked ? rgb(0xFF9F0A) : rgb(0x30D158)
         ctx.fill(circle(P(x + front * 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * (docked ? 1.2 : 4)))))
+        if festive.vacuumHat { drawVacuumHat(&ctx, at: P(x, y), front: front) }
     }
 
     /// Ladestation an der Wand: weißer Turm mit dunklem Deckel, zwei Wassertanks und Rampe.
