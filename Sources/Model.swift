@@ -285,6 +285,11 @@ enum Prefs {
     static let updateSkipped = "updateSkipped"         // „Diese Version überspringen“ im Update-Fenster
     static let hookHintDismissed = "hookHintDismissed" // Karte „Präzise Erkennung“ im Menü weggeklickt
     static let notifyPeers = "notifyPeers"         // Mitteilungen auch für andere Macs
+    static let weatherEnabled = "weatherEnabled"   // echtes Wetter hinter dem Glas (erst mit Ort)
+    static let weatherPlace = "weatherPlace"       // Anzeigename des Orts
+    static let weatherLat = "weatherLat"
+    static let weatherLon = "weatherLon"
+    static let weatherCache = "weatherCache"       // letztes Wetter (JSON), damit es nach dem Start sofort da ist
 
     static func register() {
         UserDefaults.standard.register(defaults: [
@@ -294,6 +299,7 @@ enum Prefs {
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,
             keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true, peersEnabled: false,
             notifyContext: true, notifyStalled: false, quietHours: false, quietFrom: 22, quietTo: 7, notifyPeers: false,
+            weatherEnabled: false,
         ])
     }
 }

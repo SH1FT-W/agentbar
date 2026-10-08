@@ -47,6 +47,11 @@ struct SettingsView: View {
     @AppStorage(Prefs.officeFloating) private var floating = true
     @AppStorage(Prefs.officeOpacity) private var opacity = 1.0
     @AppStorage(Prefs.officeDaylight) private var daylight = true
+    @AppStorage(Prefs.weatherEnabled) private var weatherEnabled = false
+    @AppStorage(Prefs.weatherPlace) private var weatherPlace = ""
+    @State private var placeInput = ""
+    @State private var placeSearching = false
+    @State private var placeNotFound = false
     @AppStorage(Prefs.quotaEnabled) private var quotaEnabled = true
     @AppStorage(Prefs.peersEnabled) private var peersEnabled = false
     @AppStorage(Prefs.peerCode) private var peerCode = ""
@@ -246,7 +251,7 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Section(L("Büro", "Office")) {
+            Section {
                 Toggle(isOn: $floating) { SettingLabel(L("Immer im Vordergrund", "Always on top"), "pin.fill", .orange) }
                     .onChange(of: floating) { store.office.applyPrefs() }
                 LabeledContent {
@@ -260,6 +265,37 @@ struct SettingsView: View {
                     SettingLabel(L("Deckkraft", "Opacity"), "circle.lefthalf.filled", .gray)
                 }
                 Toggle(isOn: $daylight) { SettingLabel(L("Himmel folgt der Tageszeit", "Sky follows time of day"), "sun.horizon.fill", .cyan) }
+                LabeledContent {
+                    HStack(spacing: 8) {
+                        if weatherPlace.isEmpty {
+                            TextField("", text: $placeInput, prompt: Text(L("z. B. Hamburg", "e.g. Seattle")))
+                                .textFieldStyle(.roundedBorder).frame(width: 150)
+                                .onSubmit(searchPlace)
+                                .onChange(of: placeInput) { placeNotFound = false }
+                            if placeSearching { ProgressView().controlSize(.small) }
+                            else { Button(L("Suchen", "Search"), action: searchPlace).disabled(placeInput.trimmingCharacters(in: .whitespaces).isEmpty) }
+                        } else {
+                            Text(weatherPlace).foregroundStyle(.secondary).lineLimit(1)
+                            Button(L("Ändern", "Change")) { store.office.weather.clearPlace(); placeInput = "" }
+                        }
+                    }
+                } label: {
+                    SettingLabel(L("Wetter-Ort", "Weather location"), "location.fill", .blue,
+                                 note: placeNotFound ? L("Ort nicht gefunden", "Location not found") : nil)
+                }
+                Toggle(isOn: $weatherEnabled) {
+                    SettingLabel(L("Echtes Wetter hinter dem Glas", "Real weather behind the glass"), "cloud.sun.rain.fill", .indigo,
+                                 note: L("Regen, Schnee, Nebel, Gewitter und echte Sonnenzeiten", "Rain, snow, fog, storms and real sunrise and sunset"))
+                }
+                .disabled(weatherPlace.isEmpty)
+                .onChange(of: weatherEnabled) { if weatherEnabled { store.office.weather.refreshIfNeeded() } }
+            } header: {
+                Text(L("Büro", "Office"))
+            } footer: {
+                Text(L("Das Wetter kommt von Open-Meteo. Übertragen wird nur der Ort, auf etwa 1 km gerundet.",
+                       "Weather comes from Open-Meteo. Only the location is sent, rounded to about 1 km."))
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Section {
@@ -302,6 +338,16 @@ func openSettings(_ pane: String) {
 }
 
 extension SettingsView {
+    private func searchPlace() {
+        guard !placeSearching else { return }
+        placeSearching = true
+        Task {
+            let found = await store.office.weather.setPlace(placeInput)
+            placeSearching = false
+            placeNotFound = found == nil
+        }
+    }
+
     private func copy(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)

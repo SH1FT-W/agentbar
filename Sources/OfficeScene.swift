@@ -36,6 +36,11 @@ struct OfficeScene {
     let todayTokens: Int?
     /// Vorgerenderter statischer Hintergrund (Wand + Parkett, Landschaft); nil = direkt zeichnen.
     let backdrop: OfficeBackdrop.Images?
+    /// Echtes Wetter hinter dem Glas; nil = Schönwetter wie bisher.
+    let weather: Weather?
+    /// Wie trüb es draußen ist (0 = klar) und wie viel Schnee liegt – vorab aus weather
+    let gloom: Double
+    let snow: Double
 
     /// Stunde (Kommazahl), Tageslicht 0…1 und Abendröte – einmal je Bild statt bei jedem Zugriff.
     let hour: Double
@@ -45,17 +50,21 @@ struct OfficeScene {
 
     init(time: Double, date: Date, dark: Bool, daylight: Bool, actors: [Actor], overflow: Int, hovered: String?,
          session: Double?, weekly: Double?, plan: String?, cpu: Double, vacuum: VacuumState, working: Int, waiting: Int,
-         forecast: QuotaForecast? = nil, todayTokens: Int? = nil, backdrop: OfficeBackdrop.Images? = nil, fixedDayness: Double? = nil) {
+         forecast: QuotaForecast? = nil, todayTokens: Int? = nil, backdrop: OfficeBackdrop.Images? = nil, fixedDayness: Double? = nil,
+         weather: Weather? = nil) {
         self.time = time; self.date = date; self.dark = dark; self.daylight = daylight
         self.actors = actors; self.overflow = overflow; self.hovered = hovered
         self.session = session; self.weekly = weekly; self.plan = plan; self.cpu = cpu; self.vacuum = vacuum
         self.working = working; self.waiting = waiting
         self.forecast = forecast; self.todayTokens = todayTokens; self.backdrop = backdrop
+        self.weather = weather
+        gloom = weather?.gloom ?? 0
+        snow = weather?.snowCover ?? 0
         let h = Self.hour(date: date, dark: dark, daylight: daylight)
         hour = h
         dayness = fixedDayness ?? Self.dayness(hour: h)
-        golden = Self.golden(hour: h)
-        tone = DayTone.at(hour: h, dayness: dayness, golden: golden)
+        golden = Self.golden(hour: h) * (1 - 0.7 * gloom)
+        tone = DayTone.at(hour: h, dayness: dayness, golden: golden, gloom: gloom)
     }
 
     // MARK: Farben
@@ -79,7 +88,19 @@ struct OfficeScene {
     static func hour(date: Date, dark: Bool, daylight: Bool) -> Double {
         guard daylight else { return dark ? 23 : 12 }
         let c = Calendar.current.dateComponents([.hour, .minute, .second], from: date)
-        return Double(c.hour ?? 12) + Double(c.minute ?? 0) / 60 + Double(c.second ?? 0) / 3600
+        return sceneHour(Double(c.hour ?? 12) + Double(c.minute ?? 0) / 60 + Double(c.second ?? 0) / 3600)
+    }
+
+    /// Echter Sonnenauf-/-untergang am Wetter-Ort (Ortszeit-Stunden); nil = fester Tageslauf.
+    static var sunTimes: (rise: Double, set: Double)?
+    /// Der Tageslauf der Szene ist auf Sonnenaufgang 6:18 und -untergang 20:00 gebaut – echte Zeiten werden darauf abgebildet,
+    /// damit es im Dezember um halb fünf dämmert und im Juni erst spät.
+    static func sceneHour(_ h: Double) -> Double {
+        guard let (r, s) = sunTimes else { return h }
+        let r0 = 6.3, s0 = 20.0
+        if h < r { return h * r0 / r }
+        if h <= s { return r0 + (h - r) * (s0 - r0) / (s - r) }
+        return s0 + (h - s) * (24 - s0) / (24 - s)
     }
 
     /// 0 = Nacht, 1 = Tag
@@ -140,6 +161,7 @@ struct OfficeScene {
         for (_, f) in items.sorted(by: { $0.0 < $1.0 }) { f(&ctx) }
 
         drawLighting(&ctx, seated: seated)
+        if let f = lightning() { ctx.fill(Path(CGRect(origin: .zero, size: Self.size)), with: .color(rgb(0xE8EEFF, 0.10 * f.strength))) }
         drawDisplay(&ctx)
         for a in actors { drawLabels(&ctx, a) }
         if let h = hovered, let a = actors.first(where: { $0.id == h }) { drawHover(&ctx, a) }
@@ -217,6 +239,8 @@ struct OfficeScene {
             c.clip(to: Path(g))
             c.fill(Path(g), with: vgrad([sky.0, sky.1], g.minY, g.minY + 250))
             drawSkyObjects(&c, g)
+            let flash = lightning()
+            if let f = flash { drawBolt(&c, g, f) }
             if let b = backdrop {
                 c.draw(Image(decorative: b.land, scale: b.scale), in: g)
                 drawLandscape(&c, g, hills: false)
@@ -225,6 +249,16 @@ struct OfficeScene {
             }
             // Dunst: Himmel färbt die Landschaft leicht (Abendrot, Nacht)
             c.fill(Path(g), with: vgrad([sky.1.opacity(0), sky.1.opacity(0.10 + 0.15 * golden)], g.minY + 150, g.maxY))
+            // Trübes Wetter nimmt der Landschaft die Sonne: grauer, flacher
+            if gloom > 0.05 {
+                c.fill(Path(CGRect(x: g.minX, y: g.minY + 120, width: g.width, height: g.height - 120)),
+                       with: .color(mix(rgb(0x1A1D24), rgb(0x7C8794), dayness).opacity(0.30 * gloom)))
+            }
+            if let w = weather {
+                if w.kind == .fog { drawFog(&c, g) }
+                drawPrecipitation(&c, g, w)
+                if let f = flash { c.fill(Path(g), with: .color(.white.opacity(0.35 * f.strength))) }
+            }
             // Leichte Tönung und Spiegelungen im Glas
             c.fill(Path(g), with: .color(rgb(0x9FB8C8, dark ? 0.05 : 0.06)))
             let sheen = dark || dayness < 0.4 ? 0.035 : 0.09
@@ -239,6 +273,7 @@ struct OfficeScene {
             if night > 0.05 {
                 c.fill(Path(g), with: vgrad([.clear, rgb(0xFFC77A, 0.10 * night)], g.midY, g.maxY))
             }
+            if let w = weather, w.raining { drawDrops(&c, g, w) }
         }
         // Aluminium-Profile: Kopfprofil, Pfosten, Bodenschiene
         let fr = frame
@@ -252,6 +287,122 @@ struct OfficeScene {
             ctx.fill(Path(CGRect(x: x - w / 2, y: g.minY, width: 1, height: g.height)), with: .color(hi))
         }
         ctx.fill(Path(CGRect(x: g.minX - 5, y: g.maxY - 5, width: g.width + 10, height: 5)), with: .color(darker(fr, 0.08)))
+        // Schnee liegt außen auf den Sprossen-Füßen – durchs Glas als weiche Wülste unten in jeder Scheibe
+        if snow > 0.05 {
+            let pw = g.width / CGFloat(Self.panes)
+            let white = mix(rgb(0x3A4254), rgb(0xF4F7FA), dayness)
+            for i in 0..<Self.panes {
+                let x0 = g.minX + CGFloat(i) * pw + 2, x1 = x0 + pw - 4
+                let hgt = CGFloat(3 + 6 * snow)
+                var p = Path()
+                p.move(to: P(x0, g.maxY - 5))
+                p.addCurve(to: P(x1, g.maxY - 5), control1: P(x0 + 10, g.maxY - 5 - hgt * 1.6), control2: P(x1 - 10, g.maxY - 5 - hgt * 1.5))
+                p.closeSubpath()
+                ctx.fill(p, with: .color(white.opacity(0.92)))
+            }
+        }
+    }
+
+    // MARK: Wetter
+
+    /// Blitz: alle 8 s würfelt ein Zeitfenster, ob es blitzt – doppeltes Zucken, dann Nachleuchten.
+    private func lightning() -> (strength: Double, x: CGFloat, seed: UInt64)? {
+        guard weather?.kind == .thunder else { return nil }
+        return Self.flash(time: time)
+    }
+    static func flashActive(time: Double) -> Bool { (flash(time: time)?.strength ?? 0) > 0.9 }
+    private static func flash(time: Double) -> (strength: Double, x: CGFloat, seed: UInt64)? {
+        let slot = (time / 8).rounded(.down)
+        let seed = UInt64(bitPattern: Int64(slot))
+        var r = SeededRandom(seed: seed)
+        guard r.next() < 0.45 else { return nil }
+        let dt = time - (slot * 8 + Double(r.next()) * 6)
+        guard dt >= 0 && dt < 0.9 else { return nil }
+        let f = dt < 0.1 ? 1 : dt < 0.2 ? 0.2 : dt < 0.3 ? 0.85 : max(0, 1 - (dt - 0.3) / 0.6) * 0.5
+        return (f, r.next(), seed)
+    }
+
+    private func drawBolt(_ ctx: inout GraphicsContext, _ g: CGRect, _ f: (strength: Double, x: CGFloat, seed: UInt64)) {
+        guard f.strength > 0.5 else { return }
+        var r = SeededRandom(seed: f.seed &+ 99)
+        var p = Path()
+        var pt = P(g.minX + 60 + f.x * (g.width - 120), g.minY)
+        p.move(to: pt)
+        while pt.y < g.maxY - 130 {
+            pt = P(pt.x + (r.next() - 0.5) * 34, pt.y + 14 + r.next() * 16)
+            p.addLine(to: pt)
+        }
+        ctx.stroke(p, with: .color(rgb(0xDDE6FF, 0.35 * f.strength)), lineWidth: 6)
+        ctx.stroke(p, with: .color(.white.opacity(f.strength)), lineWidth: 1.6)
+    }
+
+    private func wrap(_ v: CGFloat, _ m: CGFloat) -> CGFloat { let r = v.truncatingRemainder(dividingBy: m); return r < 0 ? r + m : r }
+
+    /// Regen als schräge Striche, Schnee als taumelnde Flocken – eine Path je Art, damit es bei 30 fps billig bleibt.
+    private func drawPrecipitation(_ ctx: inout GraphicsContext, _ g: CGRect, _ w: Weather) {
+        let slant = 0.06 + CGFloat(min(w.wind, 60) / 60) * 0.45
+        let H = g.height + 40
+        if w.kind == .snow {
+            var near = Path(), far = Path()
+            var rng = SeededRandom(seed: 21)
+            for _ in 0..<Int(50 + 120 * w.intensity) {
+                let x0 = rng.next() * g.width, ph = rng.next(), sz = 1.4 + rng.next() * 2.6
+                let y = wrap(ph * H + CGFloat(time) * (10 + sz * 9), H) - 20
+                let x = g.minX + wrap(x0 + y * slant * 0.5 + CGFloat(sin(time * 0.8 + Double(ph) * 20)) * 7, g.width)
+                let r = CGRect(x: x - sz / 2, y: g.minY + y - sz / 2, width: sz, height: sz)
+                if sz > 2.6 { near.addEllipse(in: r) } else { far.addEllipse(in: r) }
+            }
+            let white = mix(rgb(0xC9D2E6), .white, dayness)
+            ctx.fill(far, with: .color(white.opacity(0.65)))
+            ctx.fill(near, with: .color(white.opacity(0.95)))
+            return
+        }
+        guard w.raining else { return }
+        var lines = Path()
+        var rng = SeededRandom(seed: 17)
+        let n = Int(30 + (w.kind == .drizzle ? 50 : 140) * w.intensity)
+        for _ in 0..<n {
+            let x0 = rng.next() * g.width, ph = rng.next()
+            let len = (w.kind == .drizzle ? 6 : 11) + rng.next() * 8
+            let y = wrap(ph * H + CGFloat(time) * (360 + rng.next() * 160), H) - 20
+            let x = g.minX + wrap(x0 + y * slant, g.width)
+            lines.move(to: P(x, g.minY + y)); lines.addLine(to: P(x + len * slant, g.minY + y + len))
+        }
+        ctx.stroke(lines, with: .color(mix(rgb(0xAAB6D0), .white, dayness).opacity(0.55)), lineWidth: w.kind == .drizzle ? 0.8 : 1.1)
+    }
+
+    /// Tropfen auf der Scheibe: feste Perlen und einzelne, die langsam mit Spur herunterlaufen.
+    private func drawDrops(_ ctx: inout GraphicsContext, _ g: CGRect, _ w: Weather) {
+        var beads = Path(), runners = Path(), trails = Path()
+        var rng = SeededRandom(seed: 5)
+        for _ in 0..<Int(30 + 50 * w.intensity) {
+            let r = 0.6 + rng.next() * 1.3
+            beads.addEllipse(in: CGRect(x: g.minX + rng.next() * g.width, y: g.minY + rng.next() * g.height, width: r * 2, height: r * 2.2))
+        }
+        for _ in 0..<Int(6 + 14 * w.intensity) {
+            let x = g.minX + rng.next() * g.width
+            let speed = 8 + rng.next() * 22, ph = rng.next()
+            let y = g.minY + wrap(ph * (g.height + 60) + CGFloat(time) * speed, g.height + 60) - 30
+            let r = 1.4 + rng.next() * 1.2
+            runners.addEllipse(in: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2.4))
+            trails.move(to: P(x, y - r)); trails.addLine(to: P(x + (rng.next() - 0.5) * 3, y - 26 - speed))
+        }
+        let c = mix(rgb(0xB8C4DA), .white, dayness)
+        ctx.stroke(trails, with: .color(c.opacity(0.10)), lineWidth: 1.2)
+        ctx.fill(beads, with: .color(c.opacity(0.22)))
+        ctx.fill(runners, with: .color(c.opacity(0.42)))
+    }
+
+    /// Nebel: die Ferne verschwindet, vorne bleibt etwas Kontur.
+    private func drawFog(_ ctx: inout GraphicsContext, _ g: CGRect) {
+        let c = mix(rgb(0x3A3F4A), rgb(0xDDE2E6), dayness)
+        ctx.fill(Path(g), with: vgrad([c.opacity(0.55), c.opacity(0.82), c.opacity(0.5)], g.minY + 60, g.maxY))
+        // Ziehende Schwaden
+        for i in 0..<3 {
+            let x = g.minX + wrap(CGFloat(time) * (4 + CGFloat(i) * 2) + CGFloat(i) * 260, g.width + 300) - 150
+            let y = g.maxY - 120 + CGFloat(i) * 32
+            ctx.fill(oval(x - 160, y - 18, 320, 36), with: glow(P(x, y), 160, c, 0.45))
+        }
     }
 
     private func skyColors() -> (Color, Color) { tone.sky }
@@ -278,13 +429,14 @@ struct OfficeScene {
 
     private func drawSkyObjects(_ ctx: inout GraphicsContext, _ f: CGRect) {
         let h = hour
-        if dayness < 0.6 {
+        let clear = max(0, 1 - gloom * 1.25)      // Wolkendecke verschluckt Sterne, Sonne und Mond
+        if dayness < 0.6 && clear > 0 {
             var rng = SeededRandom(seed: 7)
             for _ in 0..<55 {
                 let x = f.minX + rng.next() * f.width, y = f.minY + rng.next() * 190
                 let sz = 0.8 + rng.next() * 1.3
                 let tw = 0.5 + 0.5 * sin(time * (0.8 + Double(rng.next()) * 1.6) + Double(rng.next()) * 6)
-                ctx.fill(oval(x, y, sz, sz), with: .color(.white.opacity((1 - dayness) * (0.35 + 0.55 * tw))))
+                ctx.fill(oval(x, y, sz, sz), with: .color(.white.opacity((1 - dayness) * (0.35 + 0.55 * tw) * clear)))
             }
         }
         // Sonne 6–20:30 Uhr, sonst Mond
@@ -292,22 +444,36 @@ struct OfficeScene {
         let p = isSun ? (h - 6) / 14.5 : ((h < 6 ? h + 24 : h) - 20.5) / 9.5
         let x = f.minX + 50 + CGFloat(p) * (f.width - 100)
         let y = f.minY + 210 - CGFloat(sin(p * .pi)) * 165
+        var ctx2 = ctx
+        ctx2.opacity = 0.15 + 0.85 * clear     // hinter Wolken bleibt ein blasser Schein
         if isSun {
             let tint = tone.sunTint
-            blob(&ctx, P(x, y), 110, tint, 0.55)
-            ctx.fill(circle(P(x, y), 17), with: .radialGradient(Gradient(colors: [.white, tint]), center: P(x - 4, y - 4), startRadius: 0, endRadius: 20))
+            blob(&ctx2, P(x, y), 110, tint, 0.55)
+            ctx2.fill(circle(P(x, y), 17), with: .radialGradient(Gradient(colors: [.white, tint]), center: P(x - 4, y - 4), startRadius: 0, endRadius: 20))
         } else {
-            blob(&ctx, P(x, y), 60, rgb(0xDDE6FF), 0.18)
+            blob(&ctx2, P(x, y), 60, rgb(0xDDE6FF), 0.18)
             let moon = circle(P(x, y), 12).subtracting(circle(P(x + 7, y - 4), 11))
-            ctx.fill(moon, with: .color(rgb(0xF4F1E8)))
+            ctx2.fill(moon, with: .color(rgb(0xF4F1E8)))
         }
-        // Wolken ziehen langsam
+        // Wolken ziehen langsam – mit Wetter so viele, wie die Wolkendecke hergibt, und so schnell, wie der Wind weht
         let cloudTop = tone.cloudTop, cloudBottom = tone.cloudBottom
-        for (i, c) in [(0.0, 1.0), (0.42, 0.75), (0.7, 0.9)].enumerated() {
-            let speed = 3.0 + Double(i) * 1.6
+        if gloom > 0.3 {
+            // Geschlossene Decke: graues Band oben, darunter die einzelnen Wolken
+            ctx.fill(Path(CGRect(x: f.minX, y: f.minY, width: f.width, height: 190)),
+                     with: vgrad([cloudBottom.opacity(0.9 * gloom), cloudTop.opacity(0.5 * gloom), cloudTop.opacity(0)], f.minY, f.minY + 190))
+        }
+        var clouds: [(Double, Double)] = [(0.0, 1.0), (0.42, 0.75), (0.7, 0.9)]
+        if let w = weather {
+            var r = SeededRandom(seed: 31)
+            for _ in 0..<Int((w.cloudCover * 6).rounded()) { clouds.append((Double(r.next()), 0.8 + Double(r.next()) * 0.7)) }
+            if w.kind == .clear { clouds = [clouds[1]] }
+        }
+        let windSpeed = 1 + min(weather?.wind ?? 0, 60) / 15
+        for (i, c) in clouds.enumerated() {
+            let speed = (3.0 + Double(i % 3) * 1.6 + Double(i / 3) * 0.7) * windSpeed
             let span = Double(f.width + 240)
             let cx = f.minX - 120 + CGFloat((time * speed + c.0 * span).truncatingRemainder(dividingBy: span))
-            let cy = f.minY + 50 + CGFloat(i) * 34
+            let cy = f.minY + 50 + CGFloat(i % 4) * 34 - (i >= 3 ? 18 : 0)
             let k = CGFloat(c.1)
             var cloud = Path()
             for (dx, dy, r) in [(0.0, 4.0, 15.0), (18, -6, 20), (40, -2, 17), (58, 5, 12), (26, 7, 16)] as [(CGFloat, CGFloat, CGFloat)] {
@@ -320,7 +486,9 @@ struct OfficeScene {
     /// hills = Berge, Baumreihe, Wiese (statisch, gecacht) · trees = Obstbäume (wiegen sich, bleiben live)
     private func drawLandscape(_ ctx: inout GraphicsContext, _ f: CGRect, hills: Bool = true, trees: Bool = true) {
         let d = dayness
-        func tone(_ day: Int, _ night: Int) -> Color { mix(rgb(night), rgb(day), d) }
+        let snowWhite = mix(rgb(0x2B3344), rgb(0xEEF2F6), d)
+        // Schneedecke: Flächen werden weiß, k = wie viel Schnee dort liegen bleibt
+        func tone(_ day: Int, _ night: Int, _ k: Double = 0) -> Color { mix(mix(rgb(night), rgb(day), d), snowWhite, snow * k) }
         let b = f.maxY
         func hill(_ y0: CGFloat, _ c1: CGPoint, _ c2: CGPoint, _ y1: CGFloat) -> Path {
             var p = Path()
@@ -331,9 +499,9 @@ struct OfficeScene {
         }
         if hills {
         // Ferne Berge (bläulich, Luftperspektive)
-        ctx.fill(hill(b - 128, P(f.minX + 180, b - 170), P(f.maxX - 260, b - 105), b - 140), with: .color(tone(0xB4C7CF, 0x1C2436)))
+        ctx.fill(hill(b - 128, P(f.minX + 180, b - 170), P(f.maxX - 260, b - 105), b - 140), with: .color(tone(0xB4C7CF, 0x1C2436, 0.7)))
         // Hügel mit Baumreihe
-        ctx.fill(hill(b - 104, P(f.minX + 220, b - 132), P(f.maxX - 180, b - 88), b - 110), with: .color(tone(0xA9C99A, 0x19282A)))
+        ctx.fill(hill(b - 104, P(f.minX + 220, b - 132), P(f.maxX - 180, b - 88), b - 110), with: .color(tone(0xA9C99A, 0x19282A, 0.85)))
         var rng = SeededRandom(seed: 3)
         var line = Path()
         for i in 0..<56 {
@@ -342,18 +510,19 @@ struct OfficeScene {
             let r = 5 + rng.next() * 4
             line.addEllipse(in: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r * 1.1))
         }
-        ctx.fill(line, with: .color(tone(0x93B98A, 0x162322)))
+        ctx.fill(line, with: .color(tone(0x93B98A, 0x162322, 0.45)))
         // Wiese vorn mit sanftem Lichtverlauf
         let meadow = hill(b - 66, P(f.minX + 240, b - 92), P(f.maxX - 200, b - 44), b - 70)
-        ctx.fill(meadow, with: vgrad([tone(0x9DCB7E, 0x16241E), tone(0x7FB266, 0x121E19)], b - 90, b))
+        ctx.fill(meadow, with: vgrad([tone(0x9DCB7E, 0x16241E, 0.92), tone(0x7FB266, 0x121E19, 0.88)], b - 90, b))
         }
         guard trees else { return }
+        let wind = min(weather?.wind ?? 0, 60)
         // Bäume (Obstgarten-Anmutung): runde Kronen mit Licht oben links
         let trees: [(CGFloat, CGFloat, CGFloat)] = [(30, 0, 1.0), (96, 6, 0.8), (168, -4, 1.2), (250, 10, 0.72), (318, 4, 0.9),
                                                     (500, 8, 0.85), (566, -2, 1.15), (626, 6, 0.8), (650, 14, 1.05)]
         for (i, (tx, dy, s)) in trees.enumerated() {
             let x = f.minX + tx
-            let sway = CGFloat(sin(time * 0.7 + Double(i))) * 1.2
+            let sway = CGFloat(sin(time * (0.7 + wind / 70) + Double(i))) * (1.2 + CGFloat(wind / 60) * 3.5)
             let ty = b - 40 + dy
             shadow(&ctx, CGRect(x: x - 22 * s, y: ty - 4 * s, width: 44 * s, height: 8 * s), 0.18 * d)
             ctx.fill(rounded(x - 2.2 * s, ty - 30 * s, 4.4 * s, 30 * s, 2 * s), with: .color(tone(0x8A6A4C, 0x1B1714)))
@@ -361,6 +530,12 @@ struct OfficeScene {
             ctx.fill(Path(ellipseIn: crown), with: .radialGradient(Gradient(colors: [tone(0x8CC474, 0x223B2F), tone(0x5E9C52, 0x16291F)]),
                                                                     center: P(crown.minX + crown.width * 0.35, crown.minY + crown.height * 0.3),
                                                                     startRadius: 0, endRadius: crown.width * 0.75))
+            if snow > 0.05 {
+                // Schneehaube auf der Krone
+                let cap = Path(ellipseIn: CGRect(x: crown.minX + 4 * s, y: crown.minY, width: crown.width - 8 * s, height: crown.height * 0.42))
+                    .intersection(Path(ellipseIn: crown))
+                ctx.fill(cap, with: .color(snowWhite.opacity(0.4 + 0.55 * snow)))
+            }
         }
     }
 
@@ -412,7 +587,8 @@ struct OfficeScene {
         let g = Self.glass
         let pw = g.width / CGFloat(Self.panes)
         let top = Self.floorY
-        let o = (dark ? 0.10 : 0.26) * strength
+        let o = (dark ? 0.10 : 0.26) * strength * max(0, 1 - gloom * 1.3)
+        guard o > 0.005 else { return }
         for i in 0..<Self.panes {
             let x0 = g.minX + CGFloat(i) * pw + 3, x1 = x0 + pw - 6
             var q = Path()
@@ -441,8 +617,20 @@ struct OfficeScene {
         let (clock, day) = Self.clockTexts(date)
         ctx.draw(Text(clock).font(.system(size: 27, weight: .semibold, design: .rounded)).foregroundColor(.white),
                  at: P(tx, screen.minY + 26), anchor: .leading)
-        ctx.draw(Text(day).font(.system(size: 10, weight: .medium, design: .rounded)).foregroundColor(.white.opacity(0.5)),
-                 at: P(tx + 1, screen.minY + 46), anchor: .leading)
+        // Datum, mit Wetter dahinter: „Do., 8. Okt.  ☁ 12°“ – zu breit → ohne Wochentag
+        let dayFont = Font.system(size: 10, weight: .medium, design: .rounded)
+        var dayText = ctx.resolve(Text(day).font(dayFont).foregroundColor(.white.opacity(0.5)))
+        if let w = weather {
+            let temp = Text(Image(systemName: w.symbol)) + Text(" \(Int(w.temperature.rounded()))°")
+            func line(_ d: String) -> GraphicsContext.ResolvedText {
+                ctx.resolve((Text(d).foregroundColor(.white.opacity(0.5)) + Text("  ") + temp.foregroundColor(.white.opacity(0.75))).font(dayFont))
+            }
+            dayText = line(day)
+            if dayText.measure(in: CGSize(width: 400, height: 40)).width > avail {
+                dayText = line(date.formatted(.dateTime.day().month(.abbreviated).locale(Lang.locale)))
+            }
+        }
+        ctx.draw(dayText, at: P(tx + 1, screen.minY + 46), anchor: .leading)
         // Kontingent, darunter klein: Prognose (bis wann es reicht) und heutige Tokens – nur, wenn es die Daten gibt
         var y = screen.minY + 62
         ctx.draw(Text(L("5 Std.", "5 h") + "  " + (session.map { percentText(Int($0.rounded())) } ?? "–")).font(.system(size: 11.5, weight: .semibold, design: .rounded)).foregroundColor(rgb(0xFF4F7E)),
@@ -522,7 +710,8 @@ struct OfficeScene {
 
     /// Nachtlicht: Raum wird dunkler, warme Lichtinseln, Bildschirmschein auf Gesichtern.
     private func drawLighting(_ ctx: inout GraphicsContext, seated: [String: [Actor]]) {
-        let night = 1 - dayness
+        // Trübes Wetter: tagsüber dunkler, die Lampen brennen schon
+        let night = max(1 - dayness, 0.42 * gloom)
         // Abendröte färbt den Raum warm
         if golden > 0.05 && dayness > 0.2 {
             ctx.fill(Path(CGRect(origin: .zero, size: Self.size)), with: .color(rgb(0xFF9A4D, 0.06 * golden * dayness)))
@@ -1626,13 +1815,18 @@ struct DayTone {
 
     private static var cache: (key: Int, tone: DayTone)?
 
-    static func at(hour: Double, dayness: Double, golden: Double) -> DayTone {
-        let key = Int((hour * 60).rounded(.down)) * 1000 + Int((dayness * 999).rounded())
+    /// gloom = Trübheit durchs Wetter: Himmel und Wolken werden grau.
+    static func at(hour: Double, dayness: Double, golden: Double, gloom: Double = 0) -> DayTone {
+        let key = (Int((hour * 60).rounded(.down)) * 1000 + Int((dayness * 999).rounded())) * 100 + Int((gloom * 99).rounded())
         if let c = cache, c.key == key { return c.tone }
         let mix = ColorMath.mix
-        let t = DayTone(sky: OfficeScene.skyColors(hour: hour),
-                        cloudTop: mix(rgb(0x5A6380), .white, dayness),
-                        cloudBottom: mix(rgb(0x3A4260), mix(rgb(0xDCE6F2), rgb(0xFFCFB0), golden), dayness),
+        let sky = OfficeScene.skyColors(hour: hour)
+        let g = gloom * 0.85
+        let grayTop = mix(rgb(0x1C2029), rgb(0x8C96A2), dayness), grayBottom = mix(rgb(0x2A2E38), rgb(0xC3C9D0), dayness)
+        let t = DayTone(sky: (mix(sky.0, grayTop, g), mix(sky.1, grayBottom, g)),
+                        cloudTop: mix(mix(rgb(0x5A6380), .white, dayness), mix(rgb(0x30343F), rgb(0xA9B0B9), dayness), gloom),
+                        cloudBottom: mix(mix(rgb(0x3A4260), mix(rgb(0xDCE6F2), rgb(0xFFCFB0), golden), dayness),
+                                         mix(rgb(0x23262F), rgb(0x7E8793), dayness), gloom),
                         sunTint: mix(rgb(0xFFF6D6), rgb(0xFFC48A), golden),
                         sunlight: mix(rgb(0xFFF8E6), rgb(0xFFB870), golden),
                         displayTop: mix(rgb(0xD9DCE0), rgb(0x55585E), 1 - dayness),
@@ -1651,21 +1845,23 @@ final class OfficeBackdrop {
         let land: CGImage
         let scale: CGFloat
     }
-    private struct Key: Equatable { let dark: Bool; let day: Int; let scale: Int }
+    private struct Key: Equatable { let dark: Bool; let day: Int; let scale: Int; let snow: Int }
     private var key: Key?
     private var images: Images?
     private var renderedAt = 0.0
 
     /// scale = Pixel je Szenen-Punkt (Fenster-Einpassung × Bildschirm-Skalierung).
-    func images(dark: Bool, dayness: Double, scale: CGFloat, now: Double) -> Images? {
-        let k = Key(dark: dark, day: Int((dayness * 100).rounded()), scale: Int((scale * 100).rounded()))
+    /// weather zählt nur über die Schneedecke (Hügel und Wiese werden weiß).
+    func images(dark: Bool, dayness: Double, scale: CGFloat, now: Double, weather: Weather? = nil) -> Images? {
+        let k = Key(dark: dark, day: Int((dayness * 100).rounded()), scale: Int((scale * 100).rounded()),
+                    snow: Int(((weather?.snowCover ?? 0) * 20).rounded()))
         if k == key, let images { return images }
         // Während des Aufziehens nicht jedes Bild neu rendern – kurz das alte (skaliert) weiterverwenden
-        if let images, let key, key.dark == k.dark, key.day == k.day, abs(now - renderedAt) < 0.25 { return images }
+        if let images, let key, key.dark == k.dark, key.day == k.day, key.snow == k.snow, abs(now - renderedAt) < 0.25 { return images }
         let px = max(0.5, CGFloat(k.scale) / 100)
         let base = OfficeScene(time: 0, date: Date(), dark: dark, daylight: true, actors: [], overflow: 0, hovered: nil,
                                session: nil, weekly: nil, plan: nil, cpu: 0, vacuum: .docked, working: 0, waiting: 0,
-                               fixedDayness: Double(k.day) / 100)
+                               fixedDayness: Double(k.day) / 100, weather: weather)
         let size = OfficeScene.size, g = OfficeScene.glass
         let room = ImageRenderer(content: Canvas { ctx, _ in base.drawRoom(&ctx) }.frame(width: size.width, height: size.height))
         room.scale = px

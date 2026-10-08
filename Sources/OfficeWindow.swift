@@ -9,6 +9,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     let model = OfficeModel()
     let load = SystemLoad()
     let visibility = OfficeVisibility()
+    let weather = WeatherService()
 
     init(store: AppStore) { self.store = store }
 
@@ -19,7 +20,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     func show() {
         guard let store else { return }
         if window == nil {
-            let root = OfficeView(model: model, load: load, visibility: visibility)
+            let root = OfficeView(model: model, load: load, visibility: visibility, weather: weather)
                 .environmentObject(store.monitor)
                 .environmentObject(store.quota)
                 .environmentObject(store.stats)
@@ -43,6 +44,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
         }
         applyPrefs()
         load.start()
+        weather.start()
         window?.orderFrontRegardless()
         UserDefaults.standard.set(true, forKey: "officeWasOpen")
         store.objectWillChange.send()   // Menüeintrag „Büro öffnen/schließen“ sofort umstellen
@@ -51,6 +53,7 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     func close() {
         window?.orderOut(nil)
         load.stop()
+        weather.stop()
         UserDefaults.standard.set(false, forKey: "officeWasOpen")
         store?.objectWillChange.send()
     }

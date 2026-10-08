@@ -37,18 +37,36 @@ struct Snap {
         if CommandLine.arguments.contains("--bench") { bench(demo, cached: !CommandLine.arguments.contains("--nocache")); return }
         let backdrop = OfficeBackdrop()
         let forecast = QuotaForecast(percentPerHour: 9, exhaustsAt: cal.date(bySettingHour: 16, minute: 40, second: 0, of: now))
-        func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil) {
+        func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil, weather: Weather? = Weather.fake) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
-            let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t)
+            let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t, weather: weather)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
                                     hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
                                     vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1,
-                                    forecast: forecast, todayTokens: 12_400_000, backdrop: bg)
+                                    forecast: forecast, todayTokens: 12_400_000, backdrop: bg, weather: weather)
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/office-\(name).png"))
+                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") ? "build/\(name).png" : "build/office-\(name).png"))
             }
+        }
+        // ./build.sh snapshot --weather → build/weather-<art>-<tag|nacht>.png (Vergleichsbilder fürs Wetter)
+        if CommandLine.arguments.contains("--weather") {
+            for kind in Weather.Kind.allCases {
+                for (label, hour, dark) in [("tag", 11, false), ("nacht", 22, true)] {
+                    let d = cal.date(bySettingHour: hour, minute: 20, second: 0, of: now)!
+                    var t = d.timeIntervalSinceReferenceDate
+                    if kind == .thunder { while !OfficeScene.flashActive(time: t) { t += 0.05 } }   // Moment mit Blitz
+                    render("weather-\(kind.rawValue)-\(label)", d, t, dark: dark, sessions: demo, weather: Weather.fake(kind.rawValue))
+                }
+            }
+            // Echte Sonnenzeiten im Dezember (Aufgang 8:20, Untergang 16:20): um 16:45 ist es schon Abend
+            OfficeScene.sunTimes = (8.33, 16.33)
+            let dec = cal.date(bySettingHour: 16, minute: 45, second: 0, of: now)!
+            render("weather-dezember-1645", dec, dec.timeIntervalSinceReferenceDate, dark: false, sessions: demo, weather: Weather.fake("snow"))
+            OfficeScene.sunTimes = nil
+            print("Wetterbilder in build/")
+            return
         }
         for (name, hour, dark) in [("day", 11, false), ("dusk", 19, false), ("night", 23, true), ("dawn", 7, false), ("day-dark", 13, true)] {
             let date = cal.date(bySettingHour: hour, minute: 20, second: 0, of: now)!
@@ -129,10 +147,10 @@ struct Snap {
                 if i == 5 { start = Date() }   // Aufwärmen (Caches)
                 let t = t0 + Double(i) / 30
                 let (actors, overflow) = model.actors(for: demo, now: t)
-                let bg = cached ? backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t) : nil
+                let bg = cached ? backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t, weather: Weather.fake) : nil
                 let scene = OfficeScene(time: t, date: date.addingTimeInterval(Double(i) / 30), dark: dark, daylight: true, actors: actors, overflow: overflow,
                                         hovered: nil, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
-                                        vacuum: VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1, backdrop: bg)
+                                        vacuum: VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1, backdrop: bg, weather: Weather.fake)
                 let r = ImageRenderer(content: Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)); r.scale = 2
                 _ = r.cgImage
             }
