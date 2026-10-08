@@ -38,7 +38,7 @@
 - **Kontingent-Ringe** – dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch, dazu eine Prognose, wie lange das 5-Stunden-Fenster beim aktuellen Tempo reicht. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
 - **Heute & letzte 7 Tage** – Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Balkendiagramm und deine Top-Projekte von heute. Lokal aus den Sitzungsprotokollen von Claude Code berechnet.
 - **Kontext auf einen Blick** – jede Zeile zeigt Tokens und einen kleinen Kontext-Balken, der orange wird, wenn das Kontextfenster fast voll ist.
-- **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit, Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
+- **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit und, wenn du einen Ort einträgst, dem echten Wetter (Wolken, Regen, Nebel, Gewitter, liegenbleibender Schnee, echter Sonnenauf- und -untergang); zu Advent, Weihnachten und Silvester schmückt sich das Büro selbst, und das Team zieht sich passend zu Jahreszeit und Wetter an. Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
 - **Direkt zur Sitzung** – ein Klick auf eine Figur im Büro oder „Zur Sitzung“ (bzw. Return) im Menü holt ihren Terminal-Tab nach vorn.
 - **Mitteilungen**, wenn ein Agent dich braucht (mit seiner konkreten Frage), fertig ist oder scheitert, wenn sein Kontext fast voll ist oder er zu hängen scheint, dazu eine Kontingent-Warnung und ein Hinweis auf neue AgentBar-Versionen. Mit Knöpfen „Zur Sitzung“ und „1 Std. stumm“ sowie optionalen Ruhezeiten.
 - **Tastatur und VoiceOver** – ↑/↓ wählen, Return springt zur Sitzung, Leertaste klappt auf, ⌘R lädt neu; jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.
@@ -103,10 +103,11 @@ Diagnose: `build/AgentBar.app/Contents/MacOS/AgentBar --dump` listet die erkannt
 
 ## Datenschutz
 
-Alles bleibt auf deinem Mac. AgentBar liest nur lokale Dateien (`~/.claude/projects`, Metadaten der Claude-App, das eigene Hook-Log) und spricht mit genau zwei Servern:
+Alles bleibt auf deinem Mac. AgentBar liest nur lokale Dateien (`~/.claude/projects`, Metadaten der Claude-App, das eigene Hook-Log) und spricht mit diesen Servern:
 
 - `api.anthropic.com` – dein Kontingent (nur wenn *Kontingent abrufen* an ist)
 - `api.github.com` – Update-Prüfung
+- `api.open-meteo.com` und `geocoding-api.open-meteo.com` – Wetter hinter der Glasfront (erst wenn du einen Ort einträgst; gesendet wird nur der Ort, auf etwa 1 km gerundet)
 
 Schaltest du *Andere Macs* ein, spricht AgentBar zusätzlich mit deinen gekoppelten Macs im lokalen Netzwerk (Bonjour, mit dem Kopplungscode verschlüsselt). Geteilt werden nur Status, Projekt, Titel und Tätigkeit der Sitzungen – nie Dateien oder Protokolle.
 

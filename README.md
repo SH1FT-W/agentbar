@@ -38,7 +38,7 @@
 - **Usage rings** – your 5-hour and weekly Claude plan usage as Apple-Watch-style activity rings, plus a forecast of how long your 5-hour window will last at the current pace. The OAuth token is only *read*, never refreshed or modified.
 - **Today & last 7 days** – tokens, API-equivalent cost and sessions per day, a 7-day bar chart and your top projects today. Computed locally from Claude Code's session logs.
 - **Context at a glance** – every row shows tokens and a small context bar that turns orange when the context window is almost full.
-- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
+- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day and, if you enter a location, the real weather (clouds, rain, fog, storms, snow that settles, real sunrise and sunset); the office decorates itself for Advent, Christmas and New Year's Eve, and the team dresses up for the season and the weather; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
 - **Jump to the session** – click a figure in the office, or use “Go to Session” (or Return) in the menu, to bring its Terminal tab to the front.
 - **Notifications** when an agent needs you (with the actual question it asks), finishes or fails, when its context is almost full or it seems stuck, plus a usage warning and a heads-up when a new AgentBar version is out. Actions to jump to the session or mute it for an hour, and optional quiet hours.
 - **Keyboard and VoiceOver** – ↑/↓ to select, Return to jump to the session, Space to expand, ⌘R to reload; every row and ring has a proper accessibility label.
@@ -103,10 +103,11 @@ Diagnostics: `build/AgentBar.app/Contents/MacOS/AgentBar --dump` lists the detec
 
 ## Privacy
 
-Everything stays on your Mac. AgentBar only reads local files (`~/.claude/projects`, Claude desktop metadata, its own hook log) and talks to exactly two servers:
+Everything stays on your Mac. AgentBar only reads local files (`~/.claude/projects`, Claude desktop metadata, its own hook log) and talks to these servers:
 
 - `api.anthropic.com` – your plan usage (only if *Fetch usage* is on)
 - `api.github.com` – checking for updates
+- `api.open-meteo.com` and `geocoding-api.open-meteo.com` – weather behind the office window (only once you enter a location; only the location, rounded to about 1 km, is sent)
 
 If you turn on *Other Macs*, AgentBar also talks to your paired Macs on the local network (Bonjour, encrypted with the pairing code). Only the status, project, title and activity of sessions are shared – never files or logs.
 
