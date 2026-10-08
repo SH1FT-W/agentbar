@@ -67,7 +67,10 @@ struct Snap {
                 let fest = Festive.compute(d, cal: cal)
                 if fest.fireworks >= 1 { t += 1.4 }
                 render("festive-\(name)", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) }, festive: fest)
-                render("festive-\(name)-ohne", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) })
+                // Vorher = Stand vor diesem Update: Wetter-Optik ja, aber keine Outfits (mildes Wetter, keine Deko)
+                var before = wk.flatMap { Weather.fake($0) }
+                before?.temperature = 12
+                render("festive-\(name)-ohne", d, t, dark: dark, sessions: demo, weather: before)
             }
             print("Festbilder in build/")
             return
