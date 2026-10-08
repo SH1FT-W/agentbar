@@ -17,6 +17,9 @@ struct Festive: Equatable {
     var bunting = false
     var fireworks = 0.0
     var confetti = false
+    /// Verkleidung der Figuren: welches Thema und wie viele mitmachen (0…1)
+    var outfitTheme = Outfit.Theme.none
+    var outfitChance = 0.0
 
     static let none = Festive()
     var animated: Bool { fireworks > 0 }
@@ -64,16 +67,27 @@ struct Festive: Equatable {
             }
             if m == 12 && d >= 24 && d <= 26 { f.gifts = 6 }
             else if week == 4 && m == 12 && d < 24 { f.gifts = 2 }
+            // Je näher Weihnachten, desto mehr Mützen und Pullis
+            if beforeBoxingDayEnd {
+                f.outfitTheme = .christmas
+                f.outfitChance = m == 12 && d >= 24 ? 0.85 : [0.25, 0.4, 0.55, 0.65][week - 1]
+            } else if m == 12 && d < 31 {
+                f.outfitTheme = .christmas
+                f.outfitChance = 0.3
+            }
         }
         if m == 12 && d == 6 { f.boots = true }
 
         // Silvester und Neujahr
         if m == 12 && d == 31 {
+            f.outfitTheme = .newYear
+            f.outfitChance = h >= 18 ? 0.85 : 0.45
             f.bunting = true
             if h >= 23.8 { f.fireworks = 1 } else if h >= 18 { f.fireworks = 0.15 }
         }
         if m == 1 && d == 1 {
             f.bunting = h < 12
+            if h < 12 { f.outfitTheme = .newYear; f.outfitChance = 0.6 }
             f.confetti = h < 15
             if h < 0.6 { f.fireworks = 1 } else if h < 2 { f.fireworks = 0.3 }
         }

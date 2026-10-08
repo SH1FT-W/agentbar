@@ -55,7 +55,7 @@ enum Pose: Equatable {
 struct Actor: Identifiable {
     let id: String
     let session: AgentSession
-    let look: Look
+    var look: Look
     var point: CGPoint          // sitzend: Tischkante unter dem Oberkörper · laufend: Füße
     var scale: CGFloat
     var pose: Pose
@@ -64,6 +64,7 @@ struct Actor: Identifiable {
     var depth: CGFloat
     var changeAge: Double? = nil   // Sekunden seit einem echten Statuswechsel (nicht beim ersten Auftauchen)
     var leaving = false            // beendet: geht gerade zur Tür hinaus
+    var outfit = Outfit.none       // Tages-Outfit (Mütze, Pulli, Schal …), setzt OfficeScene
 }
 
 final class OfficeModel {

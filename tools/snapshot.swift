@@ -58,6 +58,7 @@ struct Snap {
                 ("3-advent3", "2026-12-14 21:00", true, nil), ("4-heiligabend", "2026-12-24 19:00", true, "snow"),
                 ("4-heiligabend-tag", "2026-12-24 12:00", false, "snow"),
                 ("5-silvester", "2026-12-31 23:58", true, "clear"), ("6-neujahr", "2027-01-01 10:30", false, "partly"),
+                ("7-winter-kalt", "2027-01-20 10:30", false, "snow,-4"), ("8-sommer-heiss", "2027-07-15 13:00", false, "clear,31"),
             ]
             OfficeScene.sunTimes = (8.3, 16.4)     // Mitteleuropa im Dezember
             for (name, ds, dark, wk) in shots {
@@ -66,6 +67,7 @@ struct Snap {
                 let fest = Festive.compute(d, cal: cal)
                 if fest.fireworks >= 1 { t += 1.4 }
                 render("festive-\(name)", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) }, festive: fest)
+                render("festive-\(name)-ohne", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) })
             }
             print("Festbilder in build/")
             return

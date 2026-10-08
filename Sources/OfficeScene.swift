@@ -55,7 +55,7 @@ struct OfficeScene {
          forecast: QuotaForecast? = nil, todayTokens: Int? = nil, backdrop: OfficeBackdrop.Images? = nil, fixedDayness: Double? = nil,
          weather: Weather? = nil, festive: Festive = .none) {
         self.time = time; self.date = date; self.dark = dark; self.daylight = daylight
-        self.actors = actors; self.overflow = overflow; self.hovered = hovered
+        self.actors = Self.dress(actors, date: date, festive: festive, weather: weather); self.overflow = overflow; self.hovered = hovered
         self.session = session; self.weekly = weekly; self.plan = plan; self.cpu = cpu; self.vacuum = vacuum
         self.working = working; self.waiting = waiting
         self.forecast = forecast; self.todayTokens = todayTokens; self.backdrop = backdrop
@@ -1216,15 +1216,18 @@ struct OfficeScene {
 
         // Oberkörper
         let torso = CGRect(x: x - 25 * s, y: shoulderY, width: 50 * s, height: base - shoulderY + 4 * s)
-        ctx.fill(Path(roundedRect: torso, cornerRadius: 19 * s, style: .continuous), with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
+        let torsoPath = Path(roundedRect: torso, cornerRadius: 19 * s, style: .continuous)
+        ctx.fill(torsoPath, with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
+        if a.outfit.sweater != nil { drawSweaterPattern(&ctx, torso: torsoPath, x: x, y: shoulderY + 13 * s, width: 50 * s, s: s) }
         // Hals + Kragen
         ctx.fill(rounded(x - 6.5 * s, shoulderY - 9 * s, 13 * s, 14 * s, 5 * s), with: .color(T.skinShade))
         var collar = Path()
         collar.addArc(center: P(x, shoulderY + 1 * s), radius: 8 * s, startAngle: .degrees(20), endAngle: .degrees(160), clockwise: false)
         ctx.stroke(collar, with: .color(T.shirtShade), style: StrokeStyle(lineWidth: 2.2 * s, lineCap: .round))
+        if a.pose != .napping { drawScarf(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s) }
 
         // Kopf
-        drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a))
+        drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a), outfit: a.outfit)
 
         // Arme vorn
         switch a.pose {
@@ -1279,7 +1282,7 @@ struct OfficeScene {
             // Verschränkte Arme auf dem Tisch, Kopf darauf
             let armsR = CGRect(x: x - 30 * s, y: base - 22 * s, width: 60 * s, height: 16 * s)
             ctx.fill(Path(roundedRect: armsR, cornerRadius: 8 * s, style: .continuous), with: vgrad([T.shirtLight, T.shirt], armsR.minY, armsR.maxY))
-            drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a))
+            drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a), outfit: a.outfit)
         default:
             for side in [-1.0, 1.0] as [CGFloat] where a.pose != .relaxed {
                 var arm = Path(); arm.move(to: P(x + side * 19 * s, shoulderY + 10 * s))
@@ -1353,7 +1356,9 @@ struct OfficeScene {
         ctx.stroke(back, with: .color(T.shirtShade), style: StrokeStyle(lineWidth: 10 * s, lineCap: .round))
         ctx.fill(circle(P(x - 22 * s - swing * 0.6, shoulderY + 43 * s), 4.8 * s), with: .color(T.skinShade))
         let torso = CGRect(x: x - 23 * s, y: shoulderY, width: 46 * s, height: 52 * s)
-        ctx.fill(Path(roundedRect: torso, cornerRadius: 17 * s, style: .continuous), with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
+        let torsoPath = Path(roundedRect: torso, cornerRadius: 17 * s, style: .continuous)
+        ctx.fill(torsoPath, with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
+        if a.outfit.sweater != nil { drawSweaterPattern(&ctx, torso: torsoPath, x: x, y: shoulderY + 12 * s, width: 46 * s, s: s) }
         if idle {
             // Tasse vor der Brust, leichter Dampf
             let cup = P(x + 9 * s, shoulderY + 22 * s)
@@ -1374,7 +1379,8 @@ struct OfficeScene {
             ctx.fill(circle(P(x + 22 * s + swing * 0.6, shoulderY + 43 * s), 4.8 * s), with: .color(T.skin))
         }
         ctx.fill(rounded(x - 6.5 * s, shoulderY - 9 * s, 13 * s, 14 * s, 5 * s), with: .color(T.skinShade))
-        drawHead(&ctx, center: P(x, shoulderY - 25 * s), s: s, tones: T, look: a.look, pose: a.pose, tilt: Double(swing) * 0.004, tired: tiredness(a))
+        drawScarf(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s)
+        drawHead(&ctx, center: P(x, shoulderY - 25 * s), s: s, tones: T, look: a.look, pose: a.pose, tilt: Double(swing) * 0.004, tired: tiredness(a), outfit: a.outfit)
     }
 
     /// Memoji-artiger Kopf: großer runder Schädel, weiche Schattierung, ausdrucksstarke Augen/Brauen.
@@ -1384,7 +1390,7 @@ struct OfficeScene {
         return f < 0.5 ? 0 : f < 0.75 ? 1 : f < 0.9 ? 2 : 3
     }
 
-    private func drawHead(_ outer: inout GraphicsContext, center c: CGPoint, s: CGFloat, tones T: Tones, look L: Look, pose: Pose, tilt: Double, tired rawTired: Int = 0) {
+    private func drawHead(_ outer: inout GraphicsContext, center c: CGPoint, s: CGFloat, tones T: Tones, look L: Look, pose: Pose, tilt: Double, tired rawTired: Int = 0, outfit: Outfit = .none) {
         // Melden und Fehler sollen deutlich bleiben: dort höchstens leicht müde
         let alert = pose == .raiseHand || pose == .upset
         let tired = alert ? min(rawTired, 1) : rawTired
@@ -1463,6 +1469,7 @@ struct OfficeScene {
             shine.addArc(center: .zero, radius: r - 1 * s, startAngle: .degrees(222), endAngle: .degrees(252), clockwise: false)
             ctx.stroke(shine, with: .color(.white.opacity(0.22)), style: StrokeStyle(lineWidth: 2.4 * s, lineCap: .round))
         }
+        drawHat(&ctx, outfit: outfit, r: r, s: s)
 
         // Brauen
         let sleeping: Bool = { if case .sofa(true) = pose { return true }; return pose == .napping }()
@@ -1528,7 +1535,9 @@ struct OfficeScene {
                 ctx.stroke(bag, with: .color(darker(T.skin, 0.35).opacity(tired >= 3 ? 0.55 : 0.4)), style: StrokeStyle(lineWidth: 1.3 * s, lineCap: .round))
             }
         }
-        if L.glasses {
+        if outfit.sunglasses {
+            drawSunglasses(&ctx, eyeY: eyeY, s: s)
+        } else if L.glasses {
             let gc = rgb(0x2A2A2C, 0.9)
             for side in [-1.0, 1.0] as [CGFloat] {
                 ctx.stroke(Path(roundedRect: CGRect(x: side * 8.2 * s - 6.4 * s, y: eyeY - 5.6 * s, width: 12.8 * s, height: 11 * s), cornerRadius: 5 * s, style: .continuous), with: .color(gc), lineWidth: 1.3 * s)
