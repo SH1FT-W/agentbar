@@ -50,6 +50,15 @@
   <img src="docs/screenshots/en/office-night.jpg" alt="The office at night" width="800">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/en/office-rain.jpg" alt="Real weather: rain on the glass" width="395">
+  <img src="docs/screenshots/en/office-snow.jpg" alt="Snow settles outside, scarves inside" width="395">
+</p>
+<p align="center">
+  <img src="docs/screenshots/en/office-christmas.jpg" alt="Christmas Eve" width="395">
+  <img src="docs/screenshots/en/office-newyear.jpg" alt="New Year's Eve fireworks" width="395">
+</p>
+
 ## Setup
 
 ### Requirements

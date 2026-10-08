@@ -50,6 +50,15 @@
   <img src="docs/screenshots/de/office-night.jpg" alt="Das Büro bei Nacht" width="800">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/de/office-rain.jpg" alt="Echtes Wetter: Regen an der Scheibe" width="395">
+  <img src="docs/screenshots/de/office-snow.jpg" alt="Draußen bleibt Schnee liegen, drinnen Schals" width="395">
+</p>
+<p align="center">
+  <img src="docs/screenshots/de/office-christmas.jpg" alt="Heiligabend" width="395">
+  <img src="docs/screenshots/de/office-newyear.jpg" alt="Feuerwerk an Silvester" width="395">
+</p>
+
 ## Einrichten
 
 ### Voraussetzungen
