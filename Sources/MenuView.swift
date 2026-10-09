@@ -304,7 +304,7 @@ struct HookHint: View {
             Spacer(minLength: 0)
         }
         .padding(10)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.05)))
+        .background(cardShape(12).fill(Color.primary.opacity(0.05)))
     }
 }
 
@@ -351,7 +351,7 @@ struct SessionRow: View {
             .contextMenu { if s.device == nil { actions } }
             if expanded { details.transition(.opacity.combined(with: .move(edge: .top))) }
         }
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+        .background(cardShape(10)
             .fill(Color.primary.opacity(expanded ? 0.05 : 0)))
         .clipped()
     }
@@ -808,7 +808,7 @@ struct RowButtonStyle: ButtonStyle {
     let highlighted: Bool
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .background(cardShape(10)
                 .fill(Color.primary.opacity(configuration.isPressed ? 0.12 : highlighted ? 0.08 : 0)))
     }
 }
@@ -821,6 +821,15 @@ struct Chevron: View {
             .rotationEffect(.degrees(open ? 90 : 0))
             .accessibilityHidden(true)
     }
+}
+
+/// Karten- und Zeilenform im Menü: ab macOS 26 konzentrisch zu den Fensterecken (folgt dem System,
+/// auch den in macOS 27 vereinheitlichten Ecken), `minimum` hält den bisherigen Radius als Untergrenze.
+func cardShape(_ minimum: CGFloat) -> AnyShape {
+    if #available(macOS 26.0, *) {
+        return AnyShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(minimum)), isUniform: true))
+    }
+    return AnyShape(RoundedRectangle(cornerRadius: minimum, style: .continuous))
 }
 
 extension View {
@@ -862,7 +871,7 @@ struct MenuItem: View {
             }
             .foregroundStyle(hl ? Color.white : enabled ? Color.primary : Color.secondary)
             .padding(.horizontal, MenuMetrics.rowPadding).frame(height: MenuMetrics.itemHeight)
-            .background(RoundedRectangle(cornerRadius: 7, style: .continuous).fill(hl ? Color.accentColor : .clear))
+            .background(cardShape(7).fill(hl ? Color.accentColor : .clear))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -459,7 +459,7 @@ private struct VersionRow: View {
         switch updater.state {
         case .available(let v, _):
             Button(L("Auf \(v) aktualisieren", "Update to \(v)")) { Task { await updater.install() } }
-                .buttonStyle(.borderedProminent)
+                .glassProminentButton()
         case .installing, .checking:
             EmptyView()
         default:
