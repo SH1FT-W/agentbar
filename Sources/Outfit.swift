@@ -3,8 +3,8 @@ import SwiftUI
 /// Was eine Figur heute trägt. Jede Figur würfelt selbst – fest aus Sitzungs-ID und Tag, also den ganzen Tag gleich,
 /// aber anders als die Nachbarn und morgen vielleicht anders.
 struct Outfit: Equatable {
-    enum Theme { case none, christmas, newYear }
-    enum Hat: Equatable { case none, santa, antlers, party(Int), beanie(Int) }
+    enum Theme { case none, christmas, newYear, halloween, valentine, easter }
+    enum Hat: Equatable { case none, santa, antlers, party(Int), beanie(Int), witch, catEars, horns, bunnyEars, hearts }
 
     var hat = Hat.none
     /// Weihnachtspulli: ersetzt die Shirtfarbe, dazu ein Muster über der Brust
@@ -40,6 +40,12 @@ struct Outfit: Equatable {
             }
         case .newYear where joins:
             o.hat = .party(variant % partyColors.count)
+        case .halloween where joins:
+            o.hat = k < 0.4 ? .witch : k < 0.72 ? .catEars : .horns
+        case .valentine where joins:
+            o.hat = .hearts
+        case .easter where joins:
+            o.hat = .bunnyEars
         default: break
         }
         if let t = temperature {
@@ -163,6 +169,8 @@ extension OfficeScene {
             // Gummiband
             var elastic = Path(); elastic.move(to: P(-r * 0.4, -r * 0.82)); elastic.addQuadCurve(to: P(-r * 0.7, r * 0.55), control: P(-r * 0.85, -r * 0.1))
             ctx.stroke(elastic, with: .color(.white.opacity(0.5)), lineWidth: 0.7 * s)
+        case .witch, .catEars, .horns, .bunnyEars, .hearts:
+            drawCostumeHat(&ctx, o.hat, r: r, s: s)
         case .beanie(let i):
             let col = Outfit.woolColors[i % Outfit.woolColors.count]
             var dome = Path()

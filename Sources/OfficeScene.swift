@@ -43,6 +43,8 @@ struct OfficeScene {
     let snow: Double
     /// Feiertags-Deko (Advent, Weihnachten, Silvester …)
     let festive: Festive
+    /// Jahreszeit vor dem Glas (Bäume, Wiese)
+    let season: Season
 
     /// Stunde (Kommazahl), Tageslicht 0…1 und Abendröte – einmal je Bild statt bei jedem Zugriff.
     let hour: Double
@@ -61,6 +63,7 @@ struct OfficeScene {
         self.forecast = forecast; self.todayTokens = todayTokens; self.backdrop = backdrop
         self.weather = weather
         self.festive = festive
+        season = Season.now(date)
         gloom = weather?.gloom ?? 0
         snow = weather?.snowCover ?? 0
         let h = Self.hour(date: date, dark: dark, daylight: daylight)
@@ -165,12 +168,14 @@ struct OfficeScene {
         for a in seated["coffee"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
         for a in actors { if case .walking(let t) = a.pose { items.append((a.depth, { c in drawStanding(&c, a, walk: t) })) } }
         items.append((Self.vacuumDock.y - 8, { c in drawDock(&c) }))
+        items += holidayItems()
         let bot = vacuumPose()
         items.append((bot.p.y, { c in drawVacuum(&c, bot) }))
         for (_, f) in items.sorted(by: { $0.0 < $1.0 }) { f(&ctx) }
 
         drawLighting(&ctx, seated: seated)
         drawDecoGlow(&ctx)
+        drawHolidayGlow(&ctx)
         if let f = lightning() { ctx.fill(Path(CGRect(origin: .zero, size: Self.size)), with: .color(rgb(0xE8EEFF, 0.10 * f.strength))) }
         drawDisplay(&ctx)
         for a in actors { drawLabels(&ctx, a) }
@@ -259,6 +264,7 @@ struct OfficeScene {
             } else {
                 drawLandscape(&c, g)
             }
+            drawBirds(&c, g)
             // Dunst: Himmel färbt die Landschaft leicht (Abendrot, Nacht)
             c.fill(Path(g), with: vgrad([sky.1.opacity(0), sky.1.opacity(0.10 + 0.15 * golden)], g.minY + 150, g.maxY))
             // Trübes Wetter nimmt der Landschaft die Sonne: grauer, flacher
@@ -314,6 +320,7 @@ struct OfficeScene {
             }
         }
         drawWindowDeco(&ctx)
+        drawHolidayWindow(&ctx)
     }
 
     // MARK: Wetter
@@ -452,6 +459,8 @@ struct OfficeScene {
                 ctx.fill(oval(x, y, sz, sz), with: .color(.white.opacity((1 - dayness) * (0.35 + 0.55 * tw) * clear)))
             }
         }
+        drawShootingStar(&ctx, f, clear: clear)
+        drawRainbow(&ctx, f)
         // Sonne 6–20:30 Uhr, sonst Mond
         let isSun = h >= 6 && h <= 20.5
         let p = isSun ? (h - 6) / 14.5 : ((h < 6 ? h + 24 : h) - 20.5) / 9.5
@@ -502,6 +511,9 @@ struct OfficeScene {
         let snowWhite = mix(rgb(0x2B3344), rgb(0xEEF2F6), d)
         // Schneedecke: Flächen werden weiß, k = wie viel Schnee dort liegen bleibt
         func tone(_ day: Int, _ night: Int, _ k: Double = 0) -> Color { mix(mix(rgb(night), rgb(day), d), snowWhite, snow * k) }
+        func tone(_ day: Color, _ night: Int, _ k: Double = 0) -> Color { mix(mix(rgb(night), day, d), snowWhite, snow * k) }
+        // Jahreszeit: Hügel und Wiese im Herbst goldener, im Winter fahl, im Frühling frisch
+        func grass(_ day: Int, _ spring: Int, _ autumn: Int, _ winter: Int) -> Color { seasonal(day, autumnTone: autumn, winterTone: winter, springTone: spring) }
         let b = f.maxY
         func hill(_ y0: CGFloat, _ c1: CGPoint, _ c2: CGPoint, _ y1: CGFloat) -> Path {
             var p = Path()
@@ -514,7 +526,7 @@ struct OfficeScene {
         // Ferne Berge (bläulich, Luftperspektive)
         ctx.fill(hill(b - 128, P(f.minX + 180, b - 170), P(f.maxX - 260, b - 105), b - 140), with: .color(tone(0xB4C7CF, 0x1C2436, 0.7)))
         // Hügel mit Baumreihe
-        ctx.fill(hill(b - 104, P(f.minX + 220, b - 132), P(f.maxX - 180, b - 88), b - 110), with: .color(tone(0xA9C99A, 0x19282A, 0.85)))
+        ctx.fill(hill(b - 104, P(f.minX + 220, b - 132), P(f.maxX - 180, b - 88), b - 110), with: .color(tone(grass(0xA9C99A, 0xB5D998, 0xC9BE84, 0xA7AE95), 0x19282A, 0.85)))
         var rng = SeededRandom(seed: 3)
         var line = Path()
         for i in 0..<56 {
@@ -523,10 +535,11 @@ struct OfficeScene {
             let r = 5 + rng.next() * 4
             line.addEllipse(in: CGRect(x: x - r, y: y - r, width: 2 * r, height: 2 * r * 1.1))
         }
-        ctx.fill(line, with: .color(tone(0x93B98A, 0x162322, 0.45)))
+        ctx.fill(line, with: .color(tone(grass(0x93B98A, 0x9FCB86, 0xC99A55, 0x8E8A7C), 0x162322, 0.45)))
         // Wiese vorn mit sanftem Lichtverlauf
         let meadow = hill(b - 66, P(f.minX + 240, b - 92), P(f.maxX - 200, b - 44), b - 70)
-        ctx.fill(meadow, with: vgrad([tone(0x9DCB7E, 0x16241E, 0.92), tone(0x7FB266, 0x121E19, 0.88)], b - 90, b))
+        ctx.fill(meadow, with: vgrad([tone(grass(0x9DCB7E, 0xA9DA7E, 0xC2BF72, 0xA8B08A), 0x16241E, 0.92),
+                                      tone(grass(0x7FB266, 0x8CC866, 0xA8A25A, 0x8F9878), 0x121E19, 0.88)], b - 90, b))
         }
         guard trees else { return }
         let wind = min(weather?.wind ?? 0, 60)
@@ -538,18 +551,34 @@ struct OfficeScene {
             let sway = CGFloat(sin(time * (0.7 + wind / 70) + Double(i))) * (1.2 + CGFloat(wind / 60) * 3.5)
             let ty = b - 40 + dy
             shadow(&ctx, CGRect(x: x - 22 * s, y: ty - 4 * s, width: 44 * s, height: 8 * s), 0.18 * d)
+            fallenLeaves(&ctx, x: x, ty: ty, s: s, i: i)
             ctx.fill(rounded(x - 2.2 * s, ty - 30 * s, 4.4 * s, 30 * s, 2 * s), with: .color(tone(0x8A6A4C, 0x1B1714)))
+            // Winter: kahle Äste, die Krone wird dünner und verschwindet
+            bareBranches(&ctx, x: x, ty: ty, s: s, sway: sway * 0.5, color: tone(0x7A5E45, 0x1B1714), opacity: min(1, season.bare * 1.6))
             let crown = CGRect(x: x - 23 * s + sway, y: ty - 72 * s, width: 46 * s, height: 50 * s)
-            ctx.fill(Path(ellipseIn: crown), with: .radialGradient(Gradient(colors: [tone(0x8CC474, 0x223B2F), tone(0x5E9C52, 0x16291F)]),
-                                                                    center: P(crown.minX + crown.width * 0.35, crown.minY + crown.height * 0.3),
-                                                                    startRadius: 0, endRadius: crown.width * 0.75))
-            if snow > 0.05 {
+            let (lit, dim) = crownColors(i)
+            let leafy = 1 - season.bare
+            if leafy > 0.02 {
+                // Im Spätherbst lichtet sich die Krone: kleiner und durchscheinend, die Äste schauen durch
+                let k = 0.55 + 0.45 * leafy
+                let c2 = CGRect(x: crown.midX - crown.width * k / 2, y: crown.maxY - crown.height * (0.15 + 0.85 * k) - 4 * s * (1 - k),
+                                width: crown.width * k, height: crown.height * k)
+                ctx.fill(Path(ellipseIn: c2), with: .radialGradient(Gradient(colors: [tone(lit, 0x223B2F).opacity(min(1, leafy * 1.4)), tone(dim, 0x16291F).opacity(min(1, leafy * 1.4))]),
+                                                                     center: P(c2.minX + c2.width * 0.35, c2.minY + c2.height * 0.3),
+                                                                     startRadius: 0, endRadius: c2.width * 0.75))
+                blossoms(&ctx, crown: c2, s: s, seed: i)
+            }
+            if snow > 0.05 && leafy < 0.5 {
+                // Schnee auf den kahlen Ästen
+                bareBranches(&ctx, x: x, ty: ty - 1.3 * s, s: s * 0.98, sway: sway * 0.5, color: snowWhite, opacity: snow * (1 - leafy) * 0.9)
+            } else if snow > 0.05 {
                 // Schneehaube auf der Krone
                 let cap = Path(ellipseIn: CGRect(x: crown.minX + 4 * s, y: crown.minY, width: crown.width - 8 * s, height: crown.height * 0.42))
                     .intersection(Path(ellipseIn: crown))
                 ctx.fill(cap, with: .color(snowWhite.opacity(0.4 + 0.55 * snow)))
             }
         }
+        drawSnowman(&ctx, f)
     }
 
     private func drawFloor(_ ctx: inout GraphicsContext) {
@@ -973,7 +1002,7 @@ struct OfficeScene {
         }
     }
 
-    private func rot(_ a: CGFloat, _ c: CGPoint) -> CGAffineTransform {
+    func rot(_ a: CGFloat, _ c: CGPoint) -> CGAffineTransform {
         CGAffineTransform(translationX: c.x, y: c.y).rotated(by: a).translatedBy(x: -c.x, y: -c.y)
     }
 
@@ -1005,16 +1034,30 @@ struct OfficeScene {
         shadow(&ctx, CGRect(x: c.x - 44, y: c.y - 6, width: 40, height: 6), 0.2)
         ctx.fill(rounded(c.x - 42, c.y - 9, 34, 5, 1), with: .color(rgb(0xE9E2D6)))
         ctx.fill(rounded(c.x - 39, c.y - 13.5, 29, 4.5, 1), with: .color(rgb(0x8193AA)))
+        if festive.valentine { roses(&ctx, vase: c) }
+        else if festive.easter > 0 { easterShrub(&ctx, vase: c) }
+        else {
         var twig = Path(); twig.move(to: P(c.x + 2, c.y - 16)); twig.addQuadCurve(to: P(c.x + 9, c.y - 34), control: P(c.x + 2, c.y - 28))
         ctx.stroke(twig, with: .color(rgb(0x6B5A48)), lineWidth: 1)
         for (dx, dy) in [(4.0, -23.0), (8, -28), (6, -32), (10, -34)] as [(CGFloat, CGFloat)] {
             ctx.fill(oval(c.x + dx - 2, c.y + dy - 3, 5, 6), with: .color(rgb(0x7FA36E)))
         }
+        }
         ctx.fill(rounded(c.x - 3, c.y - 18, 10, 13, 4), with: .linearGradient(Gradient(colors: [rgb(0xEDEFF2, 0.95), rgb(0xBFC8D0, 0.9)]), startPoint: P(c.x - 3, 0), endPoint: P(c.x + 7, 0)))
         }
+        if festive.halloween >= 2 {
+            drawPumpkin(&ctx, at: P(Self.tablePumpkin.x, c.y - 6), r: 10, face: 1)
+        } else if Moments.pizza(Festive.fakeDate ?? date) {
+            drawPizza(&ctx, at: P(c.x + 30, c.y - 4))
+        } else {
         ctx.fill(oval(c.x + 16, c.y - 12, 30, 9), with: .color(dark ? rgb(0xDADADF) : .white))
         for (dx, col) in [(22.0, 0xE8B04A), (30.0, 0xD9674F), (37.0, 0x9CBF5A)] as [(CGFloat, Int)] {
             ctx.fill(circle(P(c.x + dx, c.y - 13), 3.8), with: .color(rgb(col)))
+        }
+        // Ostern: ein paar Eier in der Obstschale
+        if festive.easter >= 2 {
+            for (k, dx) in [(2, 24.0), (0, 33.0)] as [(Int, CGFloat)] { easterEgg(&ctx, at: P(c.x + dx, c.y - 10), r: 3.4, style: k, tilt: Double(dx - 28) * 0.05, shadowed: false) }
+        }
         }
     }
 
@@ -1155,6 +1198,7 @@ struct OfficeScene {
         let led = cpu > 0.6 && !docked ? rgb(0xFF9F0A) : rgb(0x30D158)
         ctx.fill(circle(P(x + front * 11, y - 7.5), 1.3), with: .color(led.opacity(0.6 + 0.4 * sin(time * (docked ? 1.2 : 4)))))
         if festive.vacuumHat { drawVacuumHat(&ctx, at: P(x, y), front: front) }
+        drawVacuumCostume(&ctx, at: P(x, y), front: front)
     }
 
     /// Ladestation an der Wand: weißer Turm mit dunklem Deckel, zwei Wassertanks und Rampe.
@@ -1909,21 +1953,21 @@ final class OfficeBackdrop {
         let land: CGImage
         let scale: CGFloat
     }
-    private struct Key: Equatable { let dark: Bool; let day: Int; let scale: Int; let snow: Int }
+    private struct Key: Equatable { let dark: Bool; let day: Int; let scale: Int; let snow: Int; let season: Int }
     private var key: Key?
     private var images: Images?
     private var renderedAt = 0.0
 
     /// scale = Pixel je Szenen-Punkt (Fenster-Einpassung × Bildschirm-Skalierung).
     /// weather zählt nur über die Schneedecke (Hügel und Wiese werden weiß).
-    func images(dark: Bool, dayness: Double, scale: CGFloat, now: Double, weather: Weather? = nil) -> Images? {
+    func images(dark: Bool, dayness: Double, scale: CGFloat, now: Double, weather: Weather? = nil, date: Date = Date()) -> Images? {
         let k = Key(dark: dark, day: Int((dayness * 100).rounded()), scale: Int((scale * 100).rounded()),
-                    snow: Int(((weather?.snowCover ?? 0) * 20).rounded()))
+                    snow: Int(((weather?.snowCover ?? 0) * 20).rounded()), season: Season.now(date).bucket)
         if k == key, let images { return images }
         // Während des Aufziehens nicht jedes Bild neu rendern – kurz das alte (skaliert) weiterverwenden
-        if let images, let key, key.dark == k.dark, key.day == k.day, key.snow == k.snow, abs(now - renderedAt) < 0.25 { return images }
+        if let images, let key, key.dark == k.dark, key.day == k.day, key.snow == k.snow, key.season == k.season, abs(now - renderedAt) < 0.25 { return images }
         let px = max(0.5, CGFloat(k.scale) / 100)
-        let base = OfficeScene(time: 0, date: Date(), dark: dark, daylight: true, actors: [], overflow: 0, hovered: nil,
+        let base = OfficeScene(time: 0, date: date, dark: dark, daylight: true, actors: [], overflow: 0, hovered: nil,
                                session: nil, weekly: nil, plan: nil, cpu: 0, vacuum: .docked, working: 0, waiting: 0,
                                fixedDayness: Double(k.day) / 100, weather: weather)
         let size = OfficeScene.size, g = OfficeScene.glass

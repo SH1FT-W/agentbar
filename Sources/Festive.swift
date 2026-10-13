@@ -17,6 +17,14 @@ struct Festive: Equatable {
     var bunting = false
     var fireworks = 0.0
     var confetti = false
+    /// Halloween: 1 = Woche davor (Kürbis, Fledermäuse), 2 = am 31. (dazu Tisch-Kürbis, Spinnennetz, Gespenst-Saugroboter)
+    var halloween = 0
+    /// Valentinstag: Herzgirlande, Rosen auf dem Couchtisch
+    var valentine = false
+    /// Ostern: 1 = Palmsonntag bis Ostermontag (Osterstrauch), 2 = Ostersonntag/-montag (versteckte Eier, Hasenohren)
+    var easter = 0
+    var vacuumGhost = false
+    var vacuumEars = false
     /// Verkleidung der Figuren: welches Thema und wie viele mitmachen (0…1)
     var outfitTheme = Outfit.Theme.none
     var outfitChance = 0.0
@@ -32,6 +40,16 @@ struct Festive: Equatable {
         let v = compute(date, cal: .current)
         cache = (minute, v)
         return v
+    }
+
+    /// Ostersonntag (anonymer gregorianischer Algorithmus)
+    static func easterSunday(year y: Int, cal: Calendar) -> Date {
+        let a = y % 19, b = y / 100, c = y % 100, d = b / 4, e = b % 4
+        let f = (b + 8) / 25, g = (b - f + 1) / 3, h = (19 * a + b - d - g + 15) % 30
+        let i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7
+        let m = (a + 11 * h + 22 * l) / 451
+        let month = (h + l - 7 * m + 114) / 31, day = (h + l - 7 * m + 114) % 31 + 1
+        return cal.date(from: DateComponents(year: y, month: month, day: day))!
     }
 
     /// Erster Advent: vier Sonntage vor Weihnachten (27.11.–3.12.)
@@ -77,6 +95,34 @@ struct Festive: Equatable {
             }
         }
         if m == 12 && d == 6 { f.boots = true }
+
+        // Halloween: Woche davor dekoriert, am 31. alles (bis Allerheiligen früh)
+        if m == 10 && d >= 24 { f.halloween = d == 31 ? 2 : 1 }
+        if m == 11 && d == 1 && h < 6 { f.halloween = 2 }
+        if f.halloween == 2 {
+            f.vacuumGhost = true
+            f.outfitTheme = .halloween
+            f.outfitChance = h >= 17 || m == 11 ? 0.75 : 0.45
+        }
+
+        // Valentinstag
+        if m == 2 && d == 14 {
+            f.valentine = true
+            f.outfitTheme = .valentine
+            f.outfitChance = 0.3
+        }
+
+        // Ostern (Gauß/Meeus): Strauch ab Palmsonntag, Eier und Hasenohren an Ostersonntag und -montag
+        if m == 3 || m == 4 {
+            let easter = easterSunday(year: y, cal: cal)
+            let off = cal.dateComponents([.day], from: easter, to: day).day ?? -99
+            if off >= -7 && off <= 1 { f.easter = off >= 0 ? 2 : 1 }
+            if off >= 0 && off <= 1 {
+                f.vacuumEars = true
+                f.outfitTheme = .easter
+                f.outfitChance = 0.4
+            }
+        }
 
         // Silvester und Neujahr
         if m == 12 && d == 31 {

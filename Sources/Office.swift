@@ -472,9 +472,9 @@ struct OfficeView: View {
                 let lightsOn = OfficeScene.lightsOn(date: tl.date, dark: dark, daylight: daylight)
                 let vacuum = load.vacuum(at: now, dock: lightsOn)
                 // Regen und Schnee brauchen die flüssige Bildrate, sonst springen die Striche
-                let moving = model.animating || vacuum.spur < OfficeScene.vacuumSpurLength || (w.map { $0.raining || $0.kind == .snow } ?? false) || fest.animated
+                let moving = model.animating || vacuum.spur < OfficeScene.vacuumSpurLength || (w.map { $0.raining || $0.kind == .snow } ?? false) || fest.animated || Moments.animating(now)
                 let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: tl.date, dark: dark, daylight: daylight),
-                                         scale: fit * displayScale, now: now, weather: w)
+                                         scale: fit * displayScale, now: now, weather: w, date: tl.date)
                 let scene = OfficeScene(time: now, date: tl.date, dark: dark, daylight: daylight,
                                         actors: actors, overflow: overflow, hovered: hovered,
                                         session: quota.shownSession?.percent, weekly: quota.shownWeekly?.percent,

@@ -39,7 +39,7 @@ struct Snap {
         let forecast = QuotaForecast(percentPerHour: 9, exhaustsAt: cal.date(bySettingHour: 16, minute: 40, second: 0, of: now))
         func render(_ name: String, _ date: Date, _ t: Double, dark: Bool, sessions: [AgentSession], hovered: String? = nil, weather: Weather? = Weather.fake, festive: Festive = .none) {
             let (actors, overflow) = model.actors(for: sessions, now: t)
-            let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t, weather: weather)
+            let bg = backdrop.images(dark: dark, dayness: OfficeScene.dayness(date: date, dark: dark, daylight: true), scale: 2, now: t, weather: weather, date: date)
             let scene = OfficeScene(time: t, date: date, dark: dark, daylight: true, actors: actors, overflow: overflow,
                                     hovered: hovered, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
                                     vacuum: OfficeScene.lightsOn(date: date, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 3, waiting: 1,
@@ -114,6 +114,52 @@ struct Snap {
             }
             render("coffee-night", cal.date(bySettingHour: 22, minute: 0, second: 0, of: now)!, t, dark: true, sessions: fin)
             print("Kaffeebilder in build/ (\(n))")
+            return
+        }
+        // ./build.sh snapshot --seasons → build/season-*.png: Bäume und Wiese übers Jahr, dazu Halloween, Valentinstag, Ostern
+        if CommandLine.arguments.contains("--seasons") {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+            let shots: [(String, String, Bool, String?)] = [
+                ("01-januar", "2027-01-15 11:00", false, nil), ("02-valentin", "2027-02-14 11:00", false, nil),
+                ("02-valentin-abend", "2027-02-14 20:30", true, nil), ("03-maerz", "2027-03-15 11:00", false, nil),
+                ("04-ostern-palmsonntag", "2027-03-21 11:00", false, nil), ("04-ostersonntag", "2027-03-28 11:00", false, nil),
+                ("05-april", "2027-04-15 11:00", false, nil), ("06-mai", "2027-05-10 11:00", false, nil),
+                ("07-juli", "2027-07-10 11:00", false, nil), ("08-september", "2026-09-20 11:00", false, nil),
+                ("09-oktober", "2026-10-15 11:00", false, nil), ("10-halloween-woche", "2026-10-27 11:00", false, "cloudy"),
+                ("11-halloween-abend", "2026-10-31 20:30", true, nil), ("11-halloween-tag", "2026-10-31 11:00", false, nil),
+                ("12-november", "2026-11-12 11:00", false, nil), ("13-dezember-schnee", "2026-12-10 11:00", false, "snow,-2"),
+            ]
+            for (name, ds, dark, wk) in shots {
+                let d = f.date(from: ds)!
+                let t = d.timeIntervalSinceReferenceDate
+                render("season-\(name)", d, t, dark: dark, sessions: demo, weather: wk.flatMap { Weather.fake($0) }, festive: Festive.compute(d, cal: cal))
+            }
+            print("Jahreszeitenbilder in build/")
+            return
+        }
+        // ./build.sh snapshot --moments → build/season-moment-*.png: Sternschnuppe, Vögel, Regenbogen, Schneemann, Freitags-Pizza
+        if CommandLine.arguments.contains("--moments") {
+            func find(_ start: Date, _ hit: (Double) -> Bool) -> (Date, Double) {
+                var t = start.timeIntervalSinceReferenceDate
+                var n = 0
+                while !hit(t) && n < 400_000 { t += 0.25; n += 1 }
+                return (Date(timeIntervalSinceReferenceDate: t), t)
+            }
+            let night = cal.date(bySettingHour: 23, minute: 0, second: 0, of: now)!
+            let (sd, st) = find(night) { Moments.shootingStar($0).map { $0.t > 0.3 && $0.t < 0.7 } ?? false }
+            render("season-moment-sternschnuppe", sd, st, dark: true, sessions: demo, weather: Weather.fake("clear"))
+            let day = cal.date(bySettingHour: 11, minute: 0, second: 0, of: now)!
+            let (bd, bt) = find(day) { Moments.birds($0).map { $0.t > 0.3 && $0.t < 0.36 } ?? false }
+            render("season-moment-voegel", bd, bt, dark: false, sessions: demo, weather: Weather.fake("partly"))
+            var rain = day.timeIntervalSinceReferenceDate
+            while (UInt64(rain / 3600) &* 0x2545F4914F6CDD1D) >> 60 >= 6 { rain += 3600 }
+            render("season-moment-regenbogen", day, rain, dark: false, sessions: demo, weather: Weather.fake("drizzle"))
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+            let jan = f.date(from: "2027-01-20 11:00")!
+            render("season-moment-schneemann", jan, jan.timeIntervalSinceReferenceDate, dark: false, sessions: demo, weather: Weather.fake("partly,-3").map { var w = $0; w.snowCover = 1; return w })
+            let fri = f.date(from: "2026-10-16 12:30")!
+            render("season-moment-pizza", fri, fri.timeIntervalSinceReferenceDate, dark: false, sessions: demo)
+            print("Momentbilder in build/")
             return
         }
         // ./build.sh snapshot --weather → build/weather-<art>-<tag|nacht>.png (Vergleichsbilder fürs Wetter)
