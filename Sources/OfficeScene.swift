@@ -82,10 +82,10 @@ struct OfficeScene {
     private var deskTop2: Color { dark ? rgb(0xCFCFD4) : rgb(0xF0F0F2) }
     private var deskEdge: Color { dark ? rgb(0xB9B9BF) : rgb(0xDEDEE3) }
     private var frame: Color { dark ? rgb(0x4B4E54) : rgb(0xD8DBE0) }
-    private var oak: Color { dark ? rgb(0x8A6D4E) : rgb(0xCDA97C) }
-    private var ink: Color { dark ? .white : rgb(0x1D1D1F) }
-    private let alu = rgb(0xC5C9CF)
-    private let aluDark = rgb(0x9A9FA6)
+    var oak: Color { dark ? rgb(0x8A6D4E) : rgb(0xCDA97C) }
+    var ink: Color { dark ? .white : rgb(0x1D1D1F) }
+    let alu = rgb(0xC5C9CF)
+    let aluDark = rgb(0x9A9FA6)
 
     /// Stunde als Kommazahl; ohne Tageszeit-Himmel: hell = Mittag, dunkel = Nacht.
     static func hour(date: Date, dark: Bool, daylight: Bool) -> Double {
@@ -146,6 +146,7 @@ struct OfficeScene {
             case .desk(let i), .napAtDesk(let i): return "d\(i)"
             case .sofa: return "sofa"
             case .stand: return "stand"
+            case .coffee: return "coffee"
             }
         }
         for i in 0..<OfficeModel.deskCount {
@@ -160,6 +161,8 @@ struct OfficeScene {
         items.append((474, { c in drawSnakePlant(&c, at: CGPoint(x: 44, y: 474), scale: 1.0) }))
         items.append((566, { c in drawCoffeeTable(&c) }))
         for a in seated["stand"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
+        items.append((374, { c in drawCoffeeBar(&c, brewing: brewing(seated["coffee"] ?? [])) }))
+        for a in seated["coffee"] ?? [] { items.append((a.point.y, { c in drawStanding(&c, a, walk: 0) })) }
         for a in actors { if case .walking(let t) = a.pose { items.append((a.depth, { c in drawStanding(&c, a, walk: t) })) } }
         items.append((Self.vacuumDock.y - 8, { c in drawDock(&c) }))
         let bot = vacuumPose()
@@ -171,6 +174,7 @@ struct OfficeScene {
         if let f = lightning() { ctx.fill(Path(CGRect(origin: .zero, size: Self.size)), with: .color(rgb(0xE8EEFF, 0.10 * f.strength))) }
         drawDisplay(&ctx)
         for a in actors { drawLabels(&ctx, a) }
+        drawCoffeeChat(&ctx, seated["coffee"] ?? [])
         if let h = hovered, let a = actors.first(where: { $0.id == h }) { drawHover(&ctx, a) }
     }
 
@@ -821,6 +825,17 @@ struct OfficeScene {
         case .lamp: lamp(&ctx, P(x + 50 * s, top - 7 * s), s)
         case .books: books(&ctx, P(x - 46 * s, top - 6 * s), s)
         }
+        // Frisch geholter Kaffee: dampfende Tasse neben dem Laptop (steht schon eine Tasse da, dampft die)
+        if actor?.mug == true {
+            let b: CGPoint
+            switch deskProp(index) {
+            case .mug: b = P(x + 47 * s, top - 6 * s)
+            case .lamp: b = P(x + 35 * s, top - 6 * s)
+            default: b = P(x + 44 * s, top - 6 * s)
+            }
+            if deskProp(index) != .mug { mug(&ctx, b, s) }
+            coffeeSteam(&ctx, at: P(b.x, b.y - 16 * s), s: s, seed: Double(index))
+        }
         // Nikolaus: Stiefel auf der freien Tischseite
         if festive.boots {
             let right = deskProp(index) == .plant || deskProp(index) == .books
@@ -1093,8 +1108,8 @@ struct OfficeScene {
     static let vacuumLoopLength = Double(vacuumLengths.reduce(0, +))
     /// Ladestation an der rechten Wand hinter dem Sofa (zwischen zwei Sitzplätzen). Stichweg wie der Weg von der Tür:
     /// vom Mittelgang durch die Lücke der hinteren Tische hinauf, hinter den Stühlen an der Glasfront entlang nach rechts.
-    static let vacuumDock = CGPoint(x: 820, y: 380)          // Robotermitte, angedockt
-    static let vacuumSpur: [CGPoint] = [(560, 494), (560, 392), (820, 392), (820, 380)].map { CGPoint(x: $0.0, y: $0.1) }
+    static let vacuumDock = CGPoint(x: 948, y: 380)          // Robotermitte, angedockt (links davon steht die Kaffeebar)
+    static let vacuumSpur: [CGPoint] = [(560, 494), (560, 392), (948, 392), (948, 380)].map { CGPoint(x: $0.0, y: $0.1) }
     private static let vacuumSpurLengths: [CGFloat] = (1..<vacuumSpur.count).map {
         hypot(vacuumSpur[$0].x - vacuumSpur[$0 - 1].x, vacuumSpur[$0].y - vacuumSpur[$0 - 1].y)
     }
@@ -1359,8 +1374,22 @@ struct OfficeScene {
         let torsoPath = Path(roundedRect: torso, cornerRadius: 17 * s, style: .continuous)
         ctx.fill(torsoPath, with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
         if a.outfit.sweater != nil { drawSweaterPattern(&ctx, torso: torsoPath, x: x, y: shoulderY + 12 * s, width: 46 * s, s: s) }
-        if idle {
-            // Tasse vor der Brust, leichter Dampf
+        var atMachine = false, waiting = false
+        if idle, case .coffee(let k) = a.place, !a.cup { atMachine = k == 0; waiting = k == 1 }
+        if atMachine {
+            // Greift zur Maschine rechts daneben (Tasse steht unter dem Auslauf)
+            var front = Path(); front.move(to: P(x + 19 * s, shoulderY + 9 * s))
+            front.addLine(to: P(x + 30 * s, shoulderY + 30 * s))
+            front.addLine(to: P(x + 38 * s, shoulderY + 30 * s))
+            sleeve(&ctx, front, T, s)
+            ctx.fill(circle(P(x + 40 * s, shoulderY + 30 * s), 4.6 * s), with: .color(T.skin))
+        } else if waiting {
+            // Wartet entspannt, Hände locker
+            var front = Path(); front.move(to: P(x + 19 * s, shoulderY + 10 * s)); front.addLine(to: P(x + 21 * s, shoulderY + 40 * s))
+            ctx.stroke(front, with: .color(T.shirt), style: StrokeStyle(lineWidth: 10 * s, lineCap: .round))
+            ctx.fill(circle(P(x + 21 * s, shoulderY + 43 * s), 4.8 * s), with: .color(T.skin))
+        } else if idle || a.cup {
+            // Tasse vor der Brust, leichter Dampf (auch auf dem Rückweg von der Kaffeemaschine)
             let cup = P(x + 9 * s, shoulderY + 22 * s)
             var front = Path(); front.move(to: P(x + 19 * s, shoulderY + 8 * s))
             front.addLine(to: P(x + 27 * s, shoulderY + 34 * s))
@@ -1625,8 +1654,15 @@ struct OfficeScene {
         let nameY: CGFloat
         var maxWidth: CGFloat = 170
         var nameX = a.point.x
+        var atCoffee = false
         switch a.pose {
         case .walking: nameY = headTop(a) - 12 * s        // über dem Kopf – unten wäre es am Bildrand abgeschnitten
+        case .standing where { if case .coffee = a.place { return true }; return false }():
+            // Hinter dem Sofa: unter den Füßen lägen Sofa und Sitzende – Schild über den Kopf
+            nameY = headTop(a) - 12 * s - (a.place == .coffee(1) ? 21 : 0)   // zwei an der Maschine: Schilder gestaffelt
+            nameX += a.place == .coffee(1) ? -12 : 10
+            maxWidth = 96
+            atCoffee = true
         case .standing:
             nameY = a.point.y + 12 * s
             // Kaffee-Ecke steht direkt links vom Sofa: Schild schmaler und etwas nach links
@@ -1664,7 +1700,7 @@ struct OfficeScene {
             device: a.session.device == nil ? nil : a.session.deviceSymbol,
             warning: a.session.contextWarning ? (hover || st == .waiting ? Color.white : rgb(0xFF9F0A)) : nil, maxWidth: maxWidth)
 
-        guard !walking, !hover, !a.leaving else { return }
+        guard !walking, !hover, !a.leaving, !atCoffee else { return }
         // Status-Bläschen über dem Kopf
         let top = P(a.point.x + (a.pose == .napping ? 6 * s : 0), headTop(a) - 13 * s)
         switch st {

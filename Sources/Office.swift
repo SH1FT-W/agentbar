@@ -46,6 +46,8 @@ func rgb(_ hex: Int, _ a: Double = 1) -> Color {
 /// Plätze im Büro. Pause-Plätze: Sofa (3), Kaffee-Ecke neben der Lounge (2), am Fenster zwischen den hinteren Tischen (3).
 enum Place: Equatable {
     case desk(Int), napAtDesk(Int), sofa(Int), stand(Int)
+    /// An der Kaffeemaschine hinter dem Sofa: 0 = direkt an der Maschine, 1 = wartet daneben
+    case coffee(Int)
 }
 
 enum Pose: Equatable {
@@ -65,6 +67,8 @@ struct Actor: Identifiable {
     var changeAge: Double? = nil   // Sekunden seit einem echten Statuswechsel (nicht beim ersten Auftauchen)
     var leaving = false            // beendet: geht gerade zur Tür hinaus
     var outfit = Outfit.none       // Tages-Outfit (Mütze, Pulli, Schal …), setzt OfficeScene
+    var cup = false                // trägt einen frisch geholten Kaffee (Stehen/Laufen)
+    var mug = false                // Kaffeetasse steht auf dem Tisch
 }
 
 final class OfficeModel {
@@ -83,6 +87,12 @@ final class OfficeModel {
     private var last: [String: AgentSession] = [:]
     /// Beendete Sitzungen auf dem Weg zur Tür (letzter Stand der Sitzung fürs Zeichnen).
     private var leaving: [String: (session: AgentSession, place: Place, move: Move)] = [:]
+    /// Kaffeepause kurz nach „fertig“: wann losgehen, welcher Platz an der Maschine, wann der Kaffee durch ist.
+    private struct CoffeeRun { var due: Double; var slot: Int?; var brewEnd: Double?; var over = false }
+    private var coffee: [String: CoffeeRun] = [:]
+    /// Bis wann die Tasse auf dem Tisch steht (bzw. getragen wird)
+    private var cupUntil: [String: Double] = [:]
+    private var cupFrom: [String: Double] = [:]
     private var started = false
     /// Bewegt sich gerade etwas Größeres (Laufen, Tippen, Melden)? Danach richtet sich die Bildrate.
     private(set) var animating = true
@@ -98,6 +108,11 @@ final class OfficeModel {
         [(CGPoint(x: 674, y: 506), CGFloat(0.9)), (CGPoint(x: 646, y: 540), 0.95),
          (CGPoint(x: 404, y: 414), 0.76), (CGPoint(x: 560, y: 414), 0.76), (CGPoint(x: 248, y: 414), 0.76)][k]
     }
+
+    /// Kaffeebar an der Rückwand hinter dem Sofa (Maschine rechts auf dem Sideboard). Stehplätze davor, Füße als Anker.
+    static let coffeeMachine = CGPoint(x: 842, y: 342)   // Mitte der Maschine, Unterkante = Sideboard-Oberkante
+    static func coffeeSpot(_ k: Int) -> (CGPoint, CGFloat) { k == 0 ? (CGPoint(x: 800, y: 394), 0.74) : (CGPoint(x: 764, y: 397), 0.75) }
+    static let brewTime = 6.5
 
     // MARK: Laufwege
     //
@@ -129,6 +144,10 @@ final class OfficeModel {
         case .stand(let k):
             let (pt, _) = standSpot(k)
             return ([pt, CGPoint(x: pt.x, y: laneY(.middle))], .middle)
+        case .coffee(let k):
+            // Wie der Weg zur Tür: durch die Lücke der hinteren Tische hinauf, hinter dem Sofa entlang
+            let (pt, _) = coffeeSpot(k)
+            return ([pt, CGPoint(x: doorGapX, y: pt.y), CGPoint(x: doorGapX, y: laneY(.middle))], .middle)
         }
     }
 
@@ -209,6 +228,42 @@ final class OfficeModel {
             leaving[id] = (session, place, m)
         }
         desk[id] = nil; lounge[id] = nil; at[id] = nil; moves[id] = nil; since[id] = nil; changed[id] = nil; last[id] = nil
+        coffee[id] = nil; cupUntil[id] = nil; cupFrom[id] = nil
+    }
+
+    /// Holt sich die Figur nach „fertig“ einen Kaffee? Würfel je Sitzung und Minute; morgens öfter,
+    /// nicht wenn noch eine volle Tasse auf dem Tisch steht.
+    private func wantsCoffee(_ id: String, now: Double) -> Double? {
+        if let until = cupUntil[id], until > now { return nil }
+        var h: UInt64 = 1469598103934665603
+        for b in "\(id)|\(Int(now / 60))".utf8 { h = (h ^ UInt64(b)) &* 1099511628211 }
+        let hour = Calendar.current.component(.hour, from: Date(timeIntervalSinceReferenceDate: now))
+        let chance = (7...10).contains(hour) ? 0.8 : 0.45
+        guard Double(h % 1000) / 1000 < chance else { return nil }
+        return 4 + Double((h >> 20) % 14)          // 4–17 s nach dem Fertigwerden
+    }
+
+    /// Kaffee-Ablauf für eine fertige Sitzung am Tisch: Ziel an der Maschine oder nil (bleibt am Tisch).
+    private func coffeeTarget(_ id: String, now: Double) -> Place? {
+        guard var run = coffee[id], !run.over, now >= run.due else { return nil }
+        let used = Set(coffee.filter { $0.key != id && !$0.value.over }.compactMap(\.value.slot))
+        if run.slot == nil {
+            guard let free = [0, 1].first(where: { !used.contains($0) }) else { run.over = true; coffee[id] = run; return nil }
+            run.slot = free
+        }
+        // Wartende rückt auf, sobald die Maschine frei ist
+        if run.slot == 1, !used.contains(0) { run.slot = 0 }
+        let arrived = at[id] == .coffee(run.slot!) && moves[id].map { now - $0.start >= $0.duration } ?? true
+        if run.slot == 0 && arrived && run.brewEnd == nil { run.brewEnd = now + Self.brewTime }
+        if let end = run.brewEnd, now >= end {
+            run.over = true
+            cupFrom[id] = now
+            cupUntil[id] = now + 1500                 // Tasse bleibt 25 Min. auf dem Tisch
+            coffee[id] = run
+            return nil
+        }
+        coffee[id] = run
+        return .coffee(run.slot!)
     }
 
     /// Position auf dem Laufweg (mit sanftem Anfahren/Abbremsen).
@@ -271,7 +326,11 @@ final class OfficeModel {
             guard placed.contains(s.id) else { continue }
             last[s.id] = s
             if let prev = since[s.id] {
-                if prev.status != s.status { since[s.id] = (s.status, now); changed[s.id] = now }
+                if prev.status != s.status {
+                    since[s.id] = (s.status, now); changed[s.id] = now
+                    coffee[s.id] = nil
+                    if s.status == .done, let delay = wantsCoffee(s.id, now: now) { coffee[s.id] = CoffeeRun(due: now + delay) }
+                }
             } else {
                 since[s.id] = (s.status, now)
             }
@@ -280,7 +339,12 @@ final class OfficeModel {
             let target: Place
             if let l = lounge[s.id] { target = l }
             else if s.status == .idle { target = .napAtDesk(desk[s.id]!) }
+            else if s.status == .done, let c = coffeeTarget(s.id, now: now) { target = c }
             else { target = .desk(desk[s.id]!) }
+            if s.status != .done { coffee[s.id] = nil }
+            // Tasse in der Hand auf dem Rückweg, danach auf dem Tisch
+            let hasCup = (cupUntil[s.id] ?? 0) > now
+            if !hasCup { cupUntil[s.id] = nil; cupFrom[s.id] = nil }
 
             let jitter = jitter(s.id)
             if let cur = at[s.id] {
@@ -312,7 +376,8 @@ final class OfficeModel {
                 if now - m.start < m.duration {
                     let pt = point(on: m, now: now)
                     out.append(Actor(id: s.id, session: s, look: look, point: pt, scale: Self.depthScale(pt.y),
-                                     pose: .walking(now - m.start), place: target, statusAge: age, depth: pt.y, changeAge: changeAge))
+                                     pose: .walking(now - m.start), place: target, statusAge: age, depth: pt.y, changeAge: changeAge,
+                                     cup: hasCup && (cupFrom[s.id] ?? 0) >= m.start - 0.5))
                     busy = true
                     continue
                 }
@@ -321,7 +386,7 @@ final class OfficeModel {
             let pose: Pose
             switch (target, s.status) {
             case (.sofa, _): pose = .sofa(sleep: age > 900)
-            case (.stand, _): pose = .standing
+            case (.stand, _), (.coffee, _): pose = .standing
             case (.napAtDesk, _): pose = .napping
             case (_, .working): pose = .typing
             case (_, .waiting): pose = .raiseHand
@@ -333,10 +398,14 @@ final class OfficeModel {
             case .desk(let i), .napAtDesk(let i): (pt, sc) = Self.deskSeat(i)
             case .sofa(let j): (pt, sc) = Self.sofaSeat(j)
             case .stand(let k): (pt, sc) = Self.standSpot(k)
+            case .coffee(let k): (pt, sc) = Self.coffeeSpot(k)
             }
+            if case .coffee = target { busy = true }   // Dampf und Plausch an der Maschine
             if pose == .typing || pose == .raiseHand || (changeAge ?? 9) < 1 { busy = true }
+            var desked = false
+            if case .desk = target { desked = true }
             out.append(Actor(id: s.id, session: s, look: look, point: pt, scale: sc, pose: pose, place: target,
-                             statusAge: age, depth: pt.y, changeAge: changeAge))
+                             statusAge: age, depth: pt.y, changeAge: changeAge, mug: hasCup && desked))
         }
         for (id, l) in leaving {
             let pt = point(on: l.move, now: now)

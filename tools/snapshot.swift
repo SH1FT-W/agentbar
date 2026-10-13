@@ -47,7 +47,7 @@ struct Snap {
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") || name.hasPrefix("festive-") ? "build/\(name).png" : "build/office-\(name).png"))
+                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") || name.hasPrefix("festive-") || name.hasPrefix("coffee-") || name.hasPrefix("season-") ? "build/\(name).png" : "build/office-\(name).png"))
             }
         }
         // ./build.sh snapshot --festive → build/festive-*.png (Advent bis Neujahr)
@@ -73,6 +73,47 @@ struct Snap {
                 render("festive-\(name)-ohne", d, t, dark: dark, sessions: demo, weather: before)
             }
             print("Festbilder in build/")
+            return
+        }
+        // ./build.sh snapshot --coffee → build/coffee-*.png: zwei werden fertig und holen sich Kaffee (Plausch, Rückweg, Tasse)
+        if CommandLine.arguments.contains("--coffee") {
+            let date = cal.date(bySettingHour: 8, minute: 30, second: 0, of: now)!       // morgens: fast alle wollen Kaffee
+            let t0 = date.timeIntervalSinceReferenceDate
+            let m = model
+            var work = demo
+            for i in work.indices { work[i].status = .working }
+            _ = m.actors(for: work, now: t0)
+            var fin = work
+            fin[0].status = .done; fin[3].status = .done; fin[6].status = .done
+            _ = m.actors(for: fin, now: t0 + 1)
+            var t = t0 + 1
+            var n = 0
+            while t < t0 + 60 {
+                t += 0.5
+                let (acts, _) = m.actors(for: fin, now: t)
+                let frame = Int((t - t0) * 2)
+                if frame % 6 == 0 && acts.contains(where: { if case .coffee = $0.place { return true }; return $0.cup || $0.mug }) {
+                    n += 1
+                    render("coffee-\(String(format: "%02d", n))", date, t, dark: false, sessions: fin)
+                }
+            }
+            // Zwei kurz nacheinander fertig → einer brüht, einer wartet (Plausch)
+            var two = fin
+            for i in two.indices { two[i].status = .working }
+            _ = m.actors(for: two, now: t + 1)
+            two[1].status = .done; two[4].status = .done; two[7].status = .done
+            var u = t + 2
+            _ = m.actors(for: two, now: u)
+            var chats = 0
+            while u < t + 60 && chats < 3 {
+                u += 0.5
+                let (acts, _) = m.actors(for: two, now: u)
+                if acts.filter({ if case .coffee = $0.place, $0.pose == .standing { return true }; return false }).count == 2 {
+                    chats += 1; render("coffee-chat\(chats)", date, u + Double(chats) * 2.6, dark: false, sessions: two); u += 2
+                }
+            }
+            render("coffee-night", cal.date(bySettingHour: 22, minute: 0, second: 0, of: now)!, t, dark: true, sessions: fin)
+            print("Kaffeebilder in build/ (\(n))")
             return
         }
         // ./build.sh snapshot --weather → build/weather-<art>-<tag|nacht>.png (Vergleichsbilder fürs Wetter)
