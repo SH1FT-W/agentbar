@@ -106,10 +106,21 @@ private final class FileState {
     var contextUsed = 0                      // Token im Kontext laut letzter Antwort
     var contextMax = 0                       // größter je gesehener Kontext bzw. preTokens vor dem Zusammenfassen
     var projectVotes: [String: Int] = [:]   // Projektordner → Häufigkeit (Arbeitsordner + bearbeitete Dateien)
+    var project: String?                     // gewähltes Projekt – wechselt nur bei deutlichem Vorsprung (siehe chosenProject)
     var lastText = ""
     // Je message.id – Claude schreibt pro Inhaltsblock eine Zeile mit derselben usage. Nur die letzten Nachrichten
     // merken (nur die können noch Zeilen bekommen), die Summe bleibt in `tokens`.
     private var usage: [String: (model: String, tally: TokenTally)] = [:]
+
+    /// Projekt mit den meisten Stimmen – aber mit Hysterese: Arbeitet eine Sitzung in zwei Projekten, sprang Name
+    /// (und Figur) bei jedem knappen Führungswechsel hin und her. Gewechselt wird erst bei 1,5-fachem Vorsprung.
+    func chosenProject() -> String? {
+        guard let lead = projectVotes.max(by: { ($0.value, $1.key) < ($1.value, $0.key) }) else { return nil }
+        if let cur = project, let curVotes = projectVotes[cur], cur != lead.key,
+           Double(lead.value) < Double(curVotes) * 1.5 + 3 { return cur }
+        project = lead.key
+        return lead.key
+    }
     private var usageOrder: [String] = []
     private(set) var tokens: [String: TokenTally] = [:]             // laufende Summe je Modell
 
@@ -870,7 +881,7 @@ private final class MonitorCore: @unchecked Sendable {
 
             out.append(AgentSession(
                 id: sid, source: source,
-                cwd: st.projectVotes.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
+                cwd: st.chosenProject() ?? st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
                 title: title, model: st.model, permissionMode: st.mode, status: status, activity: activity, tool: tool,
                 lastText: st.lastText, lastActivity: max(st.lastEvent, h?.time ?? .distantPast),
                 tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive,

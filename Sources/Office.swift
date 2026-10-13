@@ -231,6 +231,7 @@ final class OfficeModel {
         // Beendet (oder aus den sichtbaren gefallen): zur Tür hinaus
         for (k, sess) in last where !ids.contains(k) { depart(k, session: sess, now: now) }
         leaving = leaving.filter { now - $0.value.move.start < $0.value.move.duration }
+        if looks.count > 60 { looks = looks.filter { ids.contains($0.key) || leaving[$0.key] != nil } }
 
         let allLounge: [Place] = (0..<Self.sofaCount).map { .sofa($0) } + (0..<Self.standCount).map { .stand($0) }
         // Aktive zuerst, der Rest nach Aktualität
@@ -306,7 +307,7 @@ final class OfficeModel {
             let age = now - (since[s.id]?.t ?? now)
             let changeAge = changed[s.id].map { now - $0 }
             if let c = changeAge, c > 5 { changed[s.id] = nil }
-            let look = Self.look(s)
+            let look = pinnedLook(s)
             if let m = moves[s.id] {
                 if now - m.start < m.duration {
                     let pt = point(on: m, now: now)
@@ -339,7 +340,7 @@ final class OfficeModel {
         }
         for (id, l) in leaving {
             let pt = point(on: l.move, now: now)
-            out.append(Actor(id: id, session: l.session, look: Self.look(l.session), point: pt, scale: Self.depthScale(pt.y),
+            out.append(Actor(id: id, session: l.session, look: pinnedLook(l.session), point: pt, scale: Self.depthScale(pt.y),
                              pose: .walking(now - l.move.start), place: l.place, statusAge: 999, depth: pt.y, leaving: true))
             busy = true
         }
@@ -348,8 +349,16 @@ final class OfficeModel {
         return (out, overflow)
     }
 
-    /// Ohne Projekt: je Sitzung eigenes Aussehen
-    private static func look(_ s: AgentSession) -> Look { Look.of(s.project == "Home" ? s.id : s.project) }
+    /// Aussehen beim ersten Auftauchen festhalten: nach Projekt (Wiedererkennen), ohne Projekt je Sitzung.
+    /// Danach bleibt es – sonst wechselte die Figur Haare und Pulli, sobald die Sitzung (anfangs im Home-Ordner)
+    /// ihrem Projekt zugeordnet wurde oder der Projektname wechselte.
+    private var looks: [String: Look] = [:]
+    private func pinnedLook(_ s: AgentSession) -> Look {
+        if let l = looks[s.id] { return l }
+        let l = Look.of(s.project == "Home" ? s.id : s.project)
+        looks[s.id] = l
+        return l
+    }
 }
 
 // MARK: - Ansicht
