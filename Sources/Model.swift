@@ -201,6 +201,9 @@ struct AgentSession: Identifiable, Equatable {
             return what.isEmpty ? L("Wartet auf deine Freigabe", "Waiting for your approval") : L("Freigabe", "Approve") + " · " + what
         }
     }
+
+    /// Läuft auf diesem Mac: ein Hook hat sie hier gemeldet (hooks.log liegt lokal, nicht im geteilten ~/.claude).
+    var runsHere: Bool { device == nil && hostBundle != nil }
 }
 
 // MARK: - Statistik & Prognose (2.0)

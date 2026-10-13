@@ -55,11 +55,13 @@ final class SessionMonitor: ObservableObject {
     }
 
     /// Eigene und fremde Sitzungen. Liegt ~/.claude in einer geteilten Cloud, kann eine fremde Sitzung auch
-    /// lokal auftauchen – dann gilt die Meldung des Macs, auf dem sie läuft.
+    /// lokal auftauchen – dann gilt die Meldung des Macs, auf dem sie läuft. Hat ein Hook auf diesem Mac die
+    /// Sitzung gemeldet, läuft sie hier; die fremde Meldung ist dann nur ein Spiegel (ohne Hooks, oft „Pause“).
     var all: [AgentSession] {
         guard !remote.isEmpty else { return sessions }
-        let ids = Set(remote.map(\.id))
-        return sessions.filter { !ids.contains($0.id) } + remote
+        let own = Set(sessions.filter(\.runsHere).map(\.id))
+        let ids = Set(remote.map(\.id)).subtracting(own)
+        return sessions.filter { !ids.contains($0.id) } + remote.filter { !own.contains($0.id) }
     }
 
     var visible: [AgentSession] {
@@ -859,11 +861,12 @@ private final class MonitorCore: @unchecked Sendable {
             }
             .filter { $0.working || now.timeIntervalSince($0.lastActivity) < 600 }
             .sorted { $0.lastActivity > $1.lastActivity }
-            // Wartet die Hauptsitzung nur auf ihre Helfer, gilt sie als arbeitend – auch mit Hooks, solange der letzte
-            // Schritt das Delegieren war
+            // Wartet die Hauptsitzung nur auf ihre Helfer, gilt sie als arbeitend – auch mit Hooks. Hintergrund-Helfer
+            // laufen weiter, nachdem die Hauptsitzung schon andere Werkzeuge benutzt und ihren Zug beendet hat
+            // (sonst landet sie nach 5 Min. auf dem Sofa, obwohl ihr Helfer arbeitet).
             let delegating = ["Agent", "Task"].contains(tool) || ["SubagentStart", "SubagentStop"].contains(h?.event ?? "")
             if helpers.contains(where: \.working),
-               ((status == .done || status == .idle) && (st.toolName == "Agent" || st.toolName == "Task")) || (status == .working && delegating) {
+               status == .done || status == .idle || (status == .working && delegating) {
                 status = .working
                 let n = helpers.filter(\.working).count
                 activity = L("Wartet auf \(n) Helfer", n == 1 ? "Waiting for 1 helper" : "Waiting for \(n) helpers")

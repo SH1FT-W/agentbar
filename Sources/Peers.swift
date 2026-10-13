@@ -193,7 +193,7 @@ final class PeerHub: ObservableObject {
 
     /// Eigene Sitzungen haben sich geändert → gebündelt an alle schicken.
     func update(local sessions: [AgentSession]) {
-        local = sessions.filter { $0.device == nil }
+        local = sessions.filter { $0.device == nil && ($0.runsHere || !$0.usesHooks) }   // keine iCloud-Spiegel fremder Sitzungen
         guard enabled, !pending else { return }
         pending = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in

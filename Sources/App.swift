@@ -192,7 +192,7 @@ final class AppStore: ObservableObject {
             if until > Date() { return false }
             mutedUntil[s.id] = nil
         }
-        if s.device == nil, monitor.remote.contains(where: { $0.id == s.id }) { return false }
+        if s.device == nil, !s.runsHere, monitor.remote.contains(where: { $0.id == s.id }) { return false }
         if !UserDefaults.standard.bool(forKey: Prefs.notifyWhenFrontmost), let b = s.hostBundle,
            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == b { return false }
         return true
