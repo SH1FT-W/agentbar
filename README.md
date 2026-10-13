@@ -38,7 +38,7 @@
 - **Usage rings** – your 5-hour and weekly Claude plan usage as Apple-Watch-style activity rings, plus a forecast of how long your 5-hour window will last at the current pace. The OAuth token is only *read*, never refreshed or modified.
 - **Today & last 7 days** – tokens, API-equivalent cost and sessions per day, a 7-day bar chart and your top projects today. Computed locally from Claude Code's session logs.
 - **Context at a glance** – every row shows tokens and a small context bar that turns orange when the context window is almost full.
-- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, walking over to the lounge for a coffee when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day and, if you enter a location, the real weather (clouds, rain, fog, storms, snow that settles, real sunrise and sunset); the office decorates itself for Advent, Christmas and New Year's Eve, and the team dresses up for the season and the weather; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
+- **The office** – a floating window (⌃⌥A) where each session is a Memoji-like character: typing while working, raising a hand when it needs you, grabbing a coffee from the espresso machine when a task is done (and chatting if someone is already waiting), walking over to the lounge when idle, and looking more and more tired as its context window fills up (fresh again after /compact). The sky follows the time of day and, if you enter a location, the real weather (clouds, rain, fog, storms, snow that settles, real sunrise and sunset); the trees outside blossom, turn golden and go bare with the seasons; the office decorates itself for Valentine's Day, Easter, Halloween, Advent, Christmas and New Year's Eve, and the team dresses up for the occasion and the weather; every now and then there's a shooting star, a flock of birds, a rainbow, a snowman or Friday pizza; helpers orbit as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
 - **Jump to the session** – click a figure in the office, or use “Go to Session” (or Return) in the menu, to bring its Terminal tab to the front.
 - **Notifications** when an agent needs you (with the actual question it asks), finishes or fails, when its context is almost full or it seems stuck, plus a usage warning and a heads-up when a new AgentBar version is out. Actions to jump to the session or mute it for an hour, and optional quiet hours.
 - **Keyboard and VoiceOver** – ↑/↓ to select, Return to jump to the session, Space to expand, ⌘R to reload; every row and ring has a proper accessibility label.
@@ -57,6 +57,14 @@
 <p align="center">
   <img src="docs/screenshots/en/office-christmas.jpg" alt="Christmas Eve" width="395">
   <img src="docs/screenshots/en/office-newyear.jpg" alt="New Year's Eve fireworks" width="395">
+</p>
+<p align="center">
+  <img src="docs/screenshots/en/office-coffee.jpg" alt="Coffee and a chat at the espresso machine" width="395">
+  <img src="docs/screenshots/en/office-halloween.jpg" alt="Halloween: pumpkins, bats and costumes" width="395">
+</p>
+<p align="center">
+  <img src="docs/screenshots/en/office-spring.jpg" alt="Spring: trees in blossom" width="395">
+  <img src="docs/screenshots/en/office-easter.jpg" alt="Easter: bunny ears and hidden eggs" width="395">
 </p>
 
 ## Setup
