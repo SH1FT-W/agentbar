@@ -3,15 +3,20 @@
 #   ./build.sh            → build/AgentBar.app
 #   ./build.sh install    → zusätzlich nach /Applications und neu starten
 #   ./build.sh snapshot   → Dropdown + Büro als PNG nach build/ (ohne Menüleiste)
-#   ./build.sh release 1.1 ["Was ist neu"]
+#   ./build.sh release next ["Was ist neu"]
 #                         → Version setzen, bauen, committen, taggen, pushen und als GitHub-Release
 #                           (AgentBar.zip + .sha256) in SH1FT-W/agentbar veröffentlichen – die App holt es per Update-Button
+#                         Versionen = Kalender-Versionen YY.M.N (tools/next-version); jedes Release ist die nächste Nummer im Monat
 set -e
 cd "$(dirname "$0")"
 
 if [[ "$1" == "release" ]]; then
     VERSION="$2"
-    [[ "$VERSION" =~ '^[0-9]+(\.[0-9]+)+$' ]] || { echo "Aufruf: ./build.sh release 1.1 [\"Was ist neu\"]"; exit 1; }
+    # Kalender-Version YY.M.N (laufende Nummer im Monat): ohne Angabe oder „next“ → tools/next-version
+    NEXT=$(tools/next-version) || { echo "tools/next-version ist fehlgeschlagen."; exit 1; }
+    [[ -z "$VERSION" || "$VERSION" == "next" ]] && VERSION="$NEXT"
+    [[ "$VERSION" =~ '^[0-9]+(\.[0-9]+)+$' ]] || { echo "Aufruf: ./build.sh release next [\"Was ist neu\"]"; exit 1; }
+    [[ "$VERSION" == "$NEXT" || -n "$ALLOW_VERSION" ]] || { echo "Nächste Kalender-Version ist $NEXT (YY.M.N), nicht $VERSION. Absichtlich anders: ALLOW_VERSION=1 ./build.sh release …"; exit 1; }
     [[ -z "$(git status --porcelain)" ]] || { echo "Erst alles committen – Arbeitsverzeichnis ist nicht sauber."; exit 1; }
     git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && { echo "Tag v$VERSION gibt es schon."; exit 1; }
     BUILD=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist) + 1 ))
