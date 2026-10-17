@@ -172,7 +172,7 @@ final class Updater: ObservableObject {
     private func launchSwapScript(newApp: URL, work: URL) throws {
         let script = work.appendingPathComponent("swap.sh")
         let body = #"""
-        #!/bin/zsh
+        #!/bin/zsh -f
         # $1 = PID der alten App, $2 = Ziel (.app), $3 = neue App, $4 = Arbeitsordner
         while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
         OLD="$2.alt"
@@ -188,7 +188,8 @@ final class Updater: ObservableObject {
         try body.write(to: script, atomically: true, encoding: .utf8)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        p.arguments = [script.path, String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundleURL.path, newApp.path, work.path]
+        // -f: keine Startdateien des Benutzers (~/.zshenv), das Skript läuft genau so, wie es hier steht
+        p.arguments = ["-f", script.path, String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundleURL.path, newApp.path, work.path]
         p.standardOutput = FileHandle.nullDevice
         p.standardError = FileHandle.nullDevice
         try p.run()
