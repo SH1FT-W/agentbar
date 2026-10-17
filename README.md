@@ -1,162 +1,241 @@
-<p align="center">
-  <img src="docs/icon.png" width="128" height="128" alt="AgentBar icon">
-</p>
+<div align="center">
 
-<h1 align="center">AgentBar</h1>
+<img src="docs/icon.png" width="96" alt="AgentBar icon" />
 
-<p align="center">
-  A macOS menu bar app that shows what your <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> agents are doing,<br>
-  styled like a native macOS 27 system menu, with a little animated office where every session sits at its own desk.
-</p>
+<h1>AgentBar</h1>
 
-<p align="center">
-  🇬🇧 English · <a href="README.de.md">🇩🇪 Deutsch</a>
-</p>
+<p><sub><b>FOR CLAUDE CODE ON THE MAC</b></sub></p>
 
-<p align="center">
-  <a href="https://github.com/SH1FT-W/agentbar/releases/latest"><img src="https://img.shields.io/github/v/release/SH1FT-W/agentbar?label=release&color=2997ff" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white" alt="macOS 14 or later">
-  <img src="https://img.shields.io/badge/Apple%20Silicon-arm64-111" alt="Apple Silicon">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2997ff" alt="MIT license"></a>
-</p>
+<p><b>Your agents. In the menu bar.</b><br/>
+AgentBar shows what every <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> session is doing, quiet until one needs you.<br/>
+And it comes with a tiny office where your agents actually work.</p>
 
-<p align="center">
-  <a href="https://github.com/SH1FT-W/agentbar/releases/latest">Download</a> ·
-  <a href="https://sh1ft-w.github.io/agentbar/">Website</a> ·
-  <a href="#setup">Setup</a> ·
-  <a href="#versions">Versions</a>
-</p>
+<p>🇬🇧 English &nbsp;·&nbsp; <a href="README.de.md">🇩🇪 Deutsch</a></p>
 
-<p align="center">
-  <img src="docs/screenshots/en/office-day.jpg" alt="The office: every Claude session is a character at a desk" width="800">
-</p>
+[![Version](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fraw.githubusercontent.com%2FSH1FT-W%2Fagentbar%2Fmain%2FInfo.plist&query=%2F%2Fkey%5B.%3D%27CFBundleShortVersionString%27%5D%2Ffollowing-sibling%3A%3Astring%5B1%5D&label=version&style=flat-square&color=2997ff&labelColor=1d1d1f)](https://github.com/SH1FT-W/agentbar/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-2997ff?style=flat-square&labelColor=1d1d1f&logo=apple&logoColor=white)](#setup)
+[![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-arm64-2997ff?style=flat-square&labelColor=1d1d1f)](#setup)
+[![License](https://img.shields.io/badge/license-MIT-2997ff?style=flat-square&labelColor=1d1d1f)](LICENSE)
 
-<p align="center">
-  <img src="docs/screenshots/en/menu-live-light.png" alt="Menu bar dropdown (light)" width="330">
-  &nbsp;
-  <img src="docs/screenshots/en/menu-live-dark.png" alt="Menu bar dropdown (dark)" width="330">
-</p>
+<p><a href="https://sh1ft-w.github.io/agentbar"><b>Website</b></a> &nbsp;·&nbsp; <a href="https://github.com/SH1FT-W/agentbar/releases/latest"><b>Download</b></a> &nbsp;·&nbsp; <a href="#new">New</a> &nbsp;·&nbsp; <a href="#menu">Menu</a> &nbsp;·&nbsp; <a href="#office">Office</a> &nbsp;·&nbsp; <a href="#macs">Other Macs</a> &nbsp;·&nbsp; <a href="#setup">Setup</a> &nbsp;·&nbsp; <a href="#privacy">Privacy</a> &nbsp;·&nbsp; <a href="https://github.com/SH1FT-W/agentbar/releases">Releases</a></p>
 
-> **Language:** AgentBar follows your macOS language, German or English.
+<br/>
 
-## Features
+<img src="docs/screenshots/en/office-day.jpg" width="800" alt="The AgentBar office by day: every Claude session is a character at its own desk behind a glass front, one raising a hand, usage rings on the wall display." />
 
-- **Live session status:** working, needs you, done, error or idle, for every Claude Code session (terminal, Claude desktop app, Cowork, Xcode). Subagents appear as helpers of their parent session.
-- **Precise detection (optional):** with Claude Code hooks AgentBar knows *exactly* when an agent is waiting for your approval instead of guessing from pauses.
-- **Usage rings:** your 5-hour and weekly Claude plan usage as Apple-Watch-style activity rings, plus a forecast of how long your 5-hour window will last at the current pace. The OAuth token is only *read*, never refreshed or modified.
-- **Today and last 7 days:** tokens, API-equivalent cost and sessions per day, a 7-day bar chart and your top projects today. Computed locally from Claude Code's session logs.
-- **Context at a glance:** every row shows tokens and a small context bar that turns orange when the context window is almost full.
-- **The office:** a floating window (⌃⌥A) where each session is a Memoji-like character. It types while working, raises a hand when it needs you, walks over to the lounge when idle, and looks more and more tired as its context window fills up (fresh again after /compact).
-- **Coffee bar:** agents that just finished a task sometimes fetch a coffee from the espresso machine behind the sofa, queue up, have a little chat and bring the mug back to their desk.
-- **Weather and time of day:** the sky follows your local time and, if you enter a location, the real weather: clouds, rain running down the glass, fog, thunderstorms, snow that settles on the hills, real sunrise and sunset, lamps that come on in gloomy weather. Weather comes from Open-Meteo.
-- **Seasons:** the trees outside blossom in spring, turn golden in autumn and go bare in winter (flipped for the southern hemisphere when a weather location is set).
-- **Holidays:** the office decorates itself for Valentine's Day, Easter (egg tree, hidden eggs, bunny ears), Halloween (pumpkins, paper bats, costumes, a ghost robot vacuum), Advent, St. Nicholas, Christmas and New Year's Eve, and the team dresses up for the occasion and the weather: Santa hats, antlers, party hats, scarves when it's freezing, sunglasses when it's hot.
-- **Rare moments:** every now and then there's a shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, or pizza on Friday lunchtime.
-- **Helpers and the robot vacuum:** subagents orbit their character as glowing spheres; a robot vacuum speeds up with your CPU load and heads back to its charging dock when the lights go on in the evening.
-- **Jump to the session:** click a figure in the office, or use "Go to Session" (or Return) in the menu, to bring its Terminal tab to the front.
-- **Notifications** when an agent needs you (with the actual question it asks), finishes or fails, when its context is almost full or it seems stuck, plus a usage warning and a heads-up when a new AgentBar version is out. Actions to jump to the session or mute it for an hour, and optional quiet hours.
-- **Keyboard and VoiceOver:** ↑/↓ to select, Return to jump to the session, Space to expand, ⌘R to reload; every row and ring has a proper accessibility label.
-- **Your other Macs (optional):** pair your Macs with a code and sessions running on the others show up in the menu and in the office, marked with a small device symbol. Discovery via Bonjour on your local network, every message encrypted with the pairing code.
-- **Keep awake:** off, always, or only while agents are working.
-- **Updates** via GitHub Releases: a small window at launch offers Install Now, Later or Skip (it never steals keyboard focus). Every update is verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
+</div>
 
-<p align="center">
-  <img src="docs/screenshots/en/office-night.jpg" alt="The office at night" width="800">
-</p>
+<br/>
 
-<p align="center">
-  <img src="docs/screenshots/en/office-coffee.jpg" alt="Coffee and a chat at the espresso machine" width="395">
-  <img src="docs/screenshots/en/office-halloween.jpg" alt="Halloween: pumpkins, bats and costumes" width="395">
-</p>
-<p align="center">
-  <img src="docs/screenshots/en/office-spring.jpg" alt="Spring: trees in blossom" width="395">
-  <img src="docs/screenshots/en/office-easter.jpg" alt="Easter: bunny ears and hidden eggs" width="395">
-</p>
-<p align="center">
-  <img src="docs/screenshots/en/office-rain.jpg" alt="Real weather: rain on the glass" width="395">
-  <img src="docs/screenshots/en/office-snow.jpg" alt="Snow settles outside, scarves inside" width="395">
-</p>
-<p align="center">
-  <img src="docs/screenshots/en/office-christmas.jpg" alt="Christmas Eve" width="395">
-  <img src="docs/screenshots/en/office-newyear.jpg" alt="New Year's Eve fireworks" width="395">
-</p>
+<a id="new"></a>
+<sub><b>JUST ARRIVED</b></sub>
+## A livelier office.
 
-## Setup
+The latest releases gave the team a coffee bar, four seasons outside the window, a few holidays to dress up for and some moments you only catch now and then.
 
-### Requirements
+| | |
+|:--|:--|
+| **Coffee bar** <sub>2.3</sub> | Agents that just finished a task sometimes walk over to the espresso machine behind the sofa, queue up, have a little chat and bring the mug back to their desk. |
+| **Seasons** <sub>2.3</sub> | The trees blossom in spring, turn golden in autumn and go bare in winter. Flipped for the southern hemisphere once a weather location is set. |
+| **Halloween** <sub>2.3</sub> | Pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum. |
+| **Easter and Valentine's Day** <sub>2.3</sub> | An egg tree, hidden eggs and bunny ears at Easter. Hearts in February. Advent, Christmas and New Year's Eve were already there. |
+| **Rare moments** <sub>2.3</sub> | Some things only happen once in a while: a shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Keep an eye on the window. |
+| **Calendar versions** <sub>26.10.11</sub> | Versions now count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1, so nothing changes for you. |
 
-- macOS 14 or later on Apple Silicon (built and tested on macOS 27)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code): AgentBar reads its local session logs
+Every change, release by release, in the [releases](https://github.com/SH1FT-W/agentbar/releases).
+
+<br/>
+
+<a id="menu"></a>
+<sub><b>THE MENU</b></sub>
+## Looks like it came with the Mac.
+
+Built like the system menus in macOS 27. Every session with its status, project and what it is doing right now, your plan usage as activity rings, and a small context bar that turns orange before a session runs out of room.
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/menu-live-dark.png" />
+  <img src="docs/screenshots/en/menu-live-light.png" width="330" alt="The AgentBar dropdown: a list of Claude sessions with status and project, usage rings, today's tokens and cost, a 7-day chart and top projects." />
+</picture>
+</div>
+
+AgentBar sees sessions from the Terminal, the Claude desktop app, Cowork and Xcode. Subagents appear as helpers of their parent session.
+
+- **Knows when you're needed.** Working, waiting for approval, done, error or idle. With Claude Code hooks AgentBar knows the moment it happens instead of guessing from pauses.
+- **Usage as activity rings.** Your 5-hour and weekly plan usage, Apple Watch style, with a forecast of how long the window lasts at your pace. The token is only read, never refreshed.
+- **Today and 7 days.** Tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today. Computed locally from Claude Code's logs.
+- **Context at a glance.** Every row shows tokens and a small context bar. It turns orange when the window is almost full, and the character in the office looks tired too.
+- **Jump right in.** Click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front.
+- **Notifications.** When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck. With quiet hours, a one-hour mute and a note when a new AgentBar is out.
+- **Keyboard and VoiceOver.** Arrow keys to select, Return to jump, Space to expand, ⌘R to reload. Every row and ring has a proper accessibility label.
+- **Keep awake.** Stop your Mac from sleeping: always, or only while agents are working. Plus launch at login and the update window with Install Now, Later or Skip.
+
+<details>
+<summary><b>How status detection works</b></summary>
+<br/>
+
+Without hooks, AgentBar parses the Claude Code JSONL logs and infers the state (for example, a tool call that is not followed by a result for a while in a non-auto permission mode probably waits for approval). With hooks, Claude Code reports `PreToolUse`, `PermissionRequest`, `Notification`, `Stop` and so on directly, and AgentBar also checks whether the Claude process is still alive.
+
+</details>
+
+<br/>
+
+<a id="office"></a>
+<sub><b>THE OFFICE</b></sub>
+## Press ⌃⌥A. Every session gets a desk.
+
+A floating window where each session is a Memoji-like character. They type while working, raise a hand when they need you, head to the lounge when idle and look more tired as their context fills up. Fresh again after `/compact`.
+
+| Late night, warm lights | The lounge |
+|:---:|:---:|
+| <img src="docs/screenshots/en/office-night.jpg" width="420" alt="The office at night: warm desk lamps, a dark sky with stars behind the glass, the robot vacuum docked at its charging station." /> | <img src="docs/screenshots/en/office-lounge-full.jpg" width="420" alt="Idle sessions sitting together on the sofa in the lounge while others keep working at their desks." /> |
+| The robot vacuum heads to its dock when the lamps come on. | The lounge fills up with everyone who has nothing to do right now. |
+
+- **Sky, weather, daylight.** The sky follows your local time. Enter a location and you get clouds, rain running down the glass, fog, thunderstorms and snow that settles on the hills, the real sunrise and sunset, and lamps that come on when it's gloomy. Weather from Open-Meteo, only the location rounded to about 1 km is sent.
+- **Holidays and outfits.** The office decorates itself for Valentine's Day, Easter, Halloween, Advent, St. Nicholas, Christmas and New Year's Eve, and the team dresses for the occasion and the weather: Santa hats, antlers, party hats, scarves when it's freezing, sunglasses when it's hot.
+- **Helpers orbit.** Subagents show up as glowing spheres around their character. The robot vacuum speeds up with your CPU load and docks in the evening.
+- **One look per session.** Every character picks its own look each day and keeps it for the whole session. Click one and its Terminal tab comes to the front.
+
+| Real weather from your location | Snow that settles, scarves when it's freezing |
+|:---:|:---:|
+| <img src="docs/screenshots/en/office-rain.jpg" width="420" alt="Rain running down the glass front of the office." /> | <img src="docs/screenshots/en/office-snow.jpg" width="420" alt="Snow settling on the hills outside, characters wearing scarves inside." /> |
+| **It decorates itself through Advent** | **Party hats and fireworks on New Year's Eve** |
+| <img src="docs/screenshots/en/office-christmas.jpg" width="420" alt="Christmas Eve in the office: tree, string lights, presents and Santa hats." /> | <img src="docs/screenshots/en/office-newyear.jpg" width="420" alt="New Year's Eve: fireworks behind the glass and party hats on the characters." /> |
+
+<details>
+<summary><b>More screenshots</b></summary>
+<br/>
+
+| Coffee bar | Halloween |
+|:---:|:---:|
+| <img src="docs/screenshots/en/office-coffee.jpg" width="420" alt="Two characters queue at the espresso machine behind the sofa while the others keep typing." /> | <img src="docs/screenshots/en/office-halloween.jpg" width="420" alt="Halloween in the office: pumpkins, paper bats and characters in costume." /> |
+| **Spring** | **Easter** |
+| <img src="docs/screenshots/en/office-spring.jpg" width="420" alt="Spring outside the office window: trees in pink blossom." /> | <img src="docs/screenshots/en/office-easter.jpg" width="420" alt="Easter in the office: bunny ears on the characters and painted eggs hidden around the room." /> |
+
+</details>
+
+<br/>
+
+<a id="macs"></a>
+<sub><b>OTHER MACS</b></sub>
+## One office for all your Macs.
+
+Pair your Macs with a code and the sessions running on the others show up in the menu and in the office, marked with a small device symbol. Discovery via Bonjour on your local network, every message encrypted with the pairing code.
+
+1. **Turn on Other Macs** in Settings and enter the same pairing code on every Mac.
+2. **Wait a moment.** A Mac only answers after the other side has proved it knows the code.
+3. **That's it.** Only status, project, title and activity of sessions are shared, never files or logs.
+
+<details>
+<summary><b>The settings</b></summary>
+<br/>
+
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/settings-dark.png" />
+  <img src="docs/screenshots/en/settings-light.png" width="330" alt="AgentBar settings, Other Macs section: show other Macs, notifications from other Macs, pairing code, code entry and connection status, followed by the office options." />
+</picture>
+</div>
+
+</details>
+
+<br/>
+
+<a id="setup"></a>
+<sub><b>SETUP</b></sub>
+## Set up in a minute.
+
+No account, no installer. Just the app. Everything beyond the two requirements is optional and off until you turn it on.
+
+| | |
+|:--|:--|
+| **macOS 14 or later** on Apple Silicon (built and tested on macOS 27) | Required |
+| **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)**, AgentBar reads its local session logs | Required |
+| **Claude Code hooks** for precise detection | Optional |
+| **A weather location** for the real weather in the office | Optional |
+| **Other Macs** paired with a code | Optional |
 
 ### Install
 
 1. Download `AgentBar.zip` from the [latest release](https://github.com/SH1FT-W/agentbar/releases/latest) and unzip it.
 2. Move `AgentBar.app` to `/Applications`.
-3. **Gatekeeper:** AgentBar is open source but not notarized by Apple (that requires a paid developer account), so macOS blocks the first launch with *"AgentBar" can't be opened / Apple could not verify…*. Allow it once, either way:
-   - Open **System Settings → Privacy & Security**, scroll down to *"AgentBar" was blocked…* and click **Open Anyway**, then confirm; **or**
+3. **Allow the first launch.** AgentBar is open source but not notarized by Apple (that requires a paid developer account), so macOS blocks the first launch with *"AgentBar" can't be opened*. Allow it once, either way:
+   - Open **System Settings → Privacy & Security**, scroll down to *"AgentBar" was blocked* and click **Open Anyway**, then confirm; **or**
    - in Terminal:
      ```sh
      xattr -dr com.apple.quarantine /Applications/AgentBar.app
      ```
-   You only need to do this once. Later updates via the built-in update window install without this prompt; they are verified with an Ed25519 signature instead.
+   Only the first launch needs this step. Later updates arrive through the built-in update window and are verified with an Ed25519 signature (key compiled into the app), bundle ID, version and code signature.
 4. Launch it. A small Clawd icon appears in the menu bar (eyes closed: idle, eyes open: working, waving: a session needs you). There is no Dock icon.
 
 ### First run
 
 - **Notifications:** macOS asks once whether AgentBar may send notifications.
-- **Precise detection:** click **Set up** on the *Precise detection* card in the dropdown (or *Settings → Precise detection*). AgentBar adds small hook commands to `~/.claude/settings.json` (a backup is written to `settings.json.agentbar-backup`). Each hook appends one line to `~/Library/Application Support/AgentBar/hooks.log`: no network, no AgentBar process involved. Applies to Claude sessions started afterwards. You can remove the hooks again at any time from the settings.
+- **Precise detection:** click **Set up** on the *Precise detection* card in the dropdown (or *Settings → Precise detection*). AgentBar adds small hook commands to `~/.claude/settings.json` (a backup is written to `settings.json.agentbar-backup`). Each hook appends one status line to `~/Library/Application Support/AgentBar/hooks.log`: no network, no prompts or file contents, no AgentBar process involved. Applies to Claude sessions started afterwards. You can remove the hooks again at any time from the settings.
 - **Usage rings:** AgentBar reads Claude Code's login from the keychain (`Claude Code-credentials`) via the `security` tool. If macOS asks, allow it. The token is sent only to `api.anthropic.com`.
 - **Weather:** enter a location under *Settings → Office* if you want the real weather behind the glass. Without a location the office only follows the time of day.
 - **Jump to Terminal:** the first time you jump to a session, macOS asks whether AgentBar may control Terminal. This is used only to select the right tab.
 - **Launch at login:** toggle *Launch at login* in *Settings → General*.
+- **Language:** AgentBar follows your macOS language, German or English.
 
 ### Shortcuts
 
 | Shortcut | Action |
-|---|---|
-| ⌃⌥A | Show / hide the office (global) |
+|:--|:--|
+| ⌃⌥A | Show or hide the office (system-wide) |
 | ⌘, | Settings (while the dropdown is open) |
+| ⌘R | Reload the session list |
 
-## Versions
-
-AgentBar uses calendar versions in the form **YY.M.N**: two-digit year, month without a leading zero, and the running number of the release within that month. **26.10.11** is the eleventh release of October 2026; the next month starts again at `.1` (for example `26.11.1`). Tags and release titles carry a `v` prefix (`v26.10.11`). The jump from the old `2.3.1` scheme to `26.10.11` is intended: the update check treats it as newer, so *Check for Updates* finds it as usual.
-
-## Build from source
+### Build from source
 
 No Xcode needed, the Command Line Tools are enough (`xcode-select --install`).
 
 ```sh
 git clone https://github.com/SH1FT-W/agentbar.git
 cd agentbar
-./build.sh            # → build/AgentBar.app
-./build.sh install    # → copies to /Applications and launches
-./build.sh snapshot   # → renders the office + dropdown as PNGs into build/
+./build.sh            # build/AgentBar.app
+./build.sh install    # copies to /Applications and launches
+./build.sh snapshot   # renders the office + dropdown as PNGs into build/
 ```
 
 `build.sh` prefers a macOS 26 SDK from the Command Line Tools (the SDK 27 in the Command Line Tools lacks the SwiftUI macro plugin); override with `SDK=/path/to/sdk ./build.sh`.
 
 Diagnostics: `build/AgentBar.app/Contents/MacOS/AgentBar --dump` lists the detected sessions and exits. Test a language with `AGENTBAR_LANG=en` or `=de`.
 
-## Privacy
+### Versions
 
-Everything stays on your Mac. AgentBar only reads local files (`~/.claude/projects`, Claude desktop metadata, its own hook log) and talks to these servers:
+AgentBar uses calendar versions **`YY.M.N`**: two-digit year, month without a leading zero, and the number of the release within that month. `26.10.11` is the eleventh release of October 2026; the next month starts again at `.1` (for example `26.11.1`). Every release, feature or fix, gets the next number. Tags and release titles carry a `v` prefix (`v26.10.11`). The jump from the old `2.3.1` scheme to `26.10.11` is intended: the update check treats it as newer, so *Check for Updates* finds it as usual.
 
-- `api.anthropic.com`: your plan usage (only if *Fetch usage* is on)
-- `api.github.com`: checking for updates
-- `api.open-meteo.com` and `geocoding-api.open-meteo.com`: weather behind the office window (only once you enter a location; only the location, rounded to about 1 km, is sent)
+<br/>
 
-If you turn on *Other Macs*, AgentBar also talks to your paired Macs on the local network (Bonjour, encrypted with the pairing code). Only the status, project, title and activity of sessions are shared, never files or logs.
+<a id="privacy"></a>
+<sub><b>PRIVACY</b></sub>
+## It stays on your Mac.
 
-No analytics, no telemetry.
+- **Local files only.** AgentBar reads Claude Code's session logs (`~/.claude/projects`), the Claude desktop metadata and its own hook log. No analytics, no telemetry.
+- **The token is only read.** For the usage rings AgentBar reads Claude Code's login from the keychain and sends it only to Anthropic. It is never refreshed, modified or stored elsewhere.
+- **Open source.** The whole app is on [GitHub](https://github.com/SH1FT-W/agentbar) under the MIT license, and you can build it yourself with the Command Line Tools.
 
-## How status detection works
+The only servers it talks to:
 
-Without hooks, AgentBar parses the Claude Code JSONL logs and infers the state (e.g. a tool call that isn't followed by a result for a while in a non-auto permission mode probably waits for approval). With hooks, Claude Code reports `PreToolUse`, `PermissionRequest`, `Notification`, `Stop` etc. directly, and AgentBar also checks whether the Claude process is still alive.
+| | |
+|:--|:--|
+| `api.anthropic.com` | your plan usage, only while *Fetch usage* is on |
+| `api.github.com` | checking for updates |
+| `api.open-meteo.com`, `geocoding-api.open-meteo.com` | weather behind the office window, only once you enter a location; the location is rounded to about 1 km |
+| Your other Macs | only if you pair them, on the local network, encrypted with the pairing code; only status, project, title and activity of sessions are shared, never files or logs |
 
-## Credits
+<br/>
 
-Inspired by [so-agentbar](https://github.com/sotthang/so-agentbar) by sotthang. AgentBar is an independent rewrite with a different design and feature set.
+<sub><b>CREDITS</b></sub>
+## Inspired by so-agentbar
 
-## License
+AgentBar was inspired by [so-agentbar](https://github.com/sotthang/so-agentbar) by sotthang. It is an independent rewrite with a different design and feature set.
 
-[MIT](LICENSE). AgentBar is an independent project, not affiliated with Anthropic or Apple. Claude is a trademark of Anthropic.
+AgentBar is an independent open-source project, not affiliated with Anthropic or Apple. Claude is a trademark of Anthropic. Licensed under [MIT](LICENSE).
+
+<br/>
+
+<div align="center">
+  <sub>A <a href="https://sh1ft-w.github.io"><b>SH1FT-W</b></a> project &nbsp;·&nbsp; <a href="https://sh1ft-w.github.io/casora">Casora</a> &nbsp;·&nbsp; <a href="https://sh1ft-w.github.io/flode">FLODE</a> &nbsp;·&nbsp; <a href="https://sh1ft-w.github.io/pulse">Pulse</a> &nbsp;·&nbsp; <a href="https://sh1ft-w.github.io/evenlight">Evenlight</a> &nbsp;·&nbsp; <a href="https://sh1ft-w.github.io/sharemount">ShareMount</a> &nbsp;·&nbsp; Built with <a href="https://claude.ai">Claude</a></sub>
+</div>
