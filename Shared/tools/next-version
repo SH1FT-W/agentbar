@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Next calendar version, scheme YY.M.N
+#   YY = two-digit year, M = month without leading zero,
+#   N  = running number of the release within the month (from 1).
+# Only real, published GitHub releases count (gh release list) that came out
+# in the current month (local time, publishedAt), including ones in the old
+# X.Y.Z scheme. No drafts; prereleases only with --pre. Plain git tags
+# without a release don't count. If releases YY.M.k already exist, the
+# highest k counts as well. Without a release in the month, N = 1.
+# For the count to be right, publish every release as a GitHub release.
+# If gh is not reachable: warning and fallback to the month's git tags.
+# Guard against duplicate numbers: if the version file (--file) already holds
+# YY.M.k of the current month, N is at least k (an already published k
+# counts through the releases anyway).
+#
+# Default in this repo: prefix "v"
+# Usage:  next-version [--prefix P] [--file F] [--pre] [--tag] [--month YYYY-MM] [--no-fetch]
+#   --prefix P   tag prefix (e.g. "v"); only releases whose tag starts with this
+#                prefix followed by a digit count
+#   --pre        count prereleases too
+#   --file F     version file (JSON/YAML with "version"); only its current value
+#                counts as guard against duplicate numbers; "" = none
+#   --tag        print with prefix (ready-made tag name)
+#   --month      compute another month (testing)
+#   --no-fetch   when falling back to tags, don't fetch them from origin first
+set -euo pipefail
+prefix="v"; vfile=""; with_tag=0; pre=0; month=$(date +%Y-%m); fetch=1
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --prefix) prefix="$2"; shift 2 ;;
+    --file) vfile="$2"; shift 2 ;;
+    --pre) pre=1; shift ;;
+    --tag) with_tag=1; shift ;;
+    --month) month="$2"; shift 2 ;;
+    --no-fetch) fetch=0; shift ;;
+    -h|--help) sed -n '2,/^set -euo/p' "$0" | sed '$d'; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+cd "$(git rev-parse --show-toplevel)"
+yy=${month:2:2}; m=$((10#${month:5:2}))
+maxn=0
+bump() { local k=${1##*.}; if [[ $k =~ ^[0-9]+$ ]] && (( 10#$k > maxn )); then maxn=$((10#$k)); fi; }
+slug=$(git remote get-url origin 2>/dev/null | sed -E 's#^(https://github\.com/|git@github\.com:)##; s#\.git$##')
+# Tag + month (local time) of every published release, without drafts
+if rel=$(gh release list -R "$slug" -L 1000 --json tagName,publishedAt,isDraft,isPrerelease \
+      -q ".[] | select(.isDraft | not) | select($pre == 1 or (.isPrerelease | not)) | select(.publishedAt != null)
+            | \"\(.tagName) \(.publishedAt | fromdateiso8601 | strflocaltime(\"%Y-%m\"))\"" 2>/dev/null); then
+  count=0
+  while read -r t mon; do
+    [ -n "${t:-}" ] || continue
+    case "$t" in "${prefix}"[0-9]*) ;; *) continue ;; esac
+    [ "$mon" = "$month" ] || continue
+    count=$((count + 1))
+    case "$t" in "${prefix}${yy}.${m}."*) bump "$t" ;; esac
+  done <<< "$rel"
+else
+  echo "Warning: GitHub releases not reachable (gh), counting the month's git tags instead." >&2
+  if [ "$fetch" = 1 ]; then git fetch --tags -q origin 2>/dev/null || true; fi
+  count=$(git for-each-ref --format='%(creatordate:format-local:%Y-%m)' "refs/tags/${prefix}[0-9]*" | grep -c "^${month}\$" || true)
+  while IFS= read -r t; do [ -n "$t" ] && bump "$t"; done < <(git tag -l "${prefix}${yy}.${m}.*")
+fi
+if [ -n "$vfile" ] && [ -f "$vfile" ]; then
+  cur=$(sed -n 's/^[[:space:]"]*version"\{0,1\}[[:space:]]*:[[:space:]]*["'\'']\{0,1\}\([0-9][0-9.]*\).*/\1/p' "$vfile" | head -1)
+  if [[ $cur == "${yy}.${m}."* ]]; then k=${cur##*.}; [[ $k =~ ^[0-9]+$ ]] && (( 10#$k - 1 > maxn )) && maxn=$((10#$k - 1)); fi
+fi
+n=$(( count > maxn ? count : maxn ))
+v="${yy}.${m}.$((n + 1))"
+if [ "$with_tag" = 1 ]; then echo "${prefix}${v}"; else echo "$v"; fi
