@@ -2,13 +2,10 @@ import SwiftUI
 
 // MARK: - Dropdown (Aufbau wie die System-Menüs in macOS 26/27: WLAN, Bluetooth, Kontrollzentrum)
 
-/// Maße der System-Menüs: Text sitzt 14 pt vom Rand, Zeilen-Hervorhebungen 5 pt.
-enum MenuMetrics {
+/// Maße der System-Menüs über die gemeinsamen hinaus (Shared/Sources/MenuComponents.swift: inset 14, rowPadding 9, itemHeight 24).
+extension MenuMetrics {
     static let width: CGFloat = 340
-    static let inset: CGFloat = 14
-    static let rowInset: CGFloat = 5
-    static let rowPadding: CGFloat = 9          // rowInset + rowPadding = inset
-    static let itemHeight: CGFloat = 24
+    static let rowInset: CGFloat = 5            // rowInset + rowPadding = inset
     static let circle: CGFloat = 26
 }
 
@@ -666,28 +663,6 @@ struct DeviceHeader: View {
     }
 }
 
-struct SectionHeader: View {
-    let title: String
-    var detail: String? = nil
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
-                .accessibilityAddTraits(.isHeader)
-            Spacer()
-            if let detail { Text(detail).font(.system(size: 11)).foregroundStyle(.tertiary).monospacedDigit() }
-        }
-        .padding(.horizontal, MenuMetrics.inset).padding(.top, 1).padding(.bottom, 4)
-    }
-}
-
-struct MenuSeparator: View {
-    var body: some View {
-        Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 1)
-            .padding(.horizontal, MenuMetrics.inset).padding(.vertical, 5)
-            .accessibilityHidden(true)
-    }
-}
-
 struct Notice: View {
     let text: String
     let close: () -> Void
@@ -827,63 +802,4 @@ struct Chevron: View {
             .rotationEffect(.degrees(open ? 90 : 0))
             .accessibilityHidden(true)
     }
-}
-
-/// Karten- und Zeilenform im Menü: ab macOS 26 konzentrisch zu den Fensterecken (folgt dem System,
-/// auch den in macOS 27 vereinheitlichten Ecken), `minimum` hält den bisherigen Radius als Untergrenze.
-func cardShape(_ minimum: CGFloat) -> AnyShape {
-    if #available(macOS 26.0, *) {
-        return AnyShape(ConcentricRectangle(corners: .concentric(minimum: .fixed(minimum)), isUniform: true))
-    }
-    return AnyShape(RoundedRectangle(cornerRadius: minimum, style: .continuous))
-}
-
-extension View {
-    /// macOS 26/27: Liquid-Glass-Buttons, auf älteren Systemen normale umrandete Buttons.
-    @ViewBuilder func glassButton() -> some View {
-        if #available(macOS 26.0, *) { self.buttonStyle(.glass) } else { self.buttonStyle(.bordered) }
-    }
-    /// Hervorgehobener Glas-Button (Akzentfarbe) für die eine empfohlene Aktion.
-    @ViewBuilder func glassProminentButton() -> some View {
-        if #available(macOS 26.0, *) { self.buttonStyle(.glassProminent) } else { self.buttonStyle(.borderedProminent) }
-    }
-    @ViewBuilder func glassCircleButton() -> some View {
-        if #available(macOS 26.0, *) {
-            self.buttonStyle(.glass).buttonBorderShape(.circle).controlSize(.small)
-        } else {
-            self.buttonStyle(.borderless)
-        }
-    }
-}
-
-/// Menüpunkt mit Akzent-Hervorhebung beim Überfahren (wie NSMenu).
-struct MenuItem: View {
-    let title: String
-    let icon: String
-    var detail: String? = nil
-    var shortcut: String? = nil
-    let action: () -> Void
-    @State private var hover = false
-    @Environment(\.isEnabled) private var enabled
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: icon).font(.system(size: 12)).frame(width: 17)
-                Text(title).font(.system(size: 13))
-                Spacer(minLength: 6)
-                if let detail { Text(detail).font(.system(size: 12)).opacity(hl ? 0.8 : 0.55) }
-                if let shortcut { Text(shortcut).font(.system(size: 12)).opacity(hl ? 0.8 : 0.45) }
-            }
-            .foregroundStyle(hl ? Color.white : enabled ? Color.primary : Color.secondary)
-            .padding(.horizontal, MenuMetrics.rowPadding).frame(height: MenuMetrics.itemHeight)
-            .background(cardShape(7).fill(hl ? Color.accentColor : .clear))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hover = $0 }
-        .accessibilityLabel(title)
-    }
-
-    private var hl: Bool { hover && enabled }
 }

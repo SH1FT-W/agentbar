@@ -1,7 +1,7 @@
 // Rendert Dropdown, Einstellungen und Menüleisten-Symbole als PNG nach build/ – mit echtem Liquid Glass.
 // Bauen (ohne tools/snapshot.swift, das hat ein eigenes @main):
 //   swiftc -swift-version 5 -parse-as-library -D SNAPSHOT -sdk …/MacOSX26.5.sdk -target arm64-apple-macos14 \
-//       Sources/*.swift tools/snapshot_menu.swift -o build/snapshot_menu
+//       Sources/*.swift Shared/Sources/*.swift tools/snapshot_menu.swift -o build/snapshot_menu
 // Aufruf: build/snapshot_menu [--flat]   (--flat: zusätzlich Offscreen-Bilder ohne Glas)
 import SwiftUI
 

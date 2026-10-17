@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Beim Start: eigenes kleines Fenster, wenn eine neue Version bereit liegt – mit „Jetzt installieren“, „Später“
 /// und „Diese Version überspringen“. Später = beim nächsten Start wieder fragen; Überspringen = erst bei der nächsten Version.
+/// Fensterstil und Bausteine der Ansicht kommen aus Shared/Sources/UpdatePromptKit.swift.
 @MainActor
 final class UpdatePromptController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
@@ -14,16 +15,10 @@ final class UpdatePromptController: NSObject, NSWindowDelegate {
         let host = NSHostingView(rootView: view)
         let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 300),
                          styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: false)
-        w.title = L("Update", "Update")
-        w.titlebarAppearsTransparent = true
-        w.titleVisibility = .hidden
-        w.isMovableByWindowBackground = true
         w.contentView = host
-        w.isReleasedWhenClosed = false
         w.delegate = self
-        w.level = .floating
         w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        w.center()
+        UpdateWindow.style(w, title: L("Update", "Update"))
         window = w
         w.orderFrontRegardless()
     }
@@ -38,39 +33,20 @@ struct UpdatePromptView: View {
     let dismiss: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 64, height: 64)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 10) {
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        UpdatePromptFrame(width: 460, insets: EdgeInsets(top: 22, leading: 22, bottom: 20, trailing: 22)) {
+            content
         }
-        .padding(.horizontal, 22).padding(.top, 22).padding(.bottom, 20)
-        .frame(width: 460)
         .fixedSize(horizontal: false, vertical: true)
     }
 
     @ViewBuilder private var content: some View {
         switch updater.state {
         case .available(let v, let notes):
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L("AgentBar \(v) ist da", "AgentBar \(v) is available")).font(.system(size: 15, weight: .semibold))
-                Text(L("Du hast Version \(AppInfo.version). Das Update dauert nur ein paar Sekunden, danach startet AgentBar neu.",
-                       "You have version \(AppInfo.version). Updating takes a few seconds, then AgentBar relaunches."))
-                    .font(.system(size: 12)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            UpdatePromptHeading(title: L("AgentBar \(v) ist da", "AgentBar \(v) is available"),
+                                subtitle: L("Du hast Version \(AppInfo.version). Das Update dauert nur ein paar Sekunden, danach startet AgentBar neu.",
+                                            "You have version \(AppInfo.version). Updating takes a few seconds, then AgentBar relaunches."))
             if !notes.isEmpty {
-                ScrollView {
-                    Text(Self.markdown(notes)).font(.system(size: 12))
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                }
-                .frame(maxHeight: 160).fixedSize(horizontal: false, vertical: true)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.primary.opacity(0.05)))
+                UpdateNotesBox(text: Text(ReleaseNotes.markdown(notes)), maxHeight: 160)
             }
             HStack(spacing: 8) {
                 Button(L("Überspringen", "Skip")) {
@@ -109,13 +85,5 @@ struct UpdatePromptView: View {
             Text(L("AgentBar ist aktuell", "AgentBar is up to date")).font(.system(size: 15, weight: .semibold))
             HStack { Spacer(); Button(L("OK", "OK"), action: dismiss).keyboardShortcut(.defaultAction) }.controlSize(.large)
         }
-    }
-
-    /// Release-Notizen sind Markdown (Listen, **fett**) – Zeilenumbrüche erhalten.
-    static func markdown(_ s: String) -> AttributedString {
-        // Listenstriche als Punkte – inline-Markdown kennt keine Listen
-        let s = s.split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.hasPrefix("- ") || $0.hasPrefix("* ") ? "•  " + $0.dropFirst(2) : String($0) }.joined(separator: "\n")
-        return (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
     }
 }
