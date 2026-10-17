@@ -141,6 +141,10 @@ final class PeerHub: ObservableObject {
     private var groupTag: String?                       // aus dem Code abgeleitet, für restart()
     private var restartDelay: TimeInterval = 2          // Backoff nach Ausfall von Listener/Browser (bis 60 s)
     private var restartPending = false
+    private var configureGeneration = 0                 // verwirft Schlüssel, deren configure() inzwischen überholt ist
+    private var masterCache: (code: String, key: SymmetricKey)?
+    /// Unveränderte Liste nur alle 15 s erneut schicken (Lebenszeichen für den 35-s-Cutoff der Gegenseite).
+    static let keepalive: TimeInterval = 15
     static let maxLinks = 8
     static let maxUntrusted = 3                          // noch nicht bestätigte Verbindungen (gegen Blockieren ohne Code)
     private let name = Host.current().localizedName ?? "Mac"
@@ -162,7 +166,20 @@ final class PeerHub: ObservableObject {
         stop()
         guard let want else { return }
         code = want
-        let master = PeerCode.master(want)
+        configureGeneration += 1
+        let generation = configureGeneration
+        if let c = masterCache, c.code == want { begin(master: c.key, generation: generation); return }
+        // PBKDF2 mit 600.000 Runden dauert ~0,1 s und würde die Oberfläche stocken lassen: im Hintergrund rechnen,
+        // Ergebnis auf dem Main-Actor übernehmen, sofern configure() inzwischen nicht erneut gelaufen ist.
+        Task.detached(priority: .userInitiated) {
+            let master = PeerCode.master(want)
+            await MainActor.run { self.begin(master: master, generation: generation) }
+        }
+    }
+
+    private func begin(master: SymmetricKey, generation: Int) {
+        guard generation == configureGeneration, code != nil, listener == nil else { return }
+        masterCache = (code!, master)
         sealKey = PeerCode.key(master, "seal")
         groupTag = PeerCode.group(master)
         start(group: groupTag!)
@@ -300,14 +317,22 @@ final class PeerHub: ObservableObject {
 
     // MARK: Nachrichten
 
+    /// An alle, die etwas Neues bekommen (geänderte Liste) oder ein Lebenszeichen brauchen (15 s ohne Nachricht).
     private func broadcast() {
         for l in links.values where l.canSend { send(to: l) }
     }
 
+    /// Das Lebenszeichen trägt die ganze Liste: ältere AgentBars werten eine leere oder fehlende Liste als
+    /// „keine Sitzungen“ bzw. schließen die Verbindung, deshalb kein eigenes leeres Paket.
     private func send(to link: PeerLink) {
         guard let sealKey else { return }
-        let env = Envelope(from: myID, name: name, laptop: laptop, sent: Date().timeIntervalSince1970, sessions: local.prefix(40).map(\.wire))
+        let sessions = local.prefix(40).map(\.wire)
+        guard let payload = try? JSONEncoder().encode(sessions) else { return }
+        if payload == link.lastPayload, Date().timeIntervalSince(link.lastSent) < Self.keepalive { return }
+        let env = Envelope(from: myID, name: name, laptop: laptop, sent: Date().timeIntervalSince1970, sessions: sessions)
         guard let json = try? JSONEncoder().encode(env), let box = try? ChaChaPoly.seal(json, using: sealKey) else { return }
+        link.lastPayload = payload
+        link.lastSent = Date()
         link.send(box.combined)
     }
 
@@ -351,6 +376,9 @@ private final class PeerLink {
     private let speaksFirst: Bool             // nur wer die Verbindung aufbaut, sendet sofort
     var isTrusted: Bool { trusted }
     var canSend: Bool { ready && (speaksFirst || trusted) }
+    /// Zuletzt geschickte Sitzungsliste (ohne Umschlag) und wann, damit Unverändertes nicht alle 5 s rausgeht
+    var lastPayload: Data?
+    var lastSent = Date.distantPast
     var onMessage: ((Data) -> Bool)?
     var onReady: (() -> Void)?
     var onClose: (() -> Void)?
