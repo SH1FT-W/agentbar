@@ -2,6 +2,7 @@
 # Baut AgentBar.app (Apple Silicon).
 #   ./build.sh            → build/AgentBar.app
 #   ./build.sh install    → zusätzlich nach /Applications und neu starten
+#   ./build.sh test       → Selbsttests (tools/selftest.swift), baut keine App
 #   ./build.sh snapshot   → Dropdown + Büro als PNG nach build/ (ohne Menüleiste)
 #   ./build.sh release next ["Was ist neu"]
 #                         → Version setzen, bauen, committen, taggen, pushen und als GitHub-Release
@@ -19,6 +20,7 @@ if [[ "$1" == "release" ]]; then
     [[ "$VERSION" == "$NEXT" || -n "$ALLOW_VERSION" ]] || { echo "Nächste Kalender-Version ist $NEXT (YY.M.N), nicht $VERSION. Absichtlich anders: ALLOW_VERSION=1 ./build.sh release …"; exit 1; }
     [[ -z "$(git status --porcelain)" ]] || { echo "Erst alles committen – Arbeitsverzeichnis ist nicht sauber."; exit 1; }
     git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && { echo "Tag v$VERSION gibt es schon."; exit 1; }
+    "$0" test || { echo "Selbsttests fehlgeschlagen, kein Release."; exit 1; }
     BUILD=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist) + 1 ))
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $BUILD" Info.plist
 fi
@@ -27,6 +29,13 @@ fi
 if [[ -z "$SDK" ]]; then
     SDK=$(ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk 2>/dev/null | grep -v 'MacOSX26.sdk$' | sort -V | tail -1)
     [[ -z "$SDK" ]] && SDK=$(xcrun --show-sdk-path)
+fi
+
+if [[ "$1" == "test" ]]; then
+    mkdir -p build
+    swiftc -swift-version 5 -parse-as-library -D SNAPSHOT -sdk "$SDK" -target arm64-apple-macos14 \
+        Sources/*.swift tools/selftest.swift -o build/selftest
+    exec build/selftest
 fi
 
 if [[ "$1" == "snapshot" ]]; then
