@@ -52,7 +52,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.weatherPlace) private var weatherPlace = ""
     @State private var placeInput = ""
     @State private var placeSearching = false
-    @State private var placeNotFound = false
+    @State private var placeProblem: String?     // Hinweis unter „Wetter-Ort“: nicht gefunden oder offline
     @AppStorage(Prefs.quotaEnabled) private var quotaEnabled = true
     @AppStorage(Prefs.peersEnabled) private var peersEnabled = false
     @AppStorage(Prefs.peerCode) private var peerCode = ""
@@ -276,7 +276,7 @@ struct SettingsView: View {
                             TextField("", text: $placeInput, prompt: Text(L("z. B. Hamburg", "e.g. Seattle")))
                                 .textFieldStyle(.roundedBorder).frame(width: 150)
                                 .onSubmit(searchPlace)
-                                .onChange(of: placeInput) { placeNotFound = false }
+                                .onChange(of: placeInput) { placeProblem = nil }
                             if placeSearching { ProgressView().controlSize(.small) }
                             else { Button(L("Suchen", "Search"), action: searchPlace).disabled(placeInput.trimmingCharacters(in: .whitespaces).isEmpty) }
                         } else {
@@ -286,7 +286,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingLabel(L("Wetter-Ort", "Weather location"), "location.fill", .blue,
-                                 note: placeNotFound ? L("Ort nicht gefunden", "Location not found") : nil)
+                                 note: placeProblem)
                 }
                 Toggle(isOn: $weatherEnabled) {
                     SettingLabel(L("Echtes Wetter hinter dem Glas", "Real weather behind the glass"), "cloud.sun.rain.fill", .indigo,
@@ -347,9 +347,13 @@ extension SettingsView {
         guard !placeSearching else { return }
         placeSearching = true
         Task {
-            let found = await store.office.weather.setPlace(placeInput)
+            let result = await store.office.weather.setPlace(placeInput)
             placeSearching = false
-            placeNotFound = found == nil
+            switch result {
+            case .found: placeProblem = nil
+            case .notFound: placeProblem = L("Ort nicht gefunden", "Location not found")
+            case .offline: placeProblem = L("Ortssuche nicht erreichbar, später nochmal", "Location service unreachable, try again later")
+            }
         }
     }
 

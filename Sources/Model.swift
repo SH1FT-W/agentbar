@@ -179,7 +179,7 @@ struct AgentSession: Identifiable, Equatable {
         if let t = title, !t.isEmpty { return t }
         return project
     }
-    var totalTokens: Int { tokens.values.reduce(0) { $0 + $1.total } + 0 }
+    var totalTokens: Int { tokens.values.reduce(0) { $0 + $1.total } }
     var cost: Double? {
         let c = tokens.compactMap { Pricing.cost(model: $0.key, $0.value) }
         return c.isEmpty ? nil : c.reduce(0, +)

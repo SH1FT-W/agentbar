@@ -49,11 +49,12 @@ struct MenuView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 2) {
-                            ForEach(list.filter { $0.device == nil }) { row($0) }
-                            // Sitzungen anderer Macs darunter, je Gerät mit schlichter Überschrift
-                            ForEach(devices(list), id: \.self) { d in
-                                DeviceHeader(name: d, symbol: list.first { $0.device == d }?.deviceSymbol ?? "desktopcomputer")
-                                ForEach(list.filter { $0.device == d }) { row($0) }
+                            // Eigene Sitzungen, darunter die anderer Macs je Gerät mit schlichter Überschrift
+                            ForEach(sections(list), id: \.device) { section in
+                                if let d = section.device {
+                                    DeviceHeader(name: d, symbol: section.rows.first?.deviceSymbol ?? "desktopcomputer")
+                                }
+                                ForEach(section.rows) { row($0) }
                             }
                         }
                         .padding(.horizontal, MenuMetrics.rowInset)
@@ -174,9 +175,14 @@ struct MenuView: View {
         .id(s.id)
     }
 
-    /// Reihenfolge wie angezeigt: eigene Sitzungen, dann je Gerät.
+    /// Abschnitte in Anzeige-Reihenfolge: eigene Sitzungen (device nil), dann je anderem Mac dessen Sitzungen.
+    private func sections(_ list: [AgentSession]) -> [(device: String?, rows: [AgentSession])] {
+        [(nil, list.filter { $0.device == nil })] + devices(list).map { d in (d, list.filter { $0.device == d }) }
+    }
+
+    /// Reihenfolge wie angezeigt (für die Tastatur-Navigation).
     private func ordered(_ list: [AgentSession]) -> [AgentSession] {
-        list.filter { $0.device == nil } + devices(list).flatMap { d in list.filter { $0.device == d } }
+        sections(list).flatMap(\.rows)
     }
 
     private func move(_ step: Int, in list: [AgentSession]) -> KeyPress.Result {

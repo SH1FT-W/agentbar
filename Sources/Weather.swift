@@ -151,10 +151,21 @@ final class WeatherService: ObservableObject {
         }
     }
 
-    /// Ort suchen, speichern und Wetter einschalten. Rückgabe: Anzeigename oder nil (nicht gefunden).
-    func setPlace(_ query: String) async -> String? {
+    /// Ergebnis der Ortssuche: gefunden (Anzeigename), kein Treffer, oder der Dienst war nicht erreichbar.
+    enum PlaceResult: Equatable { case found(String), notFound, offline }
+
+    /// Ort suchen, speichern und Wetter einschalten. „Nicht gefunden“ und „offline“ bleiben unterschieden,
+    /// damit die Einstellungen nicht bei fehlendem Netz behaupten, den Ort gebe es nicht.
+    func setPlace(_ query: String) async -> PlaceResult {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty, let place = try? await Self.geocode(q) else { return nil }
+        guard !q.isEmpty else { return .notFound }
+        let place: (name: String, lat: Double, lon: Double)
+        do {
+            guard let p = try await Self.geocode(q) else { return .notFound }
+            place = p
+        } catch {
+            return .offline
+        }
         let d = UserDefaults.standard
         d.set(place.name, forKey: Prefs.weatherPlace)
         d.set(place.lat, forKey: Prefs.weatherLat)
@@ -163,7 +174,7 @@ final class WeatherService: ObservableObject {
         d.removeObject(forKey: Prefs.weatherCache)
         current = nil
         refreshIfNeeded(force: true)
-        return place.name
+        return .found(place.name)
     }
 
     func clearPlace() {
