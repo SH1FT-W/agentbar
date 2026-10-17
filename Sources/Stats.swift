@@ -150,7 +150,7 @@ final class StatsCollector: @unchecked Sendable {
               let msg = j["message"] as? [String: Any], let id = msg["id"] as? String,
               let model = msg["model"] as? String, model != "<synthetic>",
               let u = msg["usage"] as? [String: Any] else { return }
-        let ts = (j["timestamp"] as? String).flatMap(statsDate) ?? Date()
+        let ts = (j["timestamp"] as? String).flatMap(parseISO8601) ?? Date()
         if p.born > 0, ts.timeIntervalSince1970 < p.born - 120 { return }   // kopierte ältere Nachricht
         guard !excluded.contains(session) else { return }
         let t = TokenTally(input: u["input_tokens"] as? Int ?? 0, cacheWrite: u["cache_creation_input_tokens"] as? Int ?? 0,
@@ -271,8 +271,3 @@ func statsDayKey(_ d: Date) -> String {
     let c = Calendar.current.dateComponents([.year, .month, .day], from: d)
     return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
 }
-
-private let statsISOFrac: ISO8601DateFormatter = {
-    let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
-}()
-private func statsDate(_ s: String) -> Date? { statsISOFrac.date(from: s) ?? ISO8601DateFormatter().date(from: s) }

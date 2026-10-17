@@ -16,7 +16,7 @@ final class SessionMonitor: ObservableObject {
     @Published fileprivate(set) var sessions: [AgentSession] = []
     /// Sitzungen anderer Macs (über PeerHub) – nur zur Anzeige.
     @Published var remote: [AgentSession] = [] {
-        didSet { stats.exclude(Set(remote.map(\.id))) }
+        didSet { stats.exclude(Set(remote.map(\.id))); visibleCache = nil }
     }
     @Published private(set) var hooksSeen = false
     /// Wird bei jedem Statuswechsel einer Hauptsitzung aufgerufen (für Mitteilungen).
@@ -35,6 +35,9 @@ final class SessionMonitor: ObservableObject {
         }
         core.start()
         // Zeitabhängige Übergänge (arbeitet → wartet, fertig → Pause) plant der Kern selbst: 2 s bei aktiven Sitzungen, sonst 15 s
+        defaultsObserver = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.visibleCache = nil }
+        }
     }
 
     func rescan() { core.fullScan() }
@@ -50,6 +53,7 @@ final class SessionMonitor: ObservableObject {
             next[s.id] = s.status
         }
         previous = next      // verschwundene Sitzungen vergessen
+        visibleCache = nil
         if list != sessions { sessions = list }
         onUpdate?(list)
     }
@@ -64,11 +68,19 @@ final class SessionMonitor: ObservableObject {
         return sessions.filter { !ids.contains($0.id) } + remote.filter { !own.contains($0.id) }
     }
 
+    /// Sichtbare Sitzungen (aktive immer, fertige nur bis zur eingestellten Stundenzahl). Das Büro fragt das 30-mal
+    /// pro Sekunde ab, deshalb wird nur einmal je Auswertung gefiltert: der Cache fällt bei neuer Liste, geänderten
+    /// Fremdsitzungen und geänderten Einstellungen.
     var visible: [AgentSession] {
+        if let v = visibleCache { return v }
         let hours = UserDefaults.standard.double(forKey: Prefs.visibleHours)
         let cutoff = Date().addingTimeInterval(-hours * 3600)
-        return all.filter { $0.status < .done || $0.lastActivity > cutoff }
+        let v = all.filter { $0.status < .done || $0.lastActivity > cutoff }
+        visibleCache = v
+        return v
     }
+    private var visibleCache: [AgentSession]?
+    private var defaultsObserver: NSObjectProtocol?
 
     var waitingCount: Int { all.filter { $0.status == .waiting }.count }
     var workingCount: Int { all.filter { $0.status == .working }.count }
@@ -448,7 +460,7 @@ private final class MonitorCore: @unchecked Sendable {
         default:
             return
         }
-        let ts = (j["timestamp"] as? String).flatMap(parseDate) ?? Date()
+        let ts = (j["timestamp"] as? String).flatMap(parseISO8601) ?? Date()
         if ts > st.lastEvent { st.lastEvent = ts }
         if let m = j["permissionMode"] as? String { st.mode = m }
 
@@ -600,7 +612,7 @@ private final class MonitorCore: @unchecked Sendable {
             guard parts.count >= 4, let epoch = Double(String(decoding: parts[0], as: UTF8.self)) else { continue }
             let hasPid = parts.count == 5
             let payload = String(decoding: parts[hasPid ? 4 : 3], as: UTF8.self)
-            let j = (try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]) ?? Self.looseFields(payload)
+            let j = (try? JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]) ?? Hooks.looseFields(payload)
             guard let sid = j["session_id"] as? String, let event = j["hook_event_name"] as? String else { continue }
             var h = hooks[sid] ?? HookState()
             let time = Date(timeIntervalSince1970: epoch)
@@ -634,23 +646,6 @@ private final class MonitorCore: @unchecked Sendable {
             // Beendet: nur noch die Summen behalten
             if h.ended { for st in files.values where st.sessionId == sid || st.parentId == sid { st.trim() } }
         }
-    }
-
-    /// Notfall-Parser für gekürzte Hook-Zeilen: holt einfache String-Felder per Regex.
-    static func looseFields(_ s: String) -> [String: Any] {
-        var out: [String: Any] = [:]
-        var input: [String: Any] = [:]
-        for key in ["session_id", "hook_event_name", "tool_name", "notification_type", "message", "cwd",
-                    "file_path", "command", "description", "subagent_type", "notebook_path"] {
-            guard let r = s.range(of: "\"\(key)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", options: .regularExpression) else { continue }
-            let m = String(s[r])
-            guard let q = m.range(of: ":\\s*\"", options: .regularExpression) else { continue }
-            let v = String(m[q.upperBound...].dropLast())
-                .replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\n", with: " ")
-            if ["file_path", "command", "description", "subagent_type", "notebook_path"].contains(key) { input[key] = v } else { out[key] = v }
-        }
-        if !input.isEmpty { out["tool_input"] = input }
-        return out
     }
 
     /// Läuft der Claude-Prozess noch? (Sitzungen ohne SessionEnd, z. B. Terminal hart geschlossen)
@@ -853,7 +848,11 @@ private final class MonitorCore: @unchecked Sendable {
             let helpers = (subs[sid] ?? []).map { a -> SubAgent in
                 let age = now.timeIntervalSince(a.lastEvent)
                 let finished = a.lastType == "assistant" && !a.toolPending && !a.thinking
-                let working = !finished && age < 180
+                // Läuft noch ein Werkzeug (Build, Tests, langer Befehl), gilt wie bei Hauptsitzungen eine halbe Stunde
+                // ohne neue Zeile als Arbeit, sonst 3 Min. SubagentStop aus den Hooks trägt nur die session_id des
+                // Elternteils und lässt sich keinem einzelnen Helfer zuordnen, deshalb hier nur die Frist.
+                let limit: TimeInterval = a.toolPending ? 1800 : 180
+                let working = !finished && age < limit
                 return SubAgent(id: a.sessionId, type: a.agentType.isEmpty ? L("Helfer", "Helper") : a.agentType,
                                 description: a.agentDescription, working: working,
                                 activity: working ? (a.thinking ? L("Denkt nach …", "Thinking…") : a.toolActivity) : L("Fertig", "Done"),
@@ -948,7 +947,9 @@ private let isoFrac: ISO8601DateFormatter = {
 }()
 private let isoPlain = ISO8601DateFormatter()
 
-private func parseDate(_ s: String) -> Date? { isoFrac.date(from: s) ?? isoPlain.date(from: s) }
+/// ISO-8601-Zeitstempel mit oder ohne Sekundenbruchteile ("2026-10-17T12:00:00.123Z", "2026-10-17T12:00:00Z").
+/// Gemeinsam für Sitzungsprotokolle, Statistik und Kontingent-Antwort; ISO8601DateFormatter ist thread-sicher.
+func parseISO8601(_ s: String) -> Date? { isoFrac.date(from: s) ?? isoPlain.date(from: s) }
 
 /// "-Users-name-projekt" → "/Users/name/projekt" (verlustbehaftet, nur Notlösung ohne cwd)
 private func decodeProjectDir(_ dir: String) -> String { dir.replacingOccurrences(of: "-", with: "/") }

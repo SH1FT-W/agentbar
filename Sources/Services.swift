@@ -80,6 +80,23 @@ enum Hooks {
         try writePrivately(out, to: url, perms: (perms as? NSNumber)?.int16Value ?? 0o600)
     }
 
+    /// Notfall-Parser für gekürzte Hook-Zeilen: holt einfache String-Felder per Regex.
+    static func looseFields(_ s: String) -> [String: Any] {
+        var out: [String: Any] = [:]
+        var input: [String: Any] = [:]
+        for key in ["session_id", "hook_event_name", "tool_name", "notification_type", "message", "cwd",
+                    "file_path", "command", "description", "subagent_type", "notebook_path"] {
+            guard let r = s.range(of: "\"\(key)\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"", options: .regularExpression) else { continue }
+            let m = String(s[r])
+            guard let q = m.range(of: ":\\s*\"", options: .regularExpression) else { continue }
+            let v = String(m[q.upperBound...].dropLast())
+                .replacingOccurrences(of: "\\\"", with: "\"").replacingOccurrences(of: "\\n", with: " ")
+            if ["file_path", "command", "description", "subagent_type", "notebook_path"].contains(key) { input[key] = v } else { out[key] = v }
+        }
+        if !input.isEmpty { out["tool_input"] = input }
+        return out
+    }
+
     /// Atomar ersetzen, ohne dass die Datei kurz für andere lesbar ist (settings.json kann Schlüssel enthalten):
     /// Hilfsdatei gleich mit den richtigen Rechten anlegen, dann per rename() austauschen.
     private static func writePrivately(_ data: Data, to url: URL, perms: Int16) throws {
@@ -279,7 +296,7 @@ final class QuotaMonitor: ObservableObject {
 
     private func window(_ any: Any?) -> QuotaWindow? {
         guard let d = any as? [String: Any], let u = d["utilization"] as? Double else { return nil }
-        return QuotaWindow(percent: u, resetsAt: (d["resets_at"] as? String).flatMap(parseISO))
+        return QuotaWindow(percent: u, resetsAt: (d["resets_at"] as? String).flatMap(parseISO8601))
     }
 
     private func get(_ url: String, token: String) async throws -> [String: Any] {
@@ -325,12 +342,6 @@ final class QuotaMonitor: ObservableObject {
         let exp = (oauth["expiresAt"] as? Double).map { Date(timeIntervalSince1970: $0 / 1000) }
         return (token, exp)
     }
-}
-
-private func parseISO(_ s: String) -> Date? {
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return f.date(from: s) ?? ISO8601DateFormatter().date(from: s)
 }
 
 func resetText(_ date: Date?) -> String {
