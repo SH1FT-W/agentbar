@@ -5,7 +5,7 @@
 <h1 align="center">AgentBar</h1>
 
 <p align="center">
-  Eine Menüleisten-App für macOS, die zeigt, was deine <a href="https://docs.anthropic.com/en/docs/claude-code">Claude-Code</a>-Agenten gerade tun –<br>
+  Eine Menüleisten-App für macOS, die zeigt, was deine <a href="https://docs.anthropic.com/en/docs/claude-code">Claude-Code</a>-Agenten gerade tun,<br>
   im Stil eines eingebauten macOS-27-Menüs, mit einem kleinen animierten Büro, in dem jede Sitzung an ihrem eigenen Schreibtisch sitzt.
 </p>
 
@@ -14,9 +14,17 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/SH1FT-W/agentbar/releases/latest"><img src="https://img.shields.io/github/v/release/SH1FT-W/agentbar?label=release&color=2997ff" alt="Neuestes Release"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white" alt="macOS 14 oder neuer">
+  <img src="https://img.shields.io/badge/Apple%20Silicon-arm64-111" alt="Apple Silicon">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2997ff" alt="MIT-Lizenz"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/SH1FT-W/agentbar/releases/latest">Download</a> ·
   <a href="https://sh1ft-w.github.io/agentbar/">Website</a> ·
-  <a href="#einrichten">Einrichten</a>
+  <a href="#einrichten">Einrichten</a> ·
+  <a href="#versionen">Versionen</a>
 </p>
 
 <p align="center">
@@ -29,27 +37,41 @@
   <img src="docs/screenshots/de/menu-live-dark.png" alt="Menü (dunkel)" width="330">
 </p>
 
-> **Sprache:** AgentBar folgt der Sprache deines Macs – Deutsch oder Englisch.
+> **Sprache:** AgentBar folgt der Sprache deines Macs, Deutsch oder Englisch.
 
 ## Funktionen
 
-- **Status in Echtzeit** – arbeitet, braucht dich, fertig, Fehler oder Pause, für jede Claude-Code-Sitzung (Terminal, Claude-App, Cowork, Xcode). Subagenten erscheinen als Helfer ihrer Sitzung.
-- **Präzise Erkennung (optional)** – mit Claude-Code-Hooks weiß AgentBar *genau*, wann ein Agent auf deine Freigabe wartet, statt es aus Pausen zu schätzen.
-- **Kontingent-Ringe** – dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch, dazu eine Prognose, wie lange das 5-Stunden-Fenster beim aktuellen Tempo reicht. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
-- **Heute & letzte 7 Tage** – Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Balkendiagramm und deine Top-Projekte von heute. Lokal aus den Sitzungsprotokollen von Claude Code berechnet.
-- **Kontext auf einen Blick** – jede Zeile zeigt Tokens und einen kleinen Kontext-Balken, der orange wird, wenn das Kontextfenster fast voll ist.
-- **Das Büro** – ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist: Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause zum Sofa, an die Kaffee-Ecke oder ans Fenster und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch). Der Himmel folgt der Tageszeit und, wenn du einen Ort einträgst, dem echten Wetter (Wolken, Regen, Nebel, Gewitter, liegenbleibender Schnee, echter Sonnenauf- und -untergang); zu Advent, Weihnachten und Silvester schmückt sich das Büro selbst, und das Team zieht sich passend zu Jahreszeit und Wetter an. Helfer kreisen als leuchtende Kugeln, ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
-- **Direkt zur Sitzung** – ein Klick auf eine Figur im Büro oder „Zur Sitzung“ (bzw. Return) im Menü holt ihren Terminal-Tab nach vorn.
+- **Status in Echtzeit:** arbeitet, braucht dich, fertig, Fehler oder Pause, für jede Claude-Code-Sitzung (Terminal, Claude-App, Cowork, Xcode). Subagenten erscheinen als Helfer ihrer Sitzung.
+- **Präzise Erkennung (optional):** mit Claude-Code-Hooks weiß AgentBar *genau*, wann ein Agent auf deine Freigabe wartet, statt es aus Pausen zu schätzen.
+- **Kontingent-Ringe:** dein 5-Stunden- und Wochenkontingent als Aktivitätsringe wie auf der Apple Watch, dazu eine Prognose, wie lange das 5-Stunden-Fenster beim aktuellen Tempo reicht. Das OAuth-Token wird nur *gelesen*, nie erneuert oder verändert.
+- **Heute und letzte 7 Tage:** Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Balkendiagramm und deine Top-Projekte von heute. Lokal aus den Sitzungsprotokollen von Claude Code berechnet.
+- **Kontext auf einen Blick:** jede Zeile zeigt Tokens und einen kleinen Kontext-Balken, der orange wird, wenn das Kontextfenster fast voll ist.
+- **Das Büro:** ein schwebendes Fenster (⌃⌥A), in dem jede Sitzung eine Memoji-artige Figur ist. Sie tippt beim Arbeiten, hebt die Hand, wenn sie dich braucht, geht in der Pause in die Lounge und wirkt umso müder, je voller ihr Kontextfenster ist (nach /compact wieder frisch).
+- **Kaffeebar:** Agenten, die gerade eine Aufgabe erledigt haben, holen sich manchmal einen Kaffee an der Siebträgermaschine hinter dem Sofa, stellen sich an, plaudern kurz und nehmen die Tasse mit an den Schreibtisch.
+- **Wetter und Tageszeit:** der Himmel folgt deiner Uhrzeit und, wenn du einen Ort einträgst, dem echten Wetter: Wolken, Regen, der an der Scheibe herunterläuft, Nebel, Gewitter, Schnee, der auf den Hügeln liegen bleibt, echter Sonnenauf- und -untergang, Lampen, die bei trübem Wetter angehen. Das Wetter kommt von Open-Meteo.
+- **Jahreszeiten:** die Bäume draußen blühen im Frühling, färben sich im Herbst golden und werden im Winter kahl (auf der Südhalbkugel um ein halbes Jahr versetzt, sobald ein Wetter-Ort gesetzt ist).
+- **Feiertage:** das Büro schmückt sich zum Valentinstag, zu Ostern (Eierbaum, versteckte Eier, Hasenohren), Halloween (Kürbisse, Papier-Fledermäuse, Kostüme, ein Geister-Saugroboter), im Advent, zu Nikolaus, Weihnachten und Silvester, und das Team zieht sich passend zu Anlass und Wetter an: Weihnachtsmützen, Geweihe, Partyhüte, Schals bei Frost, Sonnenbrillen bei Hitze.
+- **Seltene Momente:** ab und zu gibt es eine Sternschnuppe, einen Vogelschwarm, einen Regenbogen bei leichtem Regen, einen Schneemann, wenn Schnee liegt, oder Pizza am Freitagmittag.
+- **Helfer und Saugroboter:** Subagenten kreisen als leuchtende Kugeln um ihre Figur; ein Saugroboter wird mit der CPU-Last schneller und fährt abends, wenn das Licht angeht, in seine Ladestation.
+- **Direkt zur Sitzung:** ein Klick auf eine Figur im Büro oder „Zur Sitzung“ (bzw. Return) im Menü holt ihren Terminal-Tab nach vorn.
 - **Mitteilungen**, wenn ein Agent dich braucht (mit seiner konkreten Frage), fertig ist oder scheitert, wenn sein Kontext fast voll ist oder er zu hängen scheint, dazu eine Kontingent-Warnung und ein Hinweis auf neue AgentBar-Versionen. Mit Knöpfen „Zur Sitzung“ und „1 Std. stumm“ sowie optionalen Ruhezeiten.
-- **Tastatur und VoiceOver** – ↑/↓ wählen, Return springt zur Sitzung, Leertaste klappt auf, ⌘R lädt neu; jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.
-- **Deine anderen Macs** (optional) – koppel deine Macs per Code, dann erscheinen Sitzungen der anderen im Menü und im Büro, markiert mit einem kleinen Geräte-Symbol. Gefunden wird per Bonjour im lokalen Netzwerk, jede Nachricht ist mit dem Code verschlüsselt.
-- **Wach bleiben** – aus, immer oder nur, solange Agenten arbeiten.
-- **Updates** über GitHub-Releases, geprüft per Ed25519-Signatur (Schlüssel fest in der App), Bundle-ID, Version und Code-Signatur.
+- **Tastatur und VoiceOver:** ↑/↓ wählen, Return springt zur Sitzung, Leertaste klappt auf, ⌘R lädt neu; jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.
+- **Deine anderen Macs (optional):** koppel deine Macs per Code, dann erscheinen Sitzungen der anderen im Menü und im Büro, markiert mit einem kleinen Geräte-Symbol. Gefunden wird per Bonjour im lokalen Netzwerk, jede Nachricht ist mit dem Code verschlüsselt.
+- **Wach bleiben:** aus, immer oder nur, solange Agenten arbeiten.
+- **Updates** über GitHub-Releases: ein kleines Fenster beim Start bietet „Jetzt installieren“, „Später“ oder „Überspringen“ an (es nimmt nie den Tastaturfokus). Jedes Update wird per Ed25519-Signatur (Schlüssel fest in der App), Bundle-ID, Version und Code-Signatur geprüft.
 
 <p align="center">
   <img src="docs/screenshots/de/office-night.jpg" alt="Das Büro bei Nacht" width="800">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/de/office-coffee.jpg" alt="Kaffee und ein Plausch an der Siebträgermaschine" width="395">
+  <img src="docs/screenshots/de/office-halloween.jpg" alt="Halloween: Kürbisse, Fledermäuse und Kostüme" width="395">
+</p>
+<p align="center">
+  <img src="docs/screenshots/de/office-spring.jpg" alt="Frühling: blühende Bäume" width="395">
+  <img src="docs/screenshots/de/office-easter.jpg" alt="Ostern: Hasenohren und versteckte Eier" width="395">
+</p>
 <p align="center">
   <img src="docs/screenshots/de/office-rain.jpg" alt="Echtes Wetter: Regen an der Scheibe" width="395">
   <img src="docs/screenshots/de/office-snow.jpg" alt="Draußen bleibt Schnee liegen, drinnen Schals" width="395">
@@ -64,7 +86,7 @@
 ### Voraussetzungen
 
 - macOS 14 oder neuer auf Apple Silicon (gebaut und getestet auf macOS 27)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) – AgentBar liest dessen lokale Sitzungsprotokolle
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code): AgentBar liest dessen lokale Sitzungsprotokolle
 
 ### Installieren
 
@@ -76,15 +98,16 @@
      ```sh
      xattr -dr com.apple.quarantine /Applications/AgentBar.app
      ```
-   Das ist nur einmal nötig. Spätere Updates über den eingebauten Update-Button kommen ohne diese Abfrage aus – sie werden stattdessen per Ed25519-Signatur geprüft.
-4. Starten – oben in der Menüleiste erscheint ein kleines Clawd-Symbol. Ein Dock-Symbol gibt es nicht.
+   Das ist nur einmal nötig. Spätere Updates über das eingebaute Update-Fenster kommen ohne diese Abfrage aus; sie werden stattdessen per Ed25519-Signatur geprüft.
+4. Starten. Oben in der Menüleiste erscheint ein kleines Clawd-Symbol (Augen zu: Pause, Augen auf: arbeitet, winkt: eine Sitzung braucht dich). Ein Dock-Symbol gibt es nicht.
 
 ### Erster Start
 
 - **Mitteilungen:** macOS fragt einmal, ob AgentBar Mitteilungen senden darf.
-- **Präzise Erkennung:** im Menü bei *Präzise Erkennung* auf **Einrichten** klicken (oder *Einstellungen → Präzise Erkennung*). AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (eine Sicherung landet in `settings.json.agentbar-backup`). Jeder Hook hängt nur eine Statuszeile an `~/Library/Application Support/AgentBar/hooks.log` an – kein Netzwerk, keine Prompts oder Dateiinhalte. Gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen jederzeit wieder entfernen.
+- **Präzise Erkennung:** im Menü bei *Präzise Erkennung* auf **Einrichten** klicken (oder *Einstellungen → Präzise Erkennung*). AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (eine Sicherung landet in `settings.json.agentbar-backup`). Jeder Hook hängt nur eine Statuszeile an `~/Library/Application Support/AgentBar/hooks.log` an: kein Netzwerk, keine Prompts oder Dateiinhalte. Gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen jederzeit wieder entfernen.
 - **Kontingent-Ringe:** AgentBar liest den Login von Claude Code aus dem Schlüsselbund (`Claude Code-credentials`) über das `security`-Werkzeug. Falls macOS fragt: erlauben. Das Token geht nur an `api.anthropic.com`.
-- **Zum Terminal springen:** Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar das Terminal steuern darf – das dient nur dazu, den richtigen Tab auszuwählen.
+- **Wetter:** unter *Einstellungen → Büro* einen Ort eintragen, wenn du das echte Wetter hinter der Glasfront willst. Ohne Ort folgt das Büro nur der Tageszeit.
+- **Zum Terminal springen:** Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar das Terminal steuern darf. Das dient nur dazu, den richtigen Tab auszuwählen.
 - **Beim Anmelden starten:** in *Einstellungen → Allgemein* einschalten.
 
 ### Tastenkürzel
@@ -94,9 +117,13 @@
 | ⌃⌥A | Büro zeigen / ausblenden (systemweit) |
 | ⌘, | Einstellungen (bei geöffnetem Menü) |
 
+## Versionen
+
+AgentBar nutzt Kalender-Versionen der Form **JJ.M.N**: zweistelliges Jahr, Monat ohne führende Null und die laufende Nummer des Releases in diesem Monat. **26.10.11** ist das elfte Release im Oktober 2026; der nächste Monat beginnt wieder bei `.1` (zum Beispiel `26.11.1`). Tags und Release-Titel tragen ein `v` davor (`v26.10.11`). Der Sprung vom alten Schema `2.3.1` auf `26.10.11` ist gewollt: die Update-Prüfung sieht die neue Nummer als neuer an, „Nach Updates suchen“ findet sie also wie gewohnt.
+
 ## Selbst bauen
 
-Xcode ist nicht nötig – die Command Line Tools reichen (`xcode-select --install`).
+Xcode ist nicht nötig, die Command Line Tools reichen (`xcode-select --install`).
 
 ```sh
 git clone https://github.com/SH1FT-W/agentbar.git
@@ -114,11 +141,11 @@ Diagnose: `build/AgentBar.app/Contents/MacOS/AgentBar --dump` listet die erkannt
 
 Alles bleibt auf deinem Mac. AgentBar liest nur lokale Dateien (`~/.claude/projects`, Metadaten der Claude-App, das eigene Hook-Log) und spricht mit diesen Servern:
 
-- `api.anthropic.com` – dein Kontingent (nur wenn *Kontingent abrufen* an ist)
-- `api.github.com` – Update-Prüfung
-- `api.open-meteo.com` und `geocoding-api.open-meteo.com` – Wetter hinter der Glasfront (erst wenn du einen Ort einträgst; gesendet wird nur der Ort, auf etwa 1 km gerundet)
+- `api.anthropic.com`: dein Kontingent (nur wenn *Kontingent abrufen* an ist)
+- `api.github.com`: Update-Prüfung
+- `api.open-meteo.com` und `geocoding-api.open-meteo.com`: Wetter hinter der Glasfront (erst wenn du einen Ort einträgst; gesendet wird nur der Ort, auf etwa 1 km gerundet)
 
-Schaltest du *Andere Macs* ein, spricht AgentBar zusätzlich mit deinen gekoppelten Macs im lokalen Netzwerk (Bonjour, mit dem Kopplungscode verschlüsselt). Geteilt werden nur Status, Projekt, Titel und Tätigkeit der Sitzungen – nie Dateien oder Protokolle.
+Schaltest du *Andere Macs* ein, spricht AgentBar zusätzlich mit deinen gekoppelten Macs im lokalen Netzwerk (Bonjour, mit dem Kopplungscode verschlüsselt). Geteilt werden nur Status, Projekt, Titel und Tätigkeit der Sitzungen, nie Dateien oder Protokolle.
 
 Keine Analyse, keine Telemetrie.
 
@@ -128,7 +155,7 @@ Ohne Hooks liest AgentBar die JSONL-Protokolle von Claude Code und leitet den Zu
 
 ## Dank
 
-Inspiriert von [so-agentbar](https://github.com/sotthang/so-agentbar) von sotthang – AgentBar ist eine eigenständige Neuentwicklung mit anderem Design und Funktionsumfang.
+Inspiriert von [so-agentbar](https://github.com/sotthang/so-agentbar) von sotthang. AgentBar ist eine eigenständige Neuentwicklung mit anderem Design und Funktionsumfang.
 
 ## Lizenz
 
