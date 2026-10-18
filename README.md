@@ -1,13 +1,11 @@
 <div align="center">
 
-<img src="docs/icon.png" width="96" alt="AgentBar icon" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-title-dark.png" />
+  <img src="docs/images/readme-title-light.png" alt="AgentBar: Your agents. In the menu bar. The office with every Claude Code session at its own desk, one raising a hand." />
+</picture>
 
-<h1>AgentBar</h1>
-
-<p><sub><b>FOR CLAUDE CODE ON THE MAC</b></sub></p>
-
-<p><b>Your agents. In the menu bar.</b><br/>
-AgentBar shows what every <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> session is doing, quiet until one needs you.<br/>
+<p>AgentBar shows what every <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> session is doing, quiet until one needs you.<br/>
 And it comes with a tiny office where your agents actually work.</p>
 
 <p>🇬🇧 English &nbsp;·&nbsp; <a href="README.de.md">🇩🇪 Deutsch</a></p>
@@ -19,10 +17,6 @@ And it comes with a tiny office where your agents actually work.</p>
 
 <p><a href="https://sh1ft-w.github.io/agentbar"><b>Website</b></a> &nbsp;·&nbsp; <a href="https://github.com/SH1FT-W/agentbar/releases/latest"><b>Download</b></a> &nbsp;·&nbsp; <a href="#new">New</a> &nbsp;·&nbsp; <a href="#menu">Menu</a> &nbsp;·&nbsp; <a href="#office">Office</a> &nbsp;·&nbsp; <a href="#macs">Other Macs</a> &nbsp;·&nbsp; <a href="#setup">Setup</a> &nbsp;·&nbsp; <a href="#privacy">Privacy</a> &nbsp;·&nbsp; <a href="https://github.com/SH1FT-W/agentbar/releases">Releases</a></p>
 
-<br/>
-
-<img src="docs/screenshots/en/office-day.jpg" width="800" alt="The AgentBar office by day: every Claude session is a character at its own desk behind a glass front, one raising a hand, usage rings on the wall display." />
-
 </div>
 
 <br/>
@@ -33,14 +27,10 @@ And it comes with a tiny office where your agents actually work.</p>
 
 The latest releases gave the team a coffee bar, four seasons outside the window, a few holidays to dress up for and some moments you only catch now and then.
 
-| | |
-|:--|:--|
-| **Coffee bar** <sub>2.3</sub> | Agents that just finished a task sometimes walk over to the espresso machine behind the sofa, queue up, have a little chat and bring the mug back to their desk. |
-| **Seasons** <sub>2.3</sub> | The trees blossom in spring, turn golden in autumn and go bare in winter. Flipped for the southern hemisphere once a weather location is set. |
-| **Halloween** <sub>2.3</sub> | Pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum. |
-| **Easter and Valentine's Day** <sub>2.3</sub> | An egg tree, hidden eggs and bunny ears at Easter. Hearts in February. Advent, Christmas and New Year's Eve were already there. |
-| **Rare moments** <sub>2.3</sub> | Some things only happen once in a while: a shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Keep an eye on the window. |
-| **Calendar versions** <sub>26.10.11</sub> | Versions now count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1, so nothing changes for you. |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-cards-new-dark.png" />
+  <img src="docs/images/readme-cards-new-light.png" alt="Coffee bar (2.3): agents that just finished a task sometimes walk over to the espresso machine, queue up, have a little chat and bring the mug back to their desk. Seasons (2.3): the trees blossom in spring, turn golden in autumn and go bare in winter, flipped for the southern hemisphere once a weather location is set. Halloween (2.3): pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum. Easter and Valentine's Day (2.3): an egg tree, hidden eggs and bunny ears at Easter, hearts in February, Advent, Christmas and New Year's Eve were already there. Rare moments (2.3): a shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Calendar versions (26.10.11): versions count year.month.number, 26.10.11 is the 11th release of October 2026, the update check sees it as newer than 2.3.1." />
+</picture>
 
 Every change, release by release, in the [releases](https://github.com/SH1FT-W/agentbar/releases).
 
@@ -61,14 +51,10 @@ Built like the system menus in macOS 27. Every session with its status, project 
 
 AgentBar sees sessions from the Terminal, the Claude desktop app, Cowork and Xcode. Subagents appear as helpers of their parent session.
 
-- **Knows when you're needed.** Working, waiting for approval, done, error or idle. With Claude Code hooks AgentBar knows the moment it happens instead of guessing from pauses.
-- **Usage as activity rings.** Your 5-hour and weekly plan usage, Apple Watch style, with a forecast of how long the window lasts at your pace. The token is only read, never refreshed.
-- **Today and 7 days.** Tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today. Computed locally from Claude Code's logs.
-- **Context at a glance.** Every row shows tokens and a small context bar. It turns orange when the window is almost full, and the character in the office looks tired too.
-- **Jump right in.** Click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front.
-- **Notifications.** When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck. With quiet hours, a one-hour mute and a note when a new AgentBar is out.
-- **Keyboard and VoiceOver.** Arrow keys to select, Return to jump, Space to expand, ⌘R to reload. Every row and ring has a proper accessibility label.
-- **Keep awake.** Stop your Mac from sleeping: always, or only while agents are working. Plus launch at login and the update window with Install Now, Later or Skip.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-cards-menu-dark.png" />
+  <img src="docs/images/readme-cards-menu-light.png" alt="Knows when you're needed: working, waiting for approval, done, error or idle, with Claude Code hooks AgentBar knows the moment it happens instead of guessing from pauses. Usage as activity rings: your 5-hour and weekly plan usage, Apple Watch style, with a forecast of how long the window lasts at your pace, the token is only read, never refreshed. Today and 7 days: tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today, computed locally from Claude Code's logs. Context at a glance: every row shows tokens and a small context bar, it turns orange when the window is almost full, and the character in the office looks tired too. Jump right in: click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front. Notifications: when an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck, with quiet hours and a one-hour mute. Keyboard and VoiceOver: arrow keys to select, Return to jump, Space to expand, ⌘R to reload, every row and ring has a proper accessibility label. Keep awake: stop your Mac from sleeping, always or only while agents are working, plus launch at login and the update window." />
+</picture>
 
 <details>
 <summary><b>How status detection works</b></summary>
@@ -86,31 +72,36 @@ Without hooks, AgentBar parses the Claude Code JSONL logs and infers the state (
 
 A floating window where each session is a Memoji-like character. They type while working, raise a hand when they need you, head to the lounge when idle and look more tired as their context fills up. Fresh again after `/compact`.
 
-| Late night, warm lights | The lounge |
-|:---:|:---:|
-| <img src="docs/screenshots/en/office-night.jpg" width="420" alt="The office at night: warm desk lamps, a dark sky with stars behind the glass, the robot vacuum docked at its charging station." /> | <img src="docs/screenshots/en/office-lounge-full.jpg" width="420" alt="Idle sessions sitting together on the sofa in the lounge while others keep working at their desks." /> |
-| The robot vacuum heads to its dock when the lamps come on. | The lounge fills up with everyone who has nothing to do right now. |
+<p align="center">
+<img src="docs/screenshots/en/office-night.jpg" width="49%" alt="The office at night: warm desk lamps, a dark sky with stars behind the glass, the robot vacuum docked at its charging station." />
+<img src="docs/screenshots/en/office-lounge-full.jpg" width="49%" alt="Idle sessions sitting together on the sofa in the lounge while others keep working at their desks." />
+<br/><sub>Late night, warm lights: the robot vacuum heads to its dock when the lamps come on. The lounge fills up with everyone who has nothing to do right now.</sub>
+</p>
 
-- **Sky, weather, daylight.** The sky follows your local time. Enter a location and you get clouds, rain running down the glass, fog, thunderstorms and snow that settles on the hills, the real sunrise and sunset, and lamps that come on when it's gloomy. Weather from Open-Meteo, only the location rounded to about 1 km is sent.
-- **Holidays and outfits.** The office decorates itself for Valentine's Day, Easter, Halloween, Advent, St. Nicholas, Christmas and New Year's Eve, and the team dresses for the occasion and the weather: Santa hats, antlers, party hats, scarves when it's freezing, sunglasses when it's hot.
-- **Helpers orbit.** Subagents show up as glowing spheres around their character. The robot vacuum speeds up with your CPU load and docks in the evening.
-- **One look per session.** Every character picks its own look each day and keeps it for the whole session. Click one and its Terminal tab comes to the front.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-cards-office-dark.png" />
+  <img src="docs/images/readme-cards-office-light.png" alt="Sky, weather, daylight: the sky follows your local time, with a location you get clouds, rain on the glass, fog, snow on the hills, the real sunrise and sunset, only the location rounded to about 1 km is sent. Holidays and outfits: the office decorates itself for Valentine's Day, Easter, Halloween, Advent, Christmas and New Year's Eve, and the team dresses for the occasion and the weather. Helpers orbit: subagents show up as glowing spheres around their character, the robot vacuum speeds up with your CPU load and docks in the evening. One look per session: every character picks its own look each day and keeps it for the whole session, click one and its Terminal tab comes to the front." />
+</picture>
 
-| Real weather from your location | Snow that settles, scarves when it's freezing |
-|:---:|:---:|
-| <img src="docs/screenshots/en/office-rain.jpg" width="420" alt="Rain running down the glass front of the office." /> | <img src="docs/screenshots/en/office-snow.jpg" width="420" alt="Snow settling on the hills outside, characters wearing scarves inside." /> |
-| **It decorates itself through Advent** | **Party hats and fireworks on New Year's Eve** |
-| <img src="docs/screenshots/en/office-christmas.jpg" width="420" alt="Christmas Eve in the office: tree, string lights, presents and Santa hats." /> | <img src="docs/screenshots/en/office-newyear.jpg" width="420" alt="New Year's Eve: fireworks behind the glass and party hats on the characters." /> |
+<p align="center">
+<img src="docs/screenshots/en/office-rain.jpg" width="49%" alt="Rain running down the glass front of the office." />
+<img src="docs/screenshots/en/office-snow.jpg" width="49%" alt="Snow settling on the hills outside, characters wearing scarves inside." />
+<img src="docs/screenshots/en/office-christmas.jpg" width="49%" alt="Christmas Eve in the office: tree, string lights, presents and Santa hats." />
+<img src="docs/screenshots/en/office-newyear.jpg" width="49%" alt="New Year's Eve: fireworks behind the glass and party hats on the characters." />
+<br/><sub>Real weather from your location. Snow that settles, scarves when it's freezing. It decorates itself through Advent. Party hats and fireworks on New Year's Eve.</sub>
+</p>
 
 <details>
 <summary><b>More screenshots</b></summary>
 <br/>
 
-| Coffee bar | Halloween |
-|:---:|:---:|
-| <img src="docs/screenshots/en/office-coffee.jpg" width="420" alt="Two characters queue at the espresso machine behind the sofa while the others keep typing." /> | <img src="docs/screenshots/en/office-halloween.jpg" width="420" alt="Halloween in the office: pumpkins, paper bats and characters in costume." /> |
-| **Spring** | **Easter** |
-| <img src="docs/screenshots/en/office-spring.jpg" width="420" alt="Spring outside the office window: trees in pink blossom." /> | <img src="docs/screenshots/en/office-easter.jpg" width="420" alt="Easter in the office: bunny ears on the characters and painted eggs hidden around the room." /> |
+<p align="center">
+<img src="docs/screenshots/en/office-coffee.jpg" width="49%" alt="Two characters queue at the espresso machine behind the sofa while the others keep typing." />
+<img src="docs/screenshots/en/office-halloween.jpg" width="49%" alt="Halloween in the office: pumpkins, paper bats and characters in costume." />
+<img src="docs/screenshots/en/office-spring.jpg" width="49%" alt="Spring outside the office window: trees in pink blossom." />
+<img src="docs/screenshots/en/office-easter.jpg" width="49%" alt="Easter in the office: bunny ears on the characters and painted eggs hidden around the room." />
+<br/><sub>Coffee bar, Halloween, spring and Easter.</sub>
+</p>
 
 </details>
 
@@ -147,13 +138,7 @@ Pair your Macs with a code and the sessions running on the others show up in the
 
 No account, no installer. Just the app. Everything beyond the two requirements is optional and off until you turn it on.
 
-| | |
-|:--|:--|
-| **macOS 14 or later** on Apple Silicon (built and tested on macOS 27) | Required |
-| **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)**, AgentBar reads its local session logs | Required |
-| **Claude Code hooks** for precise detection | Optional |
-| **A weather location** for the real weather in the office | Optional |
-| **Other Macs** paired with a code | Optional |
+**Required:** macOS 14 or later on Apple Silicon (built and tested on macOS 27), and [Claude Code](https://docs.anthropic.com/en/docs/claude-code), whose local session logs AgentBar reads. **Optional:** Claude Code hooks for precise detection, a weather location for the real weather in the office, and other Macs paired with a code.
 
 ### Install
 
