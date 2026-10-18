@@ -328,6 +328,10 @@ struct SessionRow: View {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(alignment: .firstTextBaseline, spacing: 5) {
                             Text(s.displayName).font(.system(size: 13)).lineLimit(1)
+                            if s.remoteControl {
+                                Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 10))
+                                    .foregroundStyle(.secondary).help("Remote Control")
+                            }
                             if s.title != nil, s.displayName != s.project {
                                 Text(s.project).font(.system(size: 11)).foregroundStyle(.tertiary)
                                     .lineLimit(1).layoutPriority(-1)
@@ -348,7 +352,7 @@ struct SessionRow: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("\(s.displayName), \(s.status.label), \(subtitle)")
+            .accessibilityLabel("\(s.displayName)\(s.remoteControl ? ", Remote Control" : ""), \(s.status.label), \(subtitle)")
             .accessibilityHint(expanded ? L("Details ausblenden", "Hide details") : L("Details zeigen", "Show details"))
             .accessibilityAction(named: L("Zur Sitzung", "Go to Session")) { if s.device == nil { Focus.open(s) } }
             .contextMenu { if s.device == nil { actions } }
@@ -404,7 +408,7 @@ struct SessionRow: View {
                 detail(L("Ordner", "Folder"), s.cwd.replacingOccurrences(of: NSHomeDirectory(), with: "~"), middle: true)
                 detail(L("Modell", "Model"), [shortModel(s.model), modeLabel(s.permissionMode)]
                     .compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "))
-                detail(L("Läuft in", "Runs in"), hostName(s))
+                detail(L("Läuft in", "Runs in"), hostName(s) + (s.remoteControl ? " · Remote Control" : ""))
                 detail("Tokens", formatTokens(s.totalTokens) + (s.cost.map { " · ≈ \(formatMoney($0))" } ?? ""))
                 if let f = s.contextFill {
                     detail(L("Kontext", "Context"), percentText(Int((f * 100).rounded())) + L(" von ", " of ") + s.contextWindowText

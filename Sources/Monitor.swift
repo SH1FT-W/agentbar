@@ -180,7 +180,7 @@ private final class MonitorCore: @unchecked Sendable {
     private var files: [String: FileState] = [:]          // Pfad → Zustand
     private var hooks: [String: HookState] = [:]          // session_id → letzter Hook
     private var hookOffset: UInt64 = 0
-    private var registryEntries: [pid_t: (stamp: Date, sid: String)] = [:]   // ~/.claude/sessions: pid → Sitzung (auch falls iCloud die Datei auslagert)
+    private var registryEntries: [pid_t: (stamp: Date, sid: String, bridged: Bool)] = [:]   // ~/.claude/sessions: pid → Sitzung (auch falls iCloud die Datei auslagert)
     private var procCache: (time: Date, registered: Set<pid_t>, unregistered: [Date])?
     private var tickItem: DispatchWorkItem?
     private var busy = true                                   // aktive Sitzungen → kurzer Takt
@@ -653,11 +653,11 @@ private final class MonitorCore: @unchecked Sendable {
 
     /// Claude Code (ab ~2.1) meldet jeden laufenden Terminal-Prozess in ~/.claude/sessions/<pid>.json an und
     /// löscht die Datei beim Beenden. `complete` nur, wenn jede Datei lesbar ist; `unregistered` = Startzeiten
-    /// lokaler claude-Prozesse ohne Anmeldung (ältere Versionen).
-    private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date]) {
+    /// lokaler claude-Prozesse ohne Anmeldung (ältere Versionen). `bridged` = Sitzungen mit Remote Control (`bridgeSessionId`).
+    private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date], bridged: Set<String>) {
         let fm = FileManager.default
-        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return ([], false, []) }
-        var seen: [pid_t: (stamp: Date, sid: String)] = [:]
+        guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return ([], false, [], []) }
+        var seen: [pid_t: (stamp: Date, sid: String, bridged: Bool)] = [:]
         var pids = Set<pid_t>(), complete = true
         for f in items where f.pathExtension == "json" {
             guard let pid = pid_t(f.deletingPathExtension().lastPathComponent) else { continue }
@@ -667,7 +667,7 @@ private final class MonitorCore: @unchecked Sendable {
             if let old = registryEntries[pid], old.stamp == stamp { seen[pid] = old; continue }
             if isLocal(f), let d = try? Data(contentsOf: f),
                let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let sid = j["sessionId"] as? String {
-                seen[pid] = (stamp, sid)
+                seen[pid] = (stamp, sid, (j["bridgeSessionId"] as? String)?.isEmpty == false)
             } else if let old = registryEntries[pid] {
                 // iCloud hat die Datei ausgelagert – letzte bekannte Sitzung nehmen, im Hintergrund nachladen
                 seen[pid] = old
@@ -678,14 +678,15 @@ private final class MonitorCore: @unchecked Sendable {
             }
         }
         registryEntries = seen
+        let bridged = Set(seen.values.filter(\.bridged).map(\.sid))
         // Prozessliste (alle PIDs, Pfade, Eltern) ist teuer: nur alle 15 s oder wenn sich die Anmeldungen ändern
         let now = Date()
         if let c = procCache, c.registered == pids, now.timeIntervalSince(c.time) < 15 {
-            return (Set(seen.values.map(\.sid)), complete, c.unregistered)
+            return (Set(seen.values.map(\.sid)), complete, c.unregistered, bridged)
         }
         let unregistered = claudePids().filter { !pids.contains($0) }.compactMap(processStart)
         procCache = (now, pids, unregistered)
-        return (Set(seen.values.map(\.sid)), complete, unregistered)
+        return (Set(seen.values.map(\.sid)), complete, unregistered, bridged)
     }
 
     /// Nicht angemeldete Sitzungen, die noch laufen dürften: je alter Prozess die eine Sitzung, deren Datei kurz nach
@@ -890,7 +891,7 @@ private final class MonitorCore: @unchecked Sendable {
                 contextUsed: st.contextUsed,
                 contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || Self.millionByDefault(st.model)
                                                     || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0,
-                question: status == .waiting ? st.question : nil))
+                question: status == .waiting ? st.question : nil, remoteControl: registry.bridged.contains(sid)))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0

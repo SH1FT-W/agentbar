@@ -148,6 +148,7 @@ struct AgentSession: Identifiable, Equatable {
     var device: String?           // Name des anderen Macs, nil = läuft auf diesem Mac
     var deviceIsLaptop = false
     var question: String? = nil   // Fragetext, solange die Sitzung auf eine Antwort (AskUserQuestion) wartet
+    var remoteControl = false     // per Remote Control mit claude.ai/der Claude-App auf dem Handy verbunden
 
     var deviceSymbol: String { deviceIsLaptop ? "laptopcomputer" : "desktopcomputer" }
 

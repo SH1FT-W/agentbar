@@ -73,6 +73,7 @@ private struct Envelope: Codable {
         var tokens: [String: [Int]]
         var helpers: [Helper]
         var q: String?            // Fragetext (ab 2.0; ältere Versionen ignorieren/fehlen → nil)
+        var rc: Bool?             // Remote Control verbunden (fehlt bei älteren Versionen → nil)
     }
     struct Helper: Codable {
         var id, type, description, activity: String
@@ -91,7 +92,7 @@ private extension AgentSession {
                      tokens: tokens.mapValues { [$0.input, $0.cacheWrite, $0.cacheRead, $0.output] },
                      helpers: subagents.prefix(12).map { .init(id: $0.id, type: $0.type, description: $0.description, activity: $0.activity,
                                                                working: $0.working, last: $0.lastActivity.timeIntervalSince1970) },
-                     q: question.map { String($0.prefix(200)) })
+                     q: question.map { String($0.prefix(200)) }, rc: remoteControl ? true : nil)
     }
 
     init?(_ w: Envelope.Wire, device: String, laptop: Bool) {
@@ -104,7 +105,8 @@ private extension AgentSession {
                   subagents: w.helpers.map { SubAgent(id: $0.id, type: $0.type, description: $0.description, working: $0.working,
                                                       activity: $0.activity, lastActivity: Date(timeIntervalSince1970: $0.last)) },
                   hostBundle: nil, tty: nil, usesHooks: false, contextUsed: w.ctx, contextWindow: w.window,
-                  device: device, deviceIsLaptop: laptop, question: w.q.map { String($0.prefix(200)) })
+                  device: device, deviceIsLaptop: laptop, question: w.q.map { String($0.prefix(200)) },
+                  remoteControl: w.rc ?? false)
     }
 }
 
