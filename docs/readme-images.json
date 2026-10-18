@@ -30,7 +30,7 @@
       { "icon": "coffee-outline", "title": "Coffee bar", "ver": "2.3", "text": "Agents that just finished a task sometimes walk over to the espresso machine, queue up, have a little chat and bring the mug back to their desk." },
       { "icon": "leaf", "title": "Seasons", "ver": "2.3", "text": "The trees blossom in spring, turn golden in autumn and go bare in winter. Flipped for the southern hemisphere once a weather location is set." },
       { "icon": "halloween", "title": "Halloween", "ver": "2.3", "text": "Pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum." },
-      { "icon": "egg-easter", "title": "Easter and Valentine's Day", "ver": "2.3", "text": "An egg tree, hidden eggs and bunny ears at Easter. Hearts in February. Advent, Christmas and New Year's Eve were already there." },
+      { "icon": "cellphone-wireless", "title": "Remote Control", "ver": "26.10.12", "text": "Sessions you drive with Remote Control from your phone or claude.ai carry a small phone symbol next to their name, on your other Macs too." },
       { "icon": "star-shooting-outline", "title": "Rare moments", "ver": "2.3", "text": "A shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Keep an eye on the window." },
       { "icon": "calendar-outline", "title": "Calendar versions", "ver": "26.10.11", "text": "Versions count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1." }
     ],
@@ -54,7 +54,7 @@
       { "icon": "coffee-outline", "title": "Kaffeebar", "ver": "2.3", "text": "Agenten, die gerade eine Aufgabe beendet haben, gehen manchmal zur Espressomaschine, stellen sich an, plaudern kurz und bringen die Tasse zurück an den Platz." },
       { "icon": "leaf", "title": "Jahreszeiten", "ver": "2.3", "text": "Die Bäume blühen im Frühling, werden im Herbst golden und sind im Winter kahl. Für die Südhalbkugel gespiegelt, sobald ein Wetterort gesetzt ist." },
       { "icon": "halloween", "title": "Halloween", "ver": "2.3", "text": "Kürbisse auf den Tischen, Papierfledermäuse am Glas, Kostüme fürs Team und ein Geisterlaken über dem Saugroboter." },
-      { "icon": "egg-easter", "title": "Ostern und Valentinstag", "ver": "2.3", "text": "Ein Eierbaum, versteckte Eier und Hasenohren zu Ostern. Herzen im Februar. Advent, Weihnachten und Silvester gab es schon." },
+      { "icon": "cellphone-wireless", "title": "Remote Control", "ver": "26.10.12", "text": "Sitzungen, die du per Remote Control vom Handy oder von claude.ai steuerst, tragen ein kleines Handy-Symbol neben dem Namen, auch auf deinen anderen Macs." },
       { "icon": "star-shooting-outline", "title": "Seltene Momente", "ver": "2.3", "text": "Eine Sternschnuppe, ein Vogelschwarm, ein Regenbogen bei leichtem Regen, ein Schneemann, wenn Schnee liegen bleibt, Pizza am Freitagmittag." },
       { "icon": "calendar-outline", "title": "Kalender-Versionen", "ver": "26.10.11", "text": "Versionen zählen Jahr.Monat.Nummer: 26.10.11 ist das 11. Release im Oktober 2026. Die Update-Prüfung sieht es als neuer als 2.3.1." }
     ],
