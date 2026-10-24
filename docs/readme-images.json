@@ -5,74 +5,300 @@
     "eyebrow": "For Claude Code on the Mac",
     "lead": "Your agents.<br><em>In the menu bar.</em>",
     "sub": "Shows what every Claude Code session is doing, quiet until one needs you. And it comes with a tiny office where your agents actually work.",
-    "pills": [["macOS 14+"], ["Claude Code", "v"], ["Menu bar"]],
+    "pills": [
+      [
+        "macOS 14+"
+      ],
+      [
+        "Claude Code",
+        "v"
+      ],
+      [
+        "Menu bar"
+      ]
+    ],
     "logo": "docs/icon.png",
-    "shot": { "light": "docs/screenshots/en/office-day.jpg", "dark": "docs/screenshots/en/office-night.jpg", "srcW": 1600, "winW": 1600, "s": 0.6125,
-      "strips": [[230, 960]], "bar": "AgentBar › Office", "left": 600, "top": 96 }
+    "shot": {
+      "light": "docs/screenshots/en/office-day.jpg",
+      "dark": "docs/screenshots/en/office-night.jpg",
+      "srcW": 1600,
+      "winW": 1600,
+      "s": 0.6125,
+      "strips": [
+        [
+          230,
+          960
+        ]
+      ],
+      "bar": "AgentBar › Office",
+      "left": 600,
+      "top": 96
+    }
   },
   "titleVariants": {
     "de": {
       "eyebrow": "Für Claude Code auf dem Mac",
       "lead": "Deine Agenten.<br><em>In der Menüleiste.</em>",
       "sub": "Zeigt, was jede Claude-Code-Sitzung gerade tut, ruhig, bis eine dich braucht. Dazu ein kleines Büro, in dem deine Agenten wirklich arbeiten.",
-      "pills": [["macOS 14+"], ["Claude Code", "v"], ["Menüleiste"]],
-      "shot": { "light": "docs/screenshots/de/office-day.jpg", "dark": "docs/screenshots/de/office-night.jpg", "bar": "AgentBar › Büro" }
+      "pills": [
+        [
+          "macOS 14+"
+        ],
+        [
+          "Claude Code",
+          "v"
+        ],
+        [
+          "Menüleiste"
+        ]
+      ],
+      "shot": {
+        "light": "docs/screenshots/de/office-day.jpg",
+        "dark": "docs/screenshots/de/office-night.jpg",
+        "bar": "AgentBar › Büro"
+      }
     }
   },
   "colors": {
-    "light": { "bg": "#fbfbfd", "bg2": "#f3f3f6", "ink": "#1d1d1f", "ink2": "#55555b", "ink3": "#86868b", "accentText": "#0071e3", "accent": "#0071e3", "accent2": "#34c759",
-      "glow1": "rgba(0,113,227,0.16)", "glow2": "rgba(52,199,89,0.14)", "frame": "rgba(29,29,31,0.10)", "pillBg": "#ffffff", "pillLine": "rgba(29,29,31,0.08)", "win": "#ffffff", "bar": "linear-gradient(#fff, #f5f5f7)" },
-    "dark": { "bg": "#000000", "bg2": "#141418", "ink": "#f5f5f7", "ink2": "rgba(235,235,245,0.72)", "ink3": "rgba(235,235,245,0.5)", "accentText": "#2997ff", "accent": "#2997ff", "accent2": "#30d158",
-      "glow1": "rgba(41,151,255,0.22)", "glow2": "rgba(48,209,88,0.12)", "frame": "rgba(255,255,255,0.10)", "pillBg": "rgba(255,255,255,0.06)", "pillLine": "rgba(255,255,255,0.10)", "win": "#18181b", "bar": "linear-gradient(#202024, #18181b)" }
+    "light": {
+      "bg": "#fbfbfd",
+      "bg2": "#f3f3f6",
+      "ink": "#1d1d1f",
+      "ink2": "#55555b",
+      "ink3": "#86868b",
+      "accentText": "#0071e3",
+      "accent": "#0071e3",
+      "accent2": "#34c759",
+      "glow1": "rgba(0,113,227,0.16)",
+      "glow2": "rgba(52,199,89,0.14)",
+      "frame": "rgba(29,29,31,0.10)",
+      "pillBg": "#ffffff",
+      "pillLine": "rgba(29,29,31,0.08)",
+      "win": "#ffffff",
+      "bar": "linear-gradient(#fff, #f5f5f7)"
+    },
+    "dark": {
+      "bg": "#000000",
+      "bg2": "#141418",
+      "ink": "#f5f5f7",
+      "ink2": "rgba(235,235,245,0.72)",
+      "ink3": "rgba(235,235,245,0.5)",
+      "accentText": "#2997ff",
+      "accent": "#2997ff",
+      "accent2": "#30d158",
+      "glow1": "rgba(41,151,255,0.22)",
+      "glow2": "rgba(48,209,88,0.12)",
+      "frame": "rgba(255,255,255,0.10)",
+      "pillBg": "rgba(255,255,255,0.06)",
+      "pillLine": "rgba(255,255,255,0.10)",
+      "win": "#18181b",
+      "bar": "linear-gradient(#202024, #18181b)"
+    }
   },
   "cards": {
     "new": [
-      { "icon": "coffee-outline", "title": "Coffee bar", "ver": "2.3", "text": "Agents that just finished a task sometimes walk over to the espresso machine, queue up, have a little chat and bring the mug back to their desk." },
-      { "icon": "leaf", "title": "Seasons", "ver": "2.3", "text": "The trees blossom in spring, turn golden in autumn and go bare in winter. Flipped for the southern hemisphere once a weather location is set." },
-      { "icon": "halloween", "title": "Halloween", "ver": "2.3", "text": "Pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum." },
-      { "icon": "cellphone-wireless", "title": "Remote Control", "ver": "26.10.12", "text": "Sessions you drive with Remote Control from your phone or claude.ai carry a small phone symbol next to their name, on your other Macs too." },
-      { "icon": "star-shooting-outline", "title": "Rare moments", "ver": "2.3", "text": "A shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Keep an eye on the window." },
-      { "icon": "calendar-outline", "title": "Calendar versions", "ver": "26.10.11", "text": "Versions count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1." }
+      {
+        "icon": "coffee-outline",
+        "title": "Coffee bar",
+        "ver": "2.3",
+        "text": "Agents that just finished a task sometimes walk over to the espresso machine, queue up, have a little chat and bring the mug back to their desk."
+      },
+      {
+        "icon": "leaf",
+        "title": "Seasons",
+        "ver": "2.3",
+        "text": "The trees blossom in spring, turn golden in autumn and go bare in winter. Flipped for the southern hemisphere once a weather location is set."
+      },
+      {
+        "icon": "halloween",
+        "title": "Halloween",
+        "ver": "2.3",
+        "text": "Pumpkins on the desks, paper bats on the glass, costumes for the team and a ghost sheet over the robot vacuum."
+      },
+      {
+        "icon": "cellphone-wireless",
+        "title": "Remote Control",
+        "ver": "26.10.12",
+        "text": "Sessions you drive with Remote Control from your phone or claude.ai carry a small phone symbol next to their name, on your other Macs too."
+      },
+      {
+        "icon": "star-shooting-outline",
+        "title": "Rare moments",
+        "ver": "2.3",
+        "text": "A shooting star, a flock of birds, a rainbow in light rain, a snowman when snow settles, pizza on Friday lunchtime. Keep an eye on the window."
+      },
+      {
+        "icon": "calendar-outline",
+        "title": "Calendar versions",
+        "ver": "26.10.11",
+        "text": "Versions count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1."
+      }
     ],
     "menu": [
-      { "icon": "hand-wave-outline", "title": "Knows when you're needed", "text": "Working, waiting for approval, done, error or idle. With Claude Code hooks AgentBar knows the moment it happens instead of guessing from pauses." },
-      { "icon": "chart-donut", "title": "Usage as activity rings", "text": "Your 5-hour and weekly plan usage, Apple Watch style, with a forecast of how long the window lasts at your pace. The token is only read, never refreshed." },
-      { "icon": "chart-bar", "title": "Today and 7 days", "text": "Tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today. Computed locally from Claude Code's logs." },
-      { "icon": "gauge", "title": "Context at a glance", "text": "Every row shows tokens and a small context bar. It turns orange when the window is almost full, and the character in the office looks tired too." },
-      { "icon": "console", "title": "Jump right in", "text": "Click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front." },
-      { "icon": "bell-outline", "title": "Notifications", "text": "When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck. With quiet hours and a one-hour mute." },
-      { "icon": "keyboard-outline", "title": "Keyboard and VoiceOver", "text": "Arrow keys to select, Return to jump, Space to expand, ⌘R to reload. Every row and ring has a proper accessibility label." },
-      { "icon": "coffee", "title": "Keep awake", "text": "Stop your Mac from sleeping: always, or only while agents are working. Plus launch at login and the update window." }
+      {
+        "icon": "hand-wave-outline",
+        "title": "Knows when you're needed",
+        "text": "Working, waiting for approval, done, error or idle. With Claude Code hooks AgentBar knows the moment it happens instead of guessing from pauses."
+      },
+      {
+        "icon": "chart-donut",
+        "title": "Usage as activity rings",
+        "text": "Your 5-hour and weekly plan usage, Apple Watch style, with a forecast of how long the window lasts at your pace. The token is only read, never refreshed."
+      },
+      {
+        "icon": "chart-bar",
+        "title": "Today and 7 days",
+        "text": "Tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today. Computed locally from Claude Code's logs."
+      },
+      {
+        "icon": "gauge",
+        "title": "Context at a glance",
+        "text": "Every row shows tokens and a small context bar. It turns orange when the window is almost full, and the character in the office looks tired too."
+      },
+      {
+        "icon": "console",
+        "title": "Jump right in",
+        "text": "Click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front."
+      },
+      {
+        "icon": "bell-outline",
+        "title": "Notifications",
+        "text": "When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck. With quiet hours and a one-hour mute."
+      },
+      {
+        "icon": "keyboard-outline",
+        "title": "Keyboard and VoiceOver",
+        "text": "Arrow keys to select, Return to jump, Space to expand, ⌘R to reload. Every row and ring has a proper accessibility label."
+      },
+      {
+        "icon": "coffee",
+        "title": "Keep awake",
+        "text": "Stop your Mac from sleeping: always, or only while agents are working. Plus launch at login and the update window."
+      }
     ],
     "office": [
-      { "icon": "weather-partly-cloudy", "title": "Sky, weather, daylight", "text": "The sky follows your local time. With a location you get clouds, rain on the glass, fog, snow on the hills, the real sunrise and sunset. Only the location rounded to about 1 km is sent." },
-      { "icon": "party-popper", "title": "Holidays and outfits", "text": "The office decorates itself for Valentine's Day, Easter, Halloween, Advent, Christmas and New Year's Eve, and the team dresses for the occasion and the weather." },
-      { "icon": "orbit", "title": "Helpers orbit", "text": "Subagents show up as glowing spheres around their character. The robot vacuum speeds up with your CPU load and docks in the evening." },
-      { "icon": "account-outline", "title": "One look per session", "text": "Every character picks its own look each day and keeps it for the whole session. Click one and its Terminal tab comes to the front." }
+      {
+        "icon": "weather-partly-cloudy",
+        "title": "Sky, weather, daylight",
+        "text": "The sky follows your local time. With a location you get clouds, rain on the glass, fog, snow on the hills, the real sunrise and sunset. Only the location rounded to about 1 km is sent."
+      },
+      {
+        "icon": "party-popper",
+        "title": "Holidays and outfits",
+        "text": "The office decorates itself for Valentine's Day, Easter, Halloween, Advent, Christmas and New Year's Eve, and the team dresses for the occasion and the weather."
+      },
+      {
+        "icon": "orbit",
+        "title": "Helpers orbit",
+        "text": "Subagents show up as glowing spheres around their character. The robot vacuum speeds up with your CPU load and docks in the evening."
+      },
+      {
+        "icon": "account-outline",
+        "title": "One look per session",
+        "text": "Every character picks its own look each day and keeps it for the whole session. Click one and its Terminal tab comes to the front."
+      }
     ],
     "new-de": [
-      { "icon": "coffee-outline", "title": "Kaffeebar", "ver": "2.3", "text": "Agenten, die gerade eine Aufgabe beendet haben, gehen manchmal zur Espressomaschine, stellen sich an, plaudern kurz und bringen die Tasse zurück an den Platz." },
-      { "icon": "leaf", "title": "Jahreszeiten", "ver": "2.3", "text": "Die Bäume blühen im Frühling, werden im Herbst golden und sind im Winter kahl. Für die Südhalbkugel gespiegelt, sobald ein Wetterort gesetzt ist." },
-      { "icon": "halloween", "title": "Halloween", "ver": "2.3", "text": "Kürbisse auf den Tischen, Papierfledermäuse am Glas, Kostüme fürs Team und ein Geisterlaken über dem Saugroboter." },
-      { "icon": "cellphone-wireless", "title": "Remote Control", "ver": "26.10.12", "text": "Sitzungen, die du per Remote Control vom Handy oder von claude.ai steuerst, tragen ein kleines Handy-Symbol neben dem Namen, auch auf deinen anderen Macs." },
-      { "icon": "star-shooting-outline", "title": "Seltene Momente", "ver": "2.3", "text": "Eine Sternschnuppe, ein Vogelschwarm, ein Regenbogen bei leichtem Regen, ein Schneemann, wenn Schnee liegen bleibt, Pizza am Freitagmittag." },
-      { "icon": "calendar-outline", "title": "Kalender-Versionen", "ver": "26.10.11", "text": "Versionen zählen Jahr.Monat.Nummer: 26.10.11 ist das 11. Release im Oktober 2026. Die Update-Prüfung sieht es als neuer als 2.3.1." }
+      {
+        "icon": "coffee-outline",
+        "title": "Kaffeebar",
+        "ver": "2.3",
+        "text": "Agenten, die gerade eine Aufgabe beendet haben, gehen manchmal zur Espressomaschine, stellen sich an, plaudern kurz und bringen die Tasse zurück an den Platz."
+      },
+      {
+        "icon": "leaf",
+        "title": "Jahreszeiten",
+        "ver": "2.3",
+        "text": "Die Bäume blühen im Frühling, werden im Herbst golden und sind im Winter kahl. Für die Südhalbkugel gespiegelt, sobald ein Wetterort gesetzt ist."
+      },
+      {
+        "icon": "halloween",
+        "title": "Halloween",
+        "ver": "2.3",
+        "text": "Kürbisse auf den Tischen, Papierfledermäuse am Glas, Kostüme fürs Team und ein Geisterlaken über dem Saugroboter."
+      },
+      {
+        "icon": "cellphone-wireless",
+        "title": "Remote Control",
+        "ver": "26.10.12",
+        "text": "Sitzungen, die du per Remote Control vom Handy oder von claude.ai steuerst, tragen ein kleines Handy-Symbol neben dem Namen, auch auf deinen anderen Macs."
+      },
+      {
+        "icon": "star-shooting-outline",
+        "title": "Seltene Momente",
+        "ver": "2.3",
+        "text": "Eine Sternschnuppe, ein Vogelschwarm, ein Regenbogen bei leichtem Regen, ein Schneemann, wenn Schnee liegen bleibt, Pizza am Freitagmittag."
+      },
+      {
+        "icon": "calendar-outline",
+        "title": "Kalender-Versionen",
+        "ver": "26.10.11",
+        "text": "Versionen zählen Jahr.Monat.Nummer: 26.10.11 ist das 11. Release im Oktober 2026. Die Update-Prüfung sieht es als neuer als 2.3.1."
+      }
     ],
     "menu-de": [
-      { "icon": "hand-wave-outline", "title": "Weiß, wann du gebraucht wirst", "text": "Arbeitet, wartet auf Freigabe, fertig, Fehler oder untätig. Mit Claude-Code-Hooks weiß AgentBar es in dem Moment, statt aus Pausen zu raten." },
-      { "icon": "chart-donut", "title": "Kontingent als Aktivitätsringe", "text": "Dein 5-Stunden- und Wochenkontingent im Apple-Watch-Stil, mit Prognose, wie lange das Fenster bei deinem Tempo reicht. Der Token wird nur gelesen." },
-      { "icon": "chart-bar", "title": "Heute und 7 Tage", "text": "Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Diagramm und deine Top-Projekte heute. Lokal aus den Claude-Code-Logs berechnet." },
-      { "icon": "gauge", "title": "Kontext auf einen Blick", "text": "Jede Zeile zeigt Tokens und einen kleinen Kontextbalken. Er wird orange, wenn das Fenster fast voll ist, und die Figur im Büro sieht müde aus." },
-      { "icon": "console", "title": "Direkt hinspringen", "text": "Klick auf eine Figur im Büro oder Return im Menü, und genau der Terminal-Tab der Sitzung kommt nach vorn." },
-      { "icon": "bell-outline", "title": "Mitteilungen", "text": "Wenn ein Agent dich braucht (mit seiner Frage), fertig ist, scheitert, der Kontext ausgeht oder er festzuhängen scheint. Mit Ruhezeiten und einer Stunde Stumm." },
-      { "icon": "keyboard-outline", "title": "Tastatur und VoiceOver", "text": "Pfeiltasten zum Auswählen, Return zum Springen, Leertaste zum Aufklappen, ⌘R zum Neuladen. Jede Zeile und jeder Ring hat eine Beschriftung." },
-      { "icon": "coffee", "title": "Wach bleiben", "text": "Den Mac am Schlafen hindern: immer oder nur, solange Agenten arbeiten. Dazu Start bei der Anmeldung und das Update-Fenster." }
+      {
+        "icon": "hand-wave-outline",
+        "title": "Weiß, wann du gebraucht wirst",
+        "text": "Arbeitet, wartet auf Freigabe, fertig, Fehler oder untätig. Mit Claude-Code-Hooks weiß AgentBar es in dem Moment, statt aus Pausen zu raten."
+      },
+      {
+        "icon": "chart-donut",
+        "title": "Kontingent als Aktivitätsringe",
+        "text": "Dein 5-Stunden- und Wochenkontingent im Apple-Watch-Stil, mit Prognose, wie lange das Fenster bei deinem Tempo reicht. Der Token wird nur gelesen."
+      },
+      {
+        "icon": "chart-bar",
+        "title": "Heute und 7 Tage",
+        "text": "Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Diagramm und deine Top-Projekte heute. Lokal aus den Claude-Code-Logs berechnet."
+      },
+      {
+        "icon": "gauge",
+        "title": "Kontext auf einen Blick",
+        "text": "Jede Zeile zeigt Tokens und einen kleinen Kontextbalken. Er wird orange, wenn das Fenster fast voll ist, und die Figur im Büro sieht müde aus."
+      },
+      {
+        "icon": "console",
+        "title": "Direkt hinspringen",
+        "text": "Klick auf eine Figur im Büro oder Return im Menü, und genau der Terminal-Tab der Sitzung kommt nach vorn."
+      },
+      {
+        "icon": "bell-outline",
+        "title": "Mitteilungen",
+        "text": "Wenn ein Agent dich braucht (mit seiner Frage), fertig ist, scheitert, der Kontext ausgeht oder er festzuhängen scheint. Mit Ruhezeiten und einer Stunde Stumm."
+      },
+      {
+        "icon": "keyboard-outline",
+        "title": "Tastatur und VoiceOver",
+        "text": "Pfeiltasten zum Auswählen, Return zum Springen, Leertaste zum Aufklappen, ⌘R zum Neuladen. Jede Zeile und jeder Ring hat eine Beschriftung."
+      },
+      {
+        "icon": "coffee",
+        "title": "Wach bleiben",
+        "text": "Den Mac am Schlafen hindern: immer oder nur, solange Agenten arbeiten. Dazu Start bei der Anmeldung und das Update-Fenster."
+      }
     ],
     "office-de": [
-      { "icon": "weather-partly-cloudy", "title": "Himmel, Wetter, Tageslicht", "text": "Der Himmel folgt deiner Ortszeit. Mit einem Ort kommen Wolken, Regen am Glas, Nebel, Schnee auf den Hügeln, echter Sonnenauf- und -untergang. Nur der auf etwa 1 km gerundete Ort wird gesendet." },
-      { "icon": "party-popper", "title": "Feiertage und Outfits", "text": "Das Büro schmückt sich zu Valentinstag, Ostern, Halloween, Advent, Weihnachten und Silvester, und das Team kleidet sich passend zum Anlass und zum Wetter." },
-      { "icon": "orbit", "title": "Helfer kreisen", "text": "Subagenten erscheinen als leuchtende Kugeln um ihre Figur. Der Saugroboter wird mit deiner CPU-Last schneller und dockt abends an." },
-      { "icon": "account-outline", "title": "Ein Aussehen je Sitzung", "text": "Jede Figur wählt täglich ihr Aussehen und behält es für die ganze Sitzung. Klick auf eine, und ihr Terminal-Tab kommt nach vorn." }
+      {
+        "icon": "weather-partly-cloudy",
+        "title": "Himmel, Wetter, Tageslicht",
+        "text": "Der Himmel folgt deiner Ortszeit. Mit einem Ort kommen Wolken, Regen am Glas, Nebel, Schnee auf den Hügeln, echter Sonnenauf- und -untergang. Nur der auf etwa 1 km gerundete Ort wird gesendet."
+      },
+      {
+        "icon": "party-popper",
+        "title": "Feiertage und Outfits",
+        "text": "Das Büro schmückt sich zu Valentinstag, Ostern, Halloween, Advent, Weihnachten und Silvester, und das Team kleidet sich passend zum Anlass und zum Wetter."
+      },
+      {
+        "icon": "orbit",
+        "title": "Helfer kreisen",
+        "text": "Subagenten erscheinen als leuchtende Kugeln um ihre Figur. Der Saugroboter wird mit deiner CPU-Last schneller und dockt abends an."
+      },
+      {
+        "icon": "account-outline",
+        "title": "Ein Aussehen je Sitzung",
+        "text": "Jede Figur wählt täglich ihr Aussehen und behält es für die ganze Sitzung. Klick auf eine, und ihr Terminal-Tab kommt nach vorn."
+      }
     ]
   }
 }
