@@ -319,6 +319,19 @@ struct SessionRow: View {
     var selected = false
     var onHover: (Bool) -> Void = { _ in }
 
+    private func titleLine(_ s: AgentSession, project: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(s.displayName).font(.system(size: 13)).lineLimit(1)
+            if s.remoteControl {
+                Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 10))
+                    .foregroundStyle(.secondary).help("Remote Control")
+            }
+            if project {
+                Text(s.project).font(.system(size: 11)).foregroundStyle(.tertiary).lineLimit(1)
+            }
+        }
+    }
+
     var body: some View {
         let s = session
         VStack(alignment: .leading, spacing: 0) {
@@ -326,21 +339,16 @@ struct SessionRow: View {
                 HStack(spacing: 10) {
                     StatusCircle(status: s.status)
                     VStack(alignment: .leading, spacing: 1) {
-                        HStack(alignment: .firstTextBaseline, spacing: 5) {
-                            Text(s.displayName).font(.system(size: 13)).lineLimit(1)
-                            if s.remoteControl {
-                                Image(systemName: "iphone.radiowaves.left.and.right").font(.system(size: 10))
-                                    .foregroundStyle(.secondary).help("Remote Control")
-                            }
-                            if s.title != nil, s.displayName != s.project {
-                                Text(s.project).font(.system(size: 11)).foregroundStyle(.tertiary)
-                                    .lineLimit(1).layoutPriority(-1)
-                            }
+                        // Project name only when the whole line fits; squeezed it ended up as a lone "c" or "…"
+                        ViewThatFits(in: .horizontal) {
+                            titleLine(s, project: s.title != nil && s.displayName != s.project)
+                            titleLine(s, project: false)
                         }
                         HStack(spacing: 0) {
                             Text(subtitle).lineLimit(1).truncationMode(.tail)
                                 .foregroundStyle(s.status == .waiting || s.status == .error ? s.status.color : Color.secondary)
-                            if !s.subagents.isEmpty {
+                            // Not when the subtitle already says "Waiting for N helpers"
+                            if !s.subagents.isEmpty, !(s.status == .working && s.tool == "Agent" && s.workingHelpers > 0) {
                                 Text(" · \(helperText)").foregroundStyle(.secondary).fixedSize()
                             }
                         }
