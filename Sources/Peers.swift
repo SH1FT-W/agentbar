@@ -145,6 +145,7 @@ final class PeerHub: ObservableObject {
     private var restartPending = false
     private var configureGeneration = 0                 // verwirft Schlüssel, deren configure() inzwischen überholt ist
     private var masterCache: (code: String, key: SymmetricKey)?
+    private var skewReported = Set<String>()            // peers whose clock warning was already shown
     /// Unveränderte Liste nur alle 15 s erneut schicken (Lebenszeichen für den 35-s-Cutoff der Gegenseite).
     static let keepalive: TimeInterval = 15
     static let maxLinks = 8
@@ -275,6 +276,7 @@ final class PeerHub: ObservableObject {
         for l in links.values { l.cancel() }
         links = [:]; outgoing = [:]; lastResults = []
         code = nil; sealKey = nil; groupTag = nil
+        skewReported = []
         if !peers.isEmpty { peers = [:]; publish() }
     }
 
@@ -297,7 +299,7 @@ final class PeerHub: ObservableObject {
         let key = ObjectIdentifier(link)
         links[key] = link
         if let peer { outgoing[peer] = key }
-        link.onMessage = { [weak self] data in self?.received(data) ?? false }
+        link.onMessage = { [weak self] data in self?.received(data) ?? .invalid }
         link.onReady = { [weak self, weak link] in if let link { self?.send(to: link) } }
         link.onClose = { [weak self] in
             guard let self else { return }
@@ -338,21 +340,30 @@ final class PeerHub: ObservableObject {
         link.send(box.combined)
     }
 
-    /// false = nicht entschlüsselbar/lesbar → Verbindung wird geschlossen.
-    private func received(_ data: Data) -> Bool {
+    /// .invalid = not decryptable/readable → the link is closed. .stale = right key but too old or replayed:
+    /// ignored and does not make a link trusted (a recorded frame must not get past the handshake).
+    private func received(_ data: Data) -> PeerMessage {
         guard let sealKey, let box = try? ChaChaPoly.SealedBox(combined: data),
               let json = try? ChaChaPoly.open(box, using: sealKey),
               let env = try? JSONDecoder().decode(Envelope.self, from: json),
-              env.v == 1, env.from != myID else { return false }
+              env.v == 1, env.from != myID else { return .invalid }
         // Nur frische Nachrichten, und nie ältere nach neueren (gegen Wiedereinspielen)
         let now = Date().timeIntervalSince1970
-        guard abs(now - env.sent) < 120, env.sent > (peers[env.from]?.lastSent ?? 0) else { return true }
+        if abs(now - env.sent) >= 120, !skewReported.contains(env.from) {
+            // Otherwise a wrong clock on one Mac drops all its messages without any hint
+            skewReported.insert(env.from)
+            let name = String(env.name.prefix(40))
+            problem = L("Die Uhr von „\(name)“ weicht über 2 Min. ab – Datum & Uhrzeit prüfen.",
+                        "The clock on “\(name)” is off by more than 2 min – check Date & Time.")
+            NSLog("AgentBar: peer clock off by \(Int(now - env.sent)) s, messages ignored")
+        }
+        guard abs(now - env.sent) < 120, env.sent > (peers[env.from]?.lastSent ?? 0) else { return .stale }
         let name = String(env.name.prefix(40))
         let list = env.sessions.prefix(40).compactMap { AgentSession($0, device: name, laptop: env.laptop) }
         let changed = peers[env.from]?.sessions != list || peers[env.from]?.name != name
         peers[env.from] = Peer(id: env.from, name: name, laptop: env.laptop, sessions: list, lastSeen: Date(), lastSent: env.sent)
         if changed { publish() }
-        return true
+        return .fresh
     }
 
     private func publish() {
@@ -369,6 +380,9 @@ final class PeerHub: ObservableObject {
     }
 }
 
+/// Outcome of one received frame.
+private enum PeerMessage { case invalid, stale, fresh }
+
 /// Eine TCP-Verbindung mit Längen-Präfix (4 Byte) je Nachricht.
 @MainActor
 private final class PeerLink {
@@ -381,7 +395,7 @@ private final class PeerLink {
     /// Zuletzt geschickte Sitzungsliste (ohne Umschlag) und wann, damit Unverändertes nicht alle 5 s rausgeht
     var lastPayload: Data?
     var lastSent = Date.distantPast
-    var onMessage: ((Data) -> Bool)?
+    var onMessage: ((Data) -> PeerMessage)?
     var onReady: (() -> Void)?
     var onClose: (() -> Void)?
     private static let maxFrame = 512_000      // 40 Sitzungen passen locker hinein
@@ -447,8 +461,9 @@ private final class PeerLink {
                 guard let self else { return }
                 guard err == nil, let data, data.count == n else { self.close(); return }
                 // Nicht entschlüsselbar → sofort schließen
-                guard self.onMessage?(data) == true else { self.close(); return }
-                if !self.trusted {
+                let result = self.onMessage?(data) ?? .invalid
+                guard result != .invalid else { self.close(); return }
+                if result == .fresh, !self.trusted {
                     self.trusted = true
                     if !self.speaksFirst { self.onReady?() }   // jetzt antworten
                 }
