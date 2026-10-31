@@ -102,7 +102,8 @@ struct Festive: Equatable {
         if f.halloween == 2 {
             f.vacuumGhost = true
             f.outfitTheme = .halloween
-            f.outfitChance = h >= 17 || m == 11 ? 0.75 : 0.45
+            // Costume party: most dress up during the day, nearly everyone in the evening
+            f.outfitChance = h >= 17 || m == 11 ? 0.95 : 0.8
         }
 
         // Valentinstag

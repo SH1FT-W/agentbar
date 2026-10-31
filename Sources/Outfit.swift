@@ -4,13 +4,16 @@ import SwiftUI
 /// aber anders als die Nachbarn und morgen vielleicht anders.
 struct Outfit: Equatable {
     enum Theme { case none, christmas, newYear, halloween, valentine, easter }
-    enum Hat: Equatable { case none, santa, antlers, party(Int), beanie(Int), witch, catEars, horns, bunnyEars, hearts }
+    enum Hat: Equatable { case none, santa, antlers, party(Int), beanie(Int), witch, catEars, horns, bunnyEars, hearts, wizard, pumpkinCap, mummyWrap, skullPaint }
+    /// Full Halloween costume (Oct 31): sets shirt colour, headwear and extras on body and face.
+    enum Costume: Int, CaseIterable { case witch, vampire, skeleton, pumpkin, wizard, mummy, devil, cat }
 
     var hat = Hat.none
     /// Weihnachtspulli: ersetzt die Shirtfarbe, dazu ein Muster über der Brust
     var sweater: Int?
     var scarf: Int?
     var sunglasses = false
+    var costume: Costume?
 
     static let none = Outfit()
 
@@ -41,7 +44,10 @@ struct Outfit: Equatable {
         case .newYear where joins:
             o.hat = .party(variant % partyColors.count)
         case .halloween where joins:
-            o.hat = k < 0.4 ? .witch : k < 0.72 ? .catEars : .horns
+            // Mixed by the second hash value so neighbours rarely share a costume
+            let c = Costume.allCases[(variant + Int(k * 1000)) % Costume.allCases.count]
+            o.costume = c
+            o.hat = c.headwear
         case .valentine where joins:
             o.hat = .hearts
         case .easter where joins:
@@ -72,6 +78,10 @@ extension OfficeScene {
             if case .walking = a.pose { walking = true }
             b.outfit = Outfit.pick(id: a.id, day: day, festive: festive, temperature: weather?.temperature, walking: walking)
             if let c = b.outfit.sweater { b.look.shirt = Outfit.sweaterColors[c] }
+            if let c = b.outfit.costume {
+                b.look.shirt = c.shirt
+                if let p = c.pants { b.look.pants = p }
+            }
             return b
         }
     }
@@ -169,7 +179,7 @@ extension OfficeScene {
             // Gummiband
             var elastic = Path(); elastic.move(to: P(-r * 0.4, -r * 0.82)); elastic.addQuadCurve(to: P(-r * 0.7, r * 0.55), control: P(-r * 0.85, -r * 0.1))
             ctx.stroke(elastic, with: .color(.white.opacity(0.5)), lineWidth: 0.7 * s)
-        case .witch, .catEars, .horns, .bunnyEars, .hearts:
+        case .witch, .catEars, .horns, .bunnyEars, .hearts, .wizard, .pumpkinCap, .mummyWrap, .skullPaint:
             drawCostumeHat(&ctx, o.hat, r: r, s: s)
         case .beanie(let i):
             let col = Outfit.woolColors[i % Outfit.woolColors.count]

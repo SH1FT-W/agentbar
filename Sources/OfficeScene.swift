@@ -1273,17 +1273,20 @@ struct OfficeScene {
         let orbitC = P(head.x, head.y - 27 * s)
         if helpers > 0 { orbs(&ctx, orbitC, s, helpers, front: false) }
 
-        // Oberkörper
+        // Torso, with a Halloween cape behind it
+        drawCostumeBack(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, bottom: base + 2 * s, s: s, standing: false)
         let torso = CGRect(x: x - 25 * s, y: shoulderY, width: 50 * s, height: base - shoulderY + 4 * s)
         let torsoPath = Path(roundedRect: torso, cornerRadius: 19 * s, style: .continuous)
         ctx.fill(torsoPath, with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
         if a.outfit.sweater != nil { drawSweaterPattern(&ctx, torso: torsoPath, x: x, y: shoulderY + 13 * s, width: 50 * s, s: s) }
+        drawCostumeTorso(&ctx, outfit: a.outfit, torso: torsoPath, x: x, shoulderY: shoulderY, s: s)
         // Hals + Kragen
         ctx.fill(rounded(x - 6.5 * s, shoulderY - 9 * s, 13 * s, 14 * s, 5 * s), with: .color(T.skinShade))
         var collar = Path()
         collar.addArc(center: P(x, shoulderY + 1 * s), radius: 8 * s, startAngle: .degrees(20), endAngle: .degrees(160), clockwise: false)
         ctx.stroke(collar, with: .color(T.shirtShade), style: StrokeStyle(lineWidth: 2.2 * s, lineCap: .round))
         if a.pose != .napping { drawScarf(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s) }
+        if a.pose != .napping { drawCostumeCollar(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s) }
 
         // Kopf
         drawHead(&ctx, center: head, s: s, tones: T, look: a.look, pose: a.pose, tilt: tilt, tired: tiredness(a), outfit: a.outfit)
@@ -1403,6 +1406,7 @@ struct OfficeScene {
         let bob = idle ? CGFloat(sin(time * 1.4 + Double(x))) * 0.6 * s : abs(CGFloat(sin(t * 8.5))) * 2 * s
         shadow(&ctx, CGRect(x: x - 24 * s, y: feet - 5 * s, width: 48 * s, height: 10 * s), 0.2)
         let hip = feet - 38 * s - bob
+        drawCostumeBack(&ctx, outfit: a.outfit, x: x, shoulderY: hip - 46 * s, bottom: feet - 6 * s, s: s, standing: true, sway: swing * 0.5)
         for (side, d) in [(-1.0, swing), (1.0, -swing)] as [(CGFloat, CGFloat)] {
             var leg = Path(); leg.move(to: P(x + side * 8 * s, hip)); leg.addLine(to: P(x + side * 8 * s + d, feet - 6 * s))
             ctx.stroke(leg, with: .color(a.look.pants), style: StrokeStyle(lineWidth: 11.5 * s, lineCap: .round))
@@ -1418,6 +1422,7 @@ struct OfficeScene {
         let torsoPath = Path(roundedRect: torso, cornerRadius: 17 * s, style: .continuous)
         ctx.fill(torsoPath, with: vgrad([T.shirtLight, T.shirt, T.shirtShade], torso.minY, torso.maxY))
         if a.outfit.sweater != nil { drawSweaterPattern(&ctx, torso: torsoPath, x: x, y: shoulderY + 12 * s, width: 46 * s, s: s) }
+        drawCostumeTorso(&ctx, outfit: a.outfit, torso: torsoPath, x: x, shoulderY: shoulderY, s: s)
         var atMachine = false, waiting = false
         if idle, case .coffee(let k) = a.place, !a.cup { atMachine = k == 0; waiting = k == 1 }
         if atMachine {
@@ -1453,6 +1458,7 @@ struct OfficeScene {
         }
         ctx.fill(rounded(x - 6.5 * s, shoulderY - 9 * s, 13 * s, 14 * s, 5 * s), with: .color(T.skinShade))
         drawScarf(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s)
+        drawCostumeCollar(&ctx, outfit: a.outfit, x: x, shoulderY: shoulderY, s: s)
         drawHead(&ctx, center: P(x, shoulderY - 25 * s), s: s, tones: T, look: a.look, pose: a.pose, tilt: Double(swing) * 0.004, tired: tiredness(a), outfit: a.outfit)
     }
 
@@ -1471,13 +1477,16 @@ struct OfficeScene {
         ctx.translateBy(x: c.x, y: c.y)
         ctx.rotate(by: .radians(tilt))
         let r = 24 * s
+        // Costume face extras go on top of everything, also after the early return for yawning
+        defer { drawCostumeFace(&ctx, outfit: outfit, r: r, s: s) }
         let hairFill = GraphicsContext.Shading.linearGradient(Gradient(colors: [T.hairLight, T.hair, T.hairShade]), startPoint: P(-r * 0.5, -r * 1.1), endPoint: P(r * 0.3, r * 0.2))
 
         // Haare hinten
-        if L.hairStyle == 2 {
+        let wrapped = outfit.hat == .mummyWrap
+        if L.hairStyle == 2 && !wrapped {
             ctx.fill(Path(roundedRect: CGRect(x: -r - 4 * s, y: -r - 2 * s, width: 2 * r + 8 * s, height: 2 * r + 20 * s), cornerRadius: r, style: .continuous), with: hairFill)
         }
-        if L.hairStyle == 3 {
+        if L.hairStyle == 3 && !wrapped {
             ctx.fill(circle(P(0, -r - 5 * s), 10 * s), with: hairFill)
         }
         // Ohren

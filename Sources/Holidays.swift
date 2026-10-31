@@ -161,12 +161,14 @@ extension OfficeScene {
         ctx.fill(f, with: .color(inside))
     }
 
-    /// Floor-Kürbis neben der Feige (Halloween), versteckte Ostereier – als tiefensortierte Einträge.
+    /// Floor pumpkins (Halloween), versteckte Ostereier – als tiefensortierte Einträge.
     func holidayItems() -> [(CGFloat, (inout GraphicsContext) -> Void)] {
         var items: [(CGFloat, (inout GraphicsContext) -> Void)] = []
         if festive.halloween > 0 {
-            items.append((458, { c in drawPumpkin(&c, at: P(668, 458), r: 13) }))
-            if festive.halloween >= 2 { items.append((560, { c in drawPumpkin(&c, at: P(30, 560), r: 15, face: 1) })) }
+            // Free floor only: by the snake plant at the window (left of the first rear desk) and on the lounge rug
+            // left of the coffee table – off the aisles, the vacuum loop and the seats
+            items.append((Self.floorPumpkins[0].y, { c in drawPumpkin(&c, at: Self.floorPumpkins[0], r: 10) }))
+            if festive.halloween >= 2 { items.append((Self.floorPumpkins[1].y, { c in drawPumpkin(&c, at: Self.floorPumpkins[1], r: 13, face: 1) })) }
         }
         if festive.easter >= 2 {
             // Gut versteckt: hinter dem Bogenhanf, an der Feige, unter dem Sofa, am Tischbein, unterm Couchtisch, an der Kaffeebar
@@ -268,8 +270,8 @@ extension OfficeScene {
     func drawHolidayGlow(_ ctx: inout GraphicsContext) {
         guard festive.halloween > 0, nightK > 0.3 else { return }
         let k = nightK
-        var spots = [P(668, 444)]
-        if festive.halloween >= 2 { spots += [P(30, 544), Self.tablePumpkin] }
+        var spots = [P(Self.floorPumpkins[0].x, Self.floorPumpkins[0].y - 10)]
+        if festive.halloween >= 2 { spots += [P(Self.floorPumpkins[1].x, Self.floorPumpkins[1].y - 14), Self.tablePumpkin] }
         for (i, p) in spots.enumerated() {
             let flick = 0.85 + 0.15 * sin(time * 6 + Double(i) * 2)
             ctx.fill(circle(p, 46), with: glow(p, 46, rgb(0xFFB347), 0.38 * k * flick))
@@ -277,6 +279,8 @@ extension OfficeScene {
     }
 
     static let tablePumpkin = CGPoint(x: 872 + 30, y: 556 - 16)
+    /// Floor pumpkins (base point): week before Halloween only the first, on the day both.
+    static let floorPumpkins = [CGPoint(x: 96, y: 402), CGPoint(x: 762, y: 568)]
 
     // MARK: Kostüme (Kopf-Koordinaten wie drawHat)
 
@@ -352,7 +356,307 @@ extension OfficeScene {
                 ctx.stroke(spring, with: .color(rgb(0x3A3A3C)), lineWidth: 1 * s)
                 ctx.fill(heartPath(tip, r * 0.24), with: .linearGradient(Gradient(colors: [rgb(0xF0718A), rgb(0xC92F4E)]), startPoint: P(tip.x - r * 0.2, tip.y - r * 0.2), endPoint: P(tip.x + r * 0.2, tip.y + r * 0.2)))
             }
+        case .wizard:
+            // Tall midnight-blue hat with a bent tip, wide brim and gold stars
+            let brimY = -r * 0.7
+            let blue = rgb(0x34407E)
+            var cone = Path()
+            cone.move(to: P(-r * 0.66, brimY))
+            cone.addQuadCurve(to: P(-r * 0.05, -r * 2.15), control: P(-r * 0.4, -r * 1.6))
+            cone.addQuadCurve(to: P(r * 0.62, -r * 2.05), control: P(r * 0.3, -r * 2.45))
+            cone.addQuadCurve(to: P(r * 0.66, brimY), control: P(r * 0.3, -r * 1.5))
+            cone.closeSubpath()
+            ctx.fill(Path(ellipseIn: CGRect(x: -r * 1.45, y: brimY - r * 0.2, width: r * 2.9, height: r * 0.42)), with: .color(darker(blue, 0.2)))
+            ctx.fill(cone, with: .linearGradient(Gradient(colors: [lighter(blue, 0.18), blue]), startPoint: P(-r * 0.6, 0), endPoint: P(r * 0.6, 0)))
+            for (sx, sy, sr) in [(-0.2, -1.25, 0.2), (0.25, -1.65, 0.15), (0.18, -0.95, 0.13)] as [(CGFloat, CGFloat, CGFloat)] {
+                ctx.fill(starPath(P(sx * r, sy * r), sr * r), with: .color(rgb(0xF2C94C)))
+            }
+        case .pumpkinCap:
+            // Pumpkin hat: ribbed orange dome, green stem and a leaf
+            let orange = rgb(0xEE8A2C)
+            var dome = Path()
+            dome.addArc(center: P(0, -r * 0.42), radius: r * 1.06, startAngle: .degrees(180), endAngle: .degrees(360), clockwise: false)
+            dome.addQuadCurve(to: P(-r * 1.06, -r * 0.42), control: P(0, -r * 0.2))
+            ctx.fill(dome, with: .linearGradient(Gradient(colors: [lighter(orange, 0.15), orange, rgb(0xC9631C)]), startPoint: P(-r, -r * 1.4), endPoint: P(r, -r * 0.4)))
+            var ribs = Path()
+            for dx in [-0.5, 0, 0.5] as [CGFloat] {
+                ribs.move(to: P(dx * r * 0.7, -r * 1.42)); ribs.addQuadCurve(to: P(dx * r * 1.3, -r * 0.36), control: P(dx * r * 1.25, -r * 1.05))
+            }
+            var c = ctx
+            c.clip(to: dome)
+            c.stroke(ribs, with: .color(rgb(0xB5561A, 0.55)), lineWidth: 1.4 * s)
+            ctx.fill(rounded(-r * 0.09, -r * 1.75, r * 0.18, r * 0.36, 1.5 * s), with: .color(rgb(0x6B7A3A)))
+            ctx.fill(Path(ellipseIn: CGRect(x: 0, y: -r * 0.13, width: r * 0.5, height: r * 0.26))
+                        .applying(CGAffineTransform(translationX: r * 0.06, y: -r * 1.55).rotated(by: -0.4)), with: .color(rgb(0x5E9C52)))
+        case .mummyWrap:
+            // Bandages over the whole head, eyes and mouth stay free (they are drawn afterwards)
+            let wrap = Path(ellipseIn: CGRect(x: -r - 1.5 * s, y: -r - 1.5 * s, width: 2 * r + 3 * s, height: 2 * r * 1.03 + 3 * s))
+            ctx.fill(wrap, with: .radialGradient(Gradient(colors: [rgb(0xF6F1E4), rgb(0xE6DDC6), rgb(0xCFC3A6)]), center: P(-r * 0.25, -r * 0.3), startRadius: 0, endRadius: r * 1.35))
+            var c = ctx
+            c.clip(to: wrap)
+            var seams = Path()
+            for (k, y) in [-0.82, -0.52, -0.22, 0.42, 0.72].enumerated() {
+                let tiltY = (k % 2 == 0 ? 1.0 : -1.0) * r * 0.12
+                seams.move(to: P(-r * 1.1, y * r - tiltY)); seams.addLine(to: P(r * 1.1, y * r + tiltY))
+            }
+            c.stroke(seams, with: .color(rgb(0xA89A7A, 0.6)), lineWidth: 1.1 * s)
+            // Dark gap around the eyes
+            c.fill(Path(roundedRect: CGRect(x: -r * 0.78, y: -r * 0.2, width: r * 1.56, height: r * 0.5), cornerRadius: r * 0.2), with: .color(rgb(0x3A3128, 0.55)))
+        case .skullPaint:
+            // White face paint with dark eye sockets (eyes, nose and mouth are drawn on top)
+            let face = Path(ellipseIn: CGRect(x: -r, y: -r * 1.0, width: 2 * r, height: 2 * r * 1.03))
+            var c = ctx
+            c.clip(to: face)
+            c.fill(Path(ellipseIn: CGRect(x: -r * 0.92, y: -r * 0.5, width: r * 1.84, height: r * 1.6)), with: .color(rgb(0xF1EFE8)))
+            for side in [-1.0, 1.0] as [CGFloat] {
+                c.fill(Path(ellipseIn: CGRect(x: side * 8.2 * s - 6.4 * s, y: 1 * s - 6.8 * s, width: 12.8 * s, height: 12.6 * s)), with: .color(rgb(0x2A2A2E)))
+            }
         default: break
+        }
+    }
+
+    /// Small five-pointed star.
+    func starPath(_ c: CGPoint, _ r: CGFloat) -> Path {
+        var p = Path()
+        for i in 0..<10 {
+            let a = -Double.pi / 2 + Double(i) * .pi / 5
+            let rr = i % 2 == 0 ? r : r * 0.45
+            let q = P(c.x + CGFloat(cos(a)) * rr, c.y + CGFloat(sin(a)) * rr)
+            if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
+        }
+        p.closeSubpath()
+        return p
+    }
+
+    // MARK: Full costumes (Halloween day)
+
+    /// Behind the body: vampire cape, devil tail. `bottom` = lower end of the cape (seat or near the feet).
+    func drawCostumeBack(_ ctx: inout GraphicsContext, outfit o: Outfit, x: CGFloat, shoulderY: CGFloat, bottom: CGFloat, s: CGFloat, standing: Bool, sway: CGFloat = 0) {
+        guard let c = o.costume else { return }
+        switch c {
+        case .vampire, .wizard:
+            let outer = c == .vampire ? rgb(0x1C1A22) : rgb(0x2A3366)
+            let lining = c == .vampire ? rgb(0xB0202E) : rgb(0x4A58A0)
+            let flare: CGFloat = standing ? 36 : 33
+            var cape = Path()
+            cape.move(to: P(x - 18 * s, shoulderY + 2 * s))
+            cape.addQuadCurve(to: P(x - flare * s - sway, bottom), control: P(x - 30 * s, shoulderY + 20 * s))
+            cape.addQuadCurve(to: P(x + flare * s - sway, bottom), control: P(x, bottom + 6 * s))
+            cape.addQuadCurve(to: P(x + 18 * s, shoulderY + 2 * s), control: P(x + 30 * s, shoulderY + 20 * s))
+            cape.closeSubpath()
+            ctx.fill(cape, with: .color(outer))
+            var inner = Path()
+            inner.move(to: P(x - 15 * s, shoulderY + 6 * s))
+            inner.addQuadCurve(to: P(x - (flare - 4) * s - sway, bottom - 2 * s), control: P(x - 26 * s, shoulderY + 22 * s))
+            inner.addQuadCurve(to: P(x + (flare - 4) * s - sway, bottom - 2 * s), control: P(x, bottom + 3 * s))
+            inner.addQuadCurve(to: P(x + 15 * s, shoulderY + 6 * s), control: P(x + 26 * s, shoulderY + 22 * s))
+            inner.closeSubpath()
+            ctx.fill(inner, with: vgrad([darker(lining, 0.25), lining], shoulderY, bottom))
+        case .devil where standing:
+            // Tail with a spade tip, sticking out to the right (seated it would poke up behind the desk like an arrow)
+            let root = P(x + 14 * s, shoulderY + 48 * s)
+            let tip = P(x + 44 * s, root.y - 4 * s + CGFloat(sin(time * 2.2 + Double(x))) * 2 * s)
+            var tail = Path(); tail.move(to: root)
+            tail.addCurve(to: tip, control1: P(root.x + 26 * s, root.y + 14 * s), control2: P(tip.x - 14 * s, tip.y + 8 * s))
+            ctx.stroke(tail, with: .color(rgb(0xA4202B)), style: StrokeStyle(lineWidth: 3 * s, lineCap: .round))
+            var spade = Path()
+            spade.move(to: P(tip.x + 7 * s, tip.y - 6 * s))
+            spade.addLine(to: P(tip.x - 4 * s, tip.y - 3 * s)); spade.addLine(to: P(tip.x + 2 * s, tip.y + 6 * s)); spade.closeSubpath()
+            ctx.fill(spade, with: .color(rgb(0xC8303A)))
+        default: break
+        }
+    }
+
+    /// On the torso (clipped to it): ribs, pumpkin face, stars, bandages, shirt front.
+    func drawCostumeTorso(_ ctx: inout GraphicsContext, outfit o: Outfit, torso: Path, x: CGFloat, shoulderY y: CGFloat, s: CGFloat) {
+        guard let c = o.costume else { return }
+        var g = ctx
+        g.clip(to: torso)
+        switch c {
+        case .skeleton:
+            let bone = rgb(0xF1EFE8)
+            g.fill(rounded(x - 1.6 * s, y + 6 * s, 3.2 * s, 44 * s, 1.6 * s), with: .color(bone))
+            var ribs = Path()
+            for k in 0..<4 {
+                let ry = y + (12 + CGFloat(k) * 7) * s, w = (15 - CGFloat(k) * 1.5) * s
+                for side in [-1.0, 1.0] as [CGFloat] {
+                    ribs.move(to: P(x + side * 2.5 * s, ry))
+                    ribs.addQuadCurve(to: P(x + side * w, ry + 4 * s), control: P(x + side * w * 0.8, ry - 2.5 * s))
+                }
+            }
+            g.stroke(ribs, with: .color(bone), style: StrokeStyle(lineWidth: 2.6 * s, lineCap: .round))
+            // Collarbones
+            var cb = Path(); cb.move(to: P(x - 16 * s, y + 5 * s)); cb.addQuadCurve(to: P(x + 16 * s, y + 5 * s), control: P(x, y + 9 * s))
+            g.stroke(cb, with: .color(bone), style: StrokeStyle(lineWidth: 2.2 * s, lineCap: .round))
+        case .pumpkin:
+            var ribs = Path()
+            for dx in [-15.0, -6, 6, 15] as [CGFloat] {
+                ribs.move(to: P(x + dx * s, y)); ribs.addQuadCurve(to: P(x + dx * 1.15 * s, y + 60 * s), control: P(x + dx * 1.35 * s, y + 30 * s))
+            }
+            g.stroke(ribs, with: .color(rgb(0xB5561A, 0.45)), lineWidth: 1.4 * s)
+            let glowing = nightK > 0.3
+            let inside = glowing ? rgb(0xFFD36B) : rgb(0x5A2D10)
+            var f = Path()
+            let ey = y + 15 * s
+            for side in [-1.0, 1.0] as [CGFloat] {
+                f.move(to: P(x + side * 5 * s, ey - 4 * s)); f.addLine(to: P(x + side * 10 * s, ey + 3 * s)); f.addLine(to: P(x + side * 1.5 * s, ey + 3 * s)); f.closeSubpath()
+            }
+            let my = y + 25 * s
+            f.move(to: P(x - 12 * s, my))
+            for (tx, ty) in [(-7.0, 3.0), (-3.5, 0.5), (0, 3.5), (3.5, 0.5), (7, 3)] as [(CGFloat, CGFloat)] { f.addLine(to: P(x + tx * s, my + ty * s)) }
+            f.addLine(to: P(x + 12 * s, my))
+            f.addQuadCurve(to: P(x - 12 * s, my), control: P(x, my + 13 * s))
+            f.closeSubpath()
+            g.fill(f, with: .color(inside))
+        case .wizard:
+            for (dx, dy, r) in [(-12.0, 14.0, 3.2), (9, 24, 2.6), (-4, 36, 2.4), (14, 42, 3), (-15, 46, 2.2)] as [(CGFloat, CGFloat, CGFloat)] {
+                g.fill(starPath(P(x + dx * s, y + dy * s), r * s), with: .color(rgb(0xF2C94C)))
+            }
+            // Crescent moon
+            var moon = Path(); moon.addEllipse(in: CGRect(x: x + 3 * s, y: y + 6 * s, width: 9 * s, height: 9 * s))
+            g.fill(moon, with: .color(rgb(0xF2C94C)))
+            g.fill(circle(P(x + 10 * s, y + 9 * s), 4.2 * s), with: .color(rgb(0x34407E)))
+        case .mummy:
+            var seams = Path()
+            for k in 0..<9 {
+                let yy = y + CGFloat(k) * 7 * s
+                let d = (k % 2 == 0 ? 1.0 : -1.0) * 5 * s
+                seams.move(to: P(x - 30 * s, yy - d)); seams.addLine(to: P(x + 30 * s, yy + d))
+            }
+            g.stroke(seams, with: .color(rgb(0xA89A7A, 0.65)), lineWidth: 1.1 * s)
+            // A loose bandage end
+            g.fill(Path(roundedRect: CGRect(x: x + 8 * s, y: y + 20 * s, width: 5 * s, height: 16 * s), cornerRadius: 1.5 * s).applying(rot(0.25, P(x + 10 * s, y + 20 * s))), with: .color(rgb(0xF6F1E4)))
+        case .vampire:
+            // White shirt front with a red vest and a brooch
+            var front = Path()
+            front.move(to: P(x - 10 * s, y)); front.addLine(to: P(x + 10 * s, y)); front.addLine(to: P(x + 4 * s, y + 34 * s)); front.addLine(to: P(x - 4 * s, y + 34 * s)); front.closeSubpath()
+            g.fill(front, with: .color(rgb(0xF2F0EC)))
+            for side in [-1.0, 1.0] as [CGFloat] {
+                var vest = Path()
+                vest.move(to: P(x + side * 10 * s, y)); vest.addLine(to: P(x + side * 4 * s, y + 34 * s)); vest.addLine(to: P(x + side * 14 * s, y + 40 * s)); vest.addLine(to: P(x + side * 18 * s, y)); vest.closeSubpath()
+                g.fill(vest, with: .color(rgb(0x8E1C24)))
+            }
+            g.fill(circle(P(x, y + 9 * s), 3 * s), with: .radialGradient(Gradient(colors: [rgb(0xFF6B6B), rgb(0xA4202B)]), center: P(x - 1 * s, y + 8 * s), startRadius: 0, endRadius: 3.2 * s))
+        case .witch:
+            // Lacing across the bodice and an orange belt
+            var lace = Path()
+            for k in 0..<3 {
+                let yy = y + (10 + CGFloat(k) * 7) * s
+                lace.move(to: P(x - 5 * s, yy)); lace.addLine(to: P(x + 5 * s, yy + 6 * s))
+                lace.move(to: P(x + 5 * s, yy)); lace.addLine(to: P(x - 5 * s, yy + 6 * s))
+            }
+            g.stroke(lace, with: .color(rgb(0x1E1E22)), style: StrokeStyle(lineWidth: 1.3 * s, lineCap: .round))
+            g.fill(Path(CGRect(x: x - 30 * s, y: y + 34 * s, width: 60 * s, height: 5 * s)), with: .color(rgb(0xE8873A)))
+            g.fill(rounded(x - 4 * s, y + 33 * s, 8 * s, 7 * s, 1.5 * s), with: .color(rgb(0xF2C14E)))
+        case .cat:
+            g.fill(Path(ellipseIn: CGRect(x: x - 11 * s, y: y + 8 * s, width: 22 * s, height: 34 * s)), with: .color(rgb(0x5A5A62)))
+        case .devil:
+            var v = Path(); v.move(to: P(x - 12 * s, y)); v.addLine(to: P(x, y + 14 * s)); v.addLine(to: P(x + 12 * s, y))
+            g.stroke(v, with: .color(rgb(0x7A1018)), lineWidth: 2 * s)
+        }
+    }
+
+    /// Standing vampire collar behind the head (drawn between neck and head).
+    func drawCostumeCollar(_ ctx: inout GraphicsContext, outfit o: Outfit, x: CGFloat, shoulderY y: CGFloat, s: CGFloat) {
+        guard o.costume == .vampire else { return }
+        for side in [-1.0, 1.0] as [CGFloat] {
+            var wing = Path()
+            wing.move(to: P(x + side * 5 * s, y + 2 * s))
+            wing.addLine(to: P(x + side * 36 * s, y - 32 * s))
+            wing.addQuadCurve(to: P(x + side * 20 * s, y + 4 * s), control: P(x + side * 34 * s, y - 6 * s))
+            wing.closeSubpath()
+            ctx.fill(wing, with: .color(rgb(0x1C1A22)))
+            var inner = Path()
+            inner.move(to: P(x + side * 8 * s, y))
+            inner.addLine(to: P(x + side * 32 * s, y - 27 * s))
+            inner.addQuadCurve(to: P(x + side * 19 * s, y + 1 * s), control: P(x + side * 30 * s, y - 6 * s))
+            inner.closeSubpath()
+            ctx.fill(inner, with: .color(rgb(0xB0202E)))
+        }
+    }
+
+    /// Face extras in head coordinates (after eyes and mouth): fangs, whiskers, skull teeth, wizard beard.
+    func drawCostumeFace(_ ctx: inout GraphicsContext, outfit o: Outfit, r: CGFloat, s: CGFloat) {
+        guard let c = o.costume else { return }
+        let my = 13 * s
+        switch c {
+        case .vampire:
+            for side in [-1.0, 1.0] as [CGFloat] {
+                var fang = Path()
+                fang.move(to: P(side * 1.4 * s, my)); fang.addLine(to: P(side * 4.2 * s, my)); fang.addLine(to: P(side * 2.9 * s, my + 4.2 * s)); fang.closeSubpath()
+                ctx.fill(fang, with: .color(.white))
+            }
+        case .cat:
+            ctx.fill(heartPath(P(0, 7.4 * s), 2.6 * s).applying(CGAffineTransform(translationX: 0, y: 0)), with: .color(rgb(0x1E1E22)))
+            var w = Path()
+            for side in [-1.0, 1.0] as [CGFloat] {
+                for dy in [-2.0, 0.5, 3] as [CGFloat] {
+                    w.move(to: P(side * 9 * s, (9 + dy * 0.4) * s)); w.addLine(to: P(side * 21 * s, (9 + dy * 1.4) * s))
+                }
+            }
+            ctx.stroke(w, with: .color(rgb(0x1E1E22, 0.8)), style: StrokeStyle(lineWidth: 0.9 * s, lineCap: .round))
+        case .skeleton:
+            ctx.fill(heartPath(P(0, 7 * s), 2.8 * s).applying(CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: 14 * s)), with: .color(rgb(0x2A2A2E)))
+            var teeth = Path()
+            teeth.move(to: P(-7 * s, my + 1.5 * s)); teeth.addLine(to: P(7 * s, my + 1.5 * s))
+            for k in -3...3 { teeth.move(to: P(CGFloat(k) * 2 * s, my - 1 * s)); teeth.addLine(to: P(CGFloat(k) * 2 * s, my + 4 * s)) }
+            ctx.stroke(teeth, with: .color(rgb(0x2A2A2E)), style: StrokeStyle(lineWidth: 1 * s, lineCap: .round))
+        case .devil:
+            // Painted pointy goatee
+            var goatee = Path()
+            goatee.move(to: P(-3.2 * s, r * 0.86)); goatee.addQuadCurve(to: P(0, r * 1.22), control: P(-1.4 * s, r * 1.05))
+            goatee.addQuadCurve(to: P(3.2 * s, r * 0.86), control: P(1.4 * s, r * 1.05)); goatee.closeSubpath()
+            ctx.fill(goatee, with: .color(rgb(0x2A1A1C)))
+        case .wizard:
+            // White beard from the cheeks down past the chin, moustache over the mouth
+            let white = rgb(0xF2F2F5), shade = rgb(0xD6D7DD)
+            var beard = Path()
+            beard.move(to: P(-r * 0.78, 4 * s))
+            beard.addQuadCurve(to: P(-r * 0.35, r * 1.35), control: P(-r * 0.85, r * 0.95))
+            beard.addLine(to: P(0, r * 1.65)); beard.addLine(to: P(r * 0.35, r * 1.35))
+            beard.addQuadCurve(to: P(r * 0.78, 4 * s), control: P(r * 0.85, r * 0.95))
+            beard.addQuadCurve(to: P(-r * 0.78, 4 * s), control: P(0, r * 0.95))
+            beard.closeSubpath()
+            ctx.fill(beard, with: .linearGradient(Gradient(colors: [white, shade]), startPoint: P(0, 4 * s), endPoint: P(0, r * 1.6)))
+            for side in [-1.0, 1.0] as [CGFloat] {
+                ctx.fill(Path(ellipseIn: CGRect(x: -5 * s, y: -2.4 * s, width: 10 * s, height: 4.8 * s))
+                            .applying(CGAffineTransform(translationX: side * 4.4 * s, y: my - 1 * s).rotated(by: side * 0.25)), with: .color(white))
+            }
+        default: break
+        }
+    }
+}
+
+extension Outfit.Costume {
+    var shirt: Color {
+        switch self {
+        case .witch: return rgb(0x5B3A7E)
+        case .vampire: return rgb(0x2A2730)
+        case .skeleton: return rgb(0x2A2A30)
+        case .pumpkin: return rgb(0xEE8A2C)
+        case .wizard: return rgb(0x34407E)
+        case .mummy: return rgb(0xE9E2CF)
+        case .devil: return rgb(0xC8303A)
+        case .cat: return rgb(0x2E2E34)
+        }
+    }
+    var pants: Color? {
+        switch self {
+        case .skeleton, .cat, .vampire: return rgb(0x1E1E22)
+        case .mummy: return rgb(0xD8CFB8)
+        default: return nil
+        }
+    }
+    var headwear: Outfit.Hat {
+        switch self {
+        case .witch: return .witch
+        case .wizard: return .wizard
+        case .pumpkin: return .pumpkinCap
+        case .mummy: return .mummyWrap
+        case .skeleton: return .skullPaint
+        case .devil: return .horns
+        case .cat: return .catEars
+        case .vampire: return .none
         }
     }
 }

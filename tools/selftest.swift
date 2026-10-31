@@ -103,8 +103,17 @@ struct SelfTest {
         f = festive(2026, 10, 24)
         expect(f.halloween == 1 && !f.vacuumGhost && f.outfitTheme == .none, "24.10.: Kürbis und Fledermäuse")
         f = festive(2026, 10, 31, 20)
-        expect(f.halloween == 2 && f.vacuumGhost && f.outfitTheme == .halloween && f.outfitChance == 0.75, "31.10. abends: alles")
-        expect(festive(2026, 10, 31, 10).outfitChance == 0.45, "31.10. morgens: weniger Kostüme")
+        expect(f.halloween == 2 && f.vacuumGhost && f.outfitTheme == .halloween && f.outfitChance == 0.95, "31.10. abends: alles")
+        expect(festive(2026, 10, 31, 10).outfitChance == 0.8, "31.10. morgens: etwas weniger Kostüme")
+        do {
+            let day = cal.ordinality(of: .day, in: .era, for: date(2026, 10, 31, 20)) ?? 0
+            let picks = (0..<200).map { Outfit.pick(id: "s\($0)", day: day, festive: festive(2026, 10, 31, 20), temperature: nil, walking: false) }
+            let kinds = Set(picks.compactMap(\.costume))
+            expect(kinds.count == Outfit.Costume.allCases.count, "31.10.: alle Kostüme kommen vor")
+            expect(picks.allSatisfy { $0.costume == nil || $0.hat == $0.costume!.headwear }, "Kostüm bringt seine Kopfbedeckung mit")
+            let week = (0..<50).map { Outfit.pick(id: "s\($0)", day: day - 3, festive: festive(2026, 10, 28, 20), temperature: nil, walking: false) }
+            expect(week.allSatisfy { $0.costume == nil && $0.hat == .none }, "Woche davor: noch keine Kostüme")
+        }
         expect(festive(2026, 11, 1, 5).halloween == 2 && festive(2026, 11, 1, 7).halloween == 0, "Allerheiligen: bis 6 Uhr")
         f = festive(2026, 2, 14)
         expect(f.valentine && f.outfitTheme == .valentine, "Valentinstag")

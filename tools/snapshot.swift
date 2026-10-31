@@ -137,6 +137,73 @@ struct Snap {
             print("Jahreszeitenbilder in build/")
             return
         }
+        // ./build.sh snapshot --halloween → build/season-halloween-*.png: costumes on many figures (desk, sofa, standing,
+        // coffee, walking) plus the empty office to check where the pumpkins stand
+        if CommandLine.arguments.contains("--halloween") {
+            let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+            let names = ["notes", "maps", "shop", "music", "garden", "travel", "budget", "fitness", "quiz", "cards", "pixel", "tasks", "lamp", "clock"]
+            // Pick session IDs so that every costume shows up (the costume follows from ID and day)
+            let evening = f.date(from: "2026-10-31 20:30")!
+            let eveDay = cal.ordinality(of: .day, in: .era, for: evening) ?? 0
+            let eveFest = Festive.compute(evening, cal: cal)
+            let wanted: [Outfit.Costume] = [.witch, .vampire, .skeleton, .pumpkin, .wizard, .mummy, .devil, .cat, .cat, .devil, .vampire, .pumpkin, .mummy, .witch]
+            var used = Set<String>()
+            func idFor(_ c: Outfit.Costume) -> String {
+                for k in 0..<5000 where !used.contains("hw\(k)") {
+                    if Outfit.pick(id: "hw\(k)", day: eveDay, festive: eveFest, temperature: nil, walking: false).costume == c { used.insert("hw\(k)"); return "hw\(k)" }
+                }
+                return "hw-none"
+            }
+            var crowd: [AgentSession] = []
+            for (i, n) in names.enumerated() {
+                let st: AgentStatus = i < 8 ? [.working, .working, .waiting, .working, .done, .working, .error, .working][i] : .idle
+                crowd.append(s(idFor(wanted[i]), n, nil, st, st == .working ? "Edit" : "", st == .working ? ["file_path": "/x/A.swift"] : [:], st == .idle ? 600 : 20, ctx: 0.3))
+            }
+            for (name, ds, dark) in [("tag", "2026-10-31 11:00", false), ("abend", "2026-10-31 20:30", true)] {
+                let d = f.date(from: ds)!
+                let t = d.timeIntervalSinceReferenceDate
+                let fest = Festive.compute(d, cal: cal)
+                render("season-halloween-leer-\(name)", d, t, dark: dark, sessions: [], weather: nil, festive: fest)
+                let m = OfficeModel()
+                let (acts, over) = m.actors(for: crowd, now: t)
+                _ = (acts, over)
+                let backdrop2 = OfficeBackdrop()
+                let bg = backdrop2.images(dark: dark, dayness: OfficeScene.dayness(date: d, dark: dark, daylight: true), scale: 2, now: t, weather: nil, date: d)
+                let scene = OfficeScene(time: t, date: d, dark: dark, daylight: true, actors: acts, overflow: over, hovered: nil, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
+                                        vacuum: OfficeScene.lightsOn(date: d, dark: dark, daylight: true) ? .docked : VacuumState(loop: t * 40, spur: 0), working: 5, waiting: 1,
+                                        forecast: forecast, todayTokens: 12_400_000, backdrop: bg, weather: nil, festive: fest)
+                let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
+                let r = ImageRenderer(content: view); r.scale = 2
+                if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                    try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/season-halloween-\(name).png"))
+                }
+                // Walking and coffee: everyone works, then three finish and fetch coffee
+                let m2 = OfficeModel()
+                var work = Array(crowd.prefix(8))
+                for i in work.indices { work[i].status = .working }
+                _ = m2.actors(for: work, now: t)
+                work[0].status = .done; work[3].status = .done; work[5].status = .done
+                var u = t + 1, n = 0
+                while u < t + 40 && n < 2 {
+                    u += 0.5
+                    let (a2, o2) = m2.actors(for: work, now: u)
+                    let walking = a2.filter { if case .walking = $0.pose { return true }; return false }.count
+                    let coffee = a2.filter { if case .coffee = $0.place { return true }; return false }.count
+                    if (n == 0 && walking >= 2) || (n == 1 && coffee >= 1) {
+                        n += 1
+                        let sc = OfficeScene(time: u, date: d, dark: dark, daylight: true, actors: a2, overflow: o2, hovered: nil, session: 42, weekly: 18, plan: "Max 20×", cpu: 0.3,
+                                             vacuum: .docked, working: 5, waiting: 0, forecast: forecast, todayTokens: 12_400_000, backdrop: bg, weather: nil, festive: fest)
+                        let v = Canvas { ctx, size in sc.draw(&ctx) }.frame(width: 1000, height: 600)
+                        let rr = ImageRenderer(content: v); rr.scale = 2
+                        if let img = rr.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                            try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "build/season-halloween-\(name)-\(n == 1 ? "laufen" : "kaffee").png"))
+                        }
+                    }
+                }
+            }
+            print("Halloween-Bilder in build/")
+            return
+        }
         // ./build.sh snapshot --moments → build/season-moment-*.png: Sternschnuppe, Vögel, Regenbogen, Schneemann, Freitags-Pizza
         if CommandLine.arguments.contains("--moments") {
             func find(_ start: Date, _ hit: (Double) -> Bool) -> (Date, Double) {
