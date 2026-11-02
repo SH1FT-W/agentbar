@@ -85,7 +85,8 @@ final class SessionMonitor: ObservableObject {
     var waitingCount: Int { all.filter { $0.status == .waiting }.count }
     var workingCount: Int { all.filter { $0.status == .working }.count }
     /// Nur dieser Mac (z. B. fürs Wachhalten).
-    var localBusy: Bool { sessions.contains { $0.status == .working || $0.status == .waiting } }
+    var localBusy: Bool { Self.busy(sessions) }
+    nonisolated static func busy(_ list: [AgentSession]) -> Bool { list.contains { $0.status == .working || $0.status == .waiting } }
 }
 
 // MARK: - Zustand je Datei

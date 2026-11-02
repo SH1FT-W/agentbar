@@ -1,6 +1,7 @@
 // Kleine Selbsttests ohne Xcode: ./build.sh test
 // Nur reine Logik (Versionen, Code, Deko-Kalender, Hook-Parser, Werkzeugtexte, Preise, Zeitstempel), nichts mit Oberfläche.
 import Foundation
+import Combine
 
 @main
 struct SelfTest {
@@ -165,6 +166,27 @@ struct SelfTest {
         expect(frac.map { abs($0.timeIntervalSince1970 - 1_792_231_200.25) < 0.001 } == true, "mit Bruchteilen")
         expect(parseISO8601("2026-10-17T12:00:00+02:00") == plain, "Zeitzonen-Offset")
         expect(parseISO8601("gestern") == nil && parseISO8601("") == nil, "Unsinn → nil")
+
+        print("Wach halten")
+        var applied: [(KeepAwakeMode, Bool)] = []
+        let follower = KeepAwakeFollower { applied.append(($0, $1)) }
+        let busy = CurrentValueSubject<Bool, Never>(false)
+        var subscriptions = 0
+        let busyPub = busy.handleEvents(receiveSubscription: { _ in subscriptions += 1 }).eraseToAnyPublisher()
+        follower.update(mode: .off, busyNow: false, busy: busyPub)
+        expect(!follower.following && subscriptions == 0, "Aus: nichts läuft im Hintergrund")
+        follower.update(mode: .always, busyNow: false, busy: busyPub)
+        expect(!follower.following && subscriptions == 0 && applied.last?.0 == .always, "Immer: einmal setzen, nichts beobachten")
+        follower.update(mode: .auto, busyNow: false, busy: busyPub)
+        expect(follower.following && subscriptions == 1, "Wenn Agenten arbeiten: folgt den Agenten")
+        busy.send(true)
+        expect(applied.last.map { $0.0 == .auto && $0.1 } == true, "Agent arbeitet → wach halten")
+        follower.update(mode: .auto, busyNow: true, busy: busyPub)
+        expect(subscriptions == 1, "kein zweites Abo bei gleichem Modus")
+        follower.update(mode: .off, busyNow: true, busy: busyPub)
+        let count = applied.count
+        busy.send(false)
+        expect(!follower.following && applied.count == count, "wieder Aus: Abo beendet")
 
         print("Sprache: \(Lang.isGerman ? "Deutsch" : "Englisch")")
         print(failures == 0 ? "\nAlle Tests bestanden." : "\n\(failures) Test(s) fehlgeschlagen.")

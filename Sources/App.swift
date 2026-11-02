@@ -84,7 +84,7 @@ final class AppStore: ObservableObject {
     lazy var office = OfficeWindowController(store: self)
     private let updatePrompt = UpdatePromptController()
     private var hotKey: HotKey?
-    private var awakeTimer: Timer?
+    private lazy var awakeFollower = KeepAwakeFollower { [keepAwake] mode, busy in keepAwake.update(mode: mode, agentsWorking: busy) }
     @Published var hooksInstalled = Hooks.installed
     @Published var message: String?
     /// Hinweis, wenn das globale Tastenkürzel nicht registriert werden konnte (sonst nil).
@@ -147,16 +147,15 @@ final class AppStore: ObservableObject {
                 self?.peers.restart()
             }
         })
-        awakeTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.updateKeepAwake() }
-        }
+        updateKeepAwake()
         if UserDefaults.standard.bool(forKey: "officeWasOpen") { office.show() }
         peers.configure()
     }
 
     func updateKeepAwake() {
         let mode = KeepAwakeMode(rawValue: UserDefaults.standard.string(forKey: Prefs.keepAwake) ?? "") ?? .off
-        keepAwake.update(mode: mode, agentsWorking: monitor.localBusy)
+        awakeFollower.update(mode: mode, busyNow: monitor.localBusy,
+                             busy: self.monitor.$sessions.map(SessionMonitor.busy).eraseToAnyPublisher())
     }
 
     func setHooks(_ on: Bool) {

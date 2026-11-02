@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Carbon.HIToolbox
 import IOKit.pwr_mgt
 import UserNotifications
@@ -447,6 +448,25 @@ final class KeepAwake {
             IOPMAssertionRelease(assertion)
             active = false
         }
+    }
+}
+
+/// Applies the keep-awake mode. Only "while agents work" has to follow the agents, so only then it subscribes to
+/// their busy state; "off" and "always" leave nothing running. Replaces a 5-second timer that polled in every mode.
+@MainActor
+final class KeepAwakeFollower {
+    private let apply: (KeepAwakeMode, Bool) -> Void
+    private var watch: AnyCancellable?
+    var following: Bool { watch != nil }
+
+    init(apply: @escaping (KeepAwakeMode, Bool) -> Void) { self.apply = apply }
+
+    /// busy: current busy state of this Mac's agents, then every change of it
+    func update(mode: KeepAwakeMode, busyNow: Bool, busy: @autoclosure () -> AnyPublisher<Bool, Never>) {
+        apply(mode, busyNow)
+        guard mode == .auto else { watch = nil; return }
+        guard watch == nil else { return }
+        watch = busy().removeDuplicates().sink { [weak self] b in self?.apply(.auto, b) }
     }
 }
 
