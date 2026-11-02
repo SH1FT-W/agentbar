@@ -40,6 +40,8 @@ struct SettingsView: View {
     @AppStorage(Prefs.quietTo) private var quietTo = 7
     @AppStorage(Prefs.notifyPeers) private var notifyPeers = false
     @AppStorage(Prefs.quotaThreshold) private var threshold = 80.0
+    @AppStorage(Prefs.quotaThreshold2) private var threshold2 = 95.0
+    @AppStorage(Prefs.notifyDelay) private var notifyDelay = 20.0
     @AppStorage(Prefs.notifyWhenFrontmost) private var whenFront = false
     @AppStorage(Prefs.showCount) private var showCount = true
     @AppStorage(Prefs.showQuota) private var showQuota = false
@@ -116,6 +118,15 @@ struct SettingsView: View {
                 Toggle(isOn: $notifyWaiting) { SettingLabel(L("Wenn ein Agent dich braucht", "When an agent needs you"), "hand.raised.fill", .orange) }
                 Toggle(isOn: $notifyDone) { SettingLabel(L("Wenn ein Agent fertig ist", "When an agent is done"), "checkmark", .green) }
                 Toggle(isOn: $notifyError) { SettingLabel(L("Bei Fehlern", "On errors"), "exclamationmark", .red) }
+                if notifyWaiting || notifyDone || notifyError {
+                    Picker(selection: $notifyDelay) {
+                        ForEach([0.0, 10, 20, 30, 60, 120], id: \.self) { Text(delayText($0)).tag($0) }
+                    } label: {
+                        SettingLabel(L("Erst melden nach", "Notify after"), "timer", .gray,
+                                     note: L("Kurze Pausen bleiben still, jeder Wartezustand meldet sich nur einmal.",
+                                             "Short pauses stay quiet; each waiting state notifies only once."))
+                    }
+                }
                 Toggle(isOn: $notifyContext) {
                     SettingLabel(L("Kontext fast voll", "Context almost full"), "text.line.last.and.arrowtriangle.forward", .orange,
                                  note: L("Ab 85 % des Kontextfensters.", "At 85% of the context window."))
@@ -127,15 +138,11 @@ struct SettingsView: View {
                 Toggle(isOn: $notifyQuota) { SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink) }
                     .disabled(!quotaEnabled)
                 if notifyQuota, quotaEnabled {
-                    LabeledContent {
-                        HStack(spacing: 10) {
-                            Slider(value: $threshold, in: 50...95, step: 5).frame(width: 150)
-                            Text(percentText(Int(threshold))).monospacedDigit().foregroundStyle(.secondary)
-                                .frame(width: 44, alignment: .trailing)
-                        }
-                    } label: {
-                        SettingLabel(L("Warnen ab", "Warn at"), nil, .clear)
-                    }
+                    // The second warning always lies above the first
+                    thresholdRow(L("Warnen ab", "Warn at"), $threshold, range: 50...95, note: L("Für das 5-Stunden- und das 7-Tage-Fenster, je einmal.",
+                                                                               "For the 5-hour and the 7-day window, once each."))
+                    thresholdRow(L("Nochmal ab", "Again at"), $threshold2, range: (threshold + 5)...100)
+                        .onChange(of: threshold) { _, t in if threshold2 <= t { threshold2 = min(100, t + 5) } }
                 }
                 Toggle(isOn: $notifyUpdate) { SettingLabel(L("Neue AgentBar-Version", "New AgentBar version"), "arrow.down.app.fill", .blue) }
                 Toggle(isOn: $whenFront) {
@@ -386,6 +393,26 @@ private struct PeerStatus: View {
             Text(names.isEmpty ? L("Nicht verbunden – suche …", "Not connected – searching…")
                                : L("Verbunden mit ", "Connected to ") + names.joined(separator: ", "))
                 .foregroundStyle(.secondary).multilineTextAlignment(.trailing)
+        }
+    }
+}
+
+extension SettingsView {
+    func delayText(_ seconds: Double) -> String {
+        if seconds == 0 { return L("Sofort", "Immediately") }
+        if seconds < 60 { return L("\(Int(seconds)) Sek.", "\(Int(seconds)) s") }
+        return L("\(Int(seconds) / 60) Min.", "\(Int(seconds) / 60) min")
+    }
+
+    func thresholdRow(_ title: String, _ value: Binding<Double>, range: ClosedRange<Double>, note: String? = nil) -> some View {
+        LabeledContent {
+            HStack(spacing: 10) {
+                Slider(value: value, in: range, step: 5).frame(width: 150)
+                Text(percentText(Int(value.wrappedValue))).monospacedDigit().foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .trailing)
+            }
+        } label: {
+            SettingLabel(title, nil, .clear, note: note)
         }
     }
 }

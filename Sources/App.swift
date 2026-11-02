@@ -55,7 +55,7 @@ extension AppStore {
     func diagnostics() -> String {
         var out = ["AgentBar \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") · macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"]
         for s in monitor.sessions {
-            out.append("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | ctx \(s.contextFill.map { "\(Int(($0 * 100).rounded())) % / \(s.contextWindowText)" } ?? "–") | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.hostBundle ?? "-")")
+            out.append("\(s.status.label.padding(toLength: 13, withPad: " ", startingAt: 0)) \(s.label) | \(s.activity) | \(shortModel(s.model)) \(s.permissionMode) | helpers \(s.subagents.count)/\(s.workingHelpers) | \(formatTokens(s.totalTokens)) | ctx \(s.contextFill.map { "\(Int(($0 * 100).rounded())) % / \(s.contextWindowText)" } ?? "–") | \(ago(s.lastActivity)) | hooks \(s.usesHooks) \(s.terminalApp ?? "-") \(s.tty ?? "-")")
         }
         out.append(L("Kontingent", "Usage") + ": \(quota.session?.percent ?? -1) / \(quota.weekly?.percent ?? -1) \(quota.plan ?? "") \(quota.problem ?? "")")
         if let f = quota.forecast {
@@ -96,18 +96,21 @@ final class AppStore: ObservableObject {
     private var contextWarned = Set<String>()
     private var stalledWarned: [String: Date] = [:]     // Sitzung → letzte Aktivität, für die schon gewarnt wurde
     private var hintsPrimed = false
-    private var remoteStatus: [String: AgentStatus] = [:]
+    private var gate = WaitGate()
+    private var gateTimer: Timer?
     private var observers: [NSObjectProtocol] = []
 
     init() {
-        monitor.onTransition = { [weak self] s, old in self?.transition(s, from: old) }
-        monitor.onUpdate = { [weak self] list in self?.checkHints(list) }
+        monitor.onUpdate = { [weak self] list in
+            self?.checkHints(list)
+            self?.checkWaits()
+        }
         monitor.stats.publish = { [weak self] days in
             MainActor.assumeIsolated { if self?.stats.days != days { self?.stats.days = days } }
         }
         peers.onChange = { [weak self] list in
             self?.monitor.remote = list
-            self?.remoteTransitions(list)
+            self?.checkWaits()
         }
         notifier.onMute = { [weak self] id in self?.mutedUntil[id] = Date().addingTimeInterval(3600) }
         peerWatch = monitor.$sessions.sink { [weak self] list in self?.peers.update(local: list) }
@@ -115,12 +118,15 @@ final class AppStore: ObservableObject {
             guard let s = self?.monitor.sessions.first(where: { $0.id == id }) else { return }
             Focus.open(s)
         }
-        quota.onThreshold = { [weak self] pct in
+        quota.onThreshold = { [weak self] alert, window in
             guard UserDefaults.standard.bool(forKey: Prefs.notifyQuota) else { return }
-            self?.notifier.post(title: L("Kontingent bei", "Usage at") + " " + percentText(Int(pct)),
-                                body: L("Das 5-Stunden-Fenster ist fast aufgebraucht.", "The 5-hour window is almost used up.")
-                                    + (self?.quota.session?.resetsAt.map { " " + freshWindowText($0) } ?? ""),
-                                sessionId: nil)
+            let pct = percentText(Int(alert.percent.rounded(.down)))
+            let title = alert.window == .fiveHour ? L("5-Stunden-Kontingent bei \(pct)", "5-hour usage at \(pct)")
+                                                  : L("Wochen-Kontingent bei \(pct)", "Weekly usage at \(pct)")
+            let body = alert.window == .fiveHour ? L("Das 5-Stunden-Fenster wird knapp.", "The 5-hour window is running low.")
+                                                 : L("Das 7-Tage-Fenster wird knapp.", "The 7-day window is running low.")
+            self?.notifier.post(title: title, body: body + (window.resetsAt.map { " " + freshWindowText($0) } ?? ""),
+                                sessionId: nil, replacing: "quota-\(alert.window.rawValue)")
         }
         updater.onLaunchFound = { [weak self] _ in
             guard let self, UserDefaults.standard.bool(forKey: Prefs.notifyUpdate) else { return }
@@ -192,43 +198,70 @@ final class AppStore: ObservableObject {
             mutedUntil[s.id] = nil
         }
         if s.device == nil, !s.runsHere, monitor.remote.contains(where: { $0.id == s.id }) { return false }
-        if !UserDefaults.standard.bool(forKey: Prefs.notifyWhenFrontmost), let b = s.hostBundle,
+        // The session's terminal (or app) is already in front: the user sees it anyway
+        if !UserDefaults.standard.bool(forKey: Prefs.notifyWhenFrontmost), let b = s.terminalApp,
            NSWorkspace.shared.frontmostApplication?.bundleIdentifier == b { return false }
         return true
     }
 
     private func title(_ s: AgentSession) -> String { s.device.map { "\(s.displayName) · \($0)" } ?? s.displayName }
 
-    private func transition(_ s: AgentSession, from old: AgentStatus) {
+    /// Waiting sessions ("needs you", question, done, error): notify only after the set delay and once per
+    /// waiting state (WaitGate). Runs on every monitor/peer update and on a one-shot timer for the next deadline.
+    private func checkWaits() {
         let d = UserDefaults.standard
-        guard shouldNotify(s) else { return }
-        let name = title(s)
-        switch s.status {
-        case .waiting where d.bool(forKey: Prefs.notifyWaiting):
-            // Bei einer Frage steht der echte Fragetext in der Mitteilung
-            if let q = s.question {
-                notifier.post(title: L("\(name) hat eine Frage", "\(name) has a question"), body: q, sessionId: s.id)
-            } else {
-                notifier.post(title: L("\(name) braucht dich", "\(name) needs you"),
-                              body: s.activity.isEmpty ? L("Wartet auf deine Freigabe.", "Waiting for your approval.") : s.waitingReason ?? s.activity, sessionId: s.id)
+        gate.delay = max(0, d.double(forKey: Prefs.notifyDelay))
+        // With other Macs: `all` prefers the reporting Mac's version over a local mirror (shared ~/.claude).
+        // Without: local mirrors of other Macs' sessions are left out, they never notify here.
+        let remoteIds = Set(monitor.remote.map(\.id))
+        let list = d.bool(forKey: Prefs.notifyPeers) ? monitor.all
+            : monitor.sessions.filter { $0.runsHere || !remoteIds.contains($0.id) }
+        for id in gate.update(list.map(Self.observation)) {
+            if let s = list.first(where: { $0.id == id }) { notifyWaiting(s) }
+        }
+        gateTimer?.invalidate()
+        gateTimer = gate.nextDeadline.map { due in
+            Timer.scheduledTimer(withTimeInterval: max(0.5, due.timeIntervalSinceNow + 0.1), repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkWaits() }
             }
-        case .done where old == .working && d.bool(forKey: Prefs.notifyDone):
-            notifier.post(title: L("\(name) ist fertig", "\(name) is done"), body: s.lastText.isEmpty ? s.project : s.lastText, sessionId: s.id)
-        case .error where d.bool(forKey: Prefs.notifyError):
-            notifier.post(title: L("\(name): Fehler", "\(name): Error"), body: L("Die Sitzung ist auf einen Fehler gelaufen.", "The session ran into an error."), sessionId: s.id)
-        default: break
         }
     }
 
-    /// Statuswechsel anderer Macs – nur mit Prefs.notifyPeers.
-    private func remoteTransitions(_ list: [AgentSession]) {
-        let on = UserDefaults.standard.bool(forKey: Prefs.notifyPeers)
-        var next: [String: AgentStatus] = [:]
-        for s in list {
-            if on, let old = remoteStatus[s.id], old != s.status { transition(s, from: old) }
-            next[s.id] = s.status
+    nonisolated static func observation(_ s: AgentSession) -> WaitGate.Observation {
+        switch s.status {
+        case .working: return .init(id: s.id, kind: nil)
+        case .idle: return .init(id: s.id, kind: nil, neutral: true)
+        case .waiting: return .init(id: s.id, kind: .waiting, key: s.question ?? s.waitingReason ?? "")
+        case .done: return .init(id: s.id, kind: .done, key: String(s.lastText.prefix(300)))
+        case .error: return .init(id: s.id, kind: .error, key: "error")
         }
-        remoteStatus = next
+    }
+
+    private func notifyWaiting(_ s: AgentSession) {
+        let d = UserDefaults.standard
+        guard shouldNotify(s) else { return }
+        // Project name first, the session's own title (if different) below it
+        var name = s.project == "Home" ? s.label : s.project
+        if let dev = s.device { name += " · \(dev)" }
+        let subtitle = s.displayName != s.project ? s.displayName : nil
+        let id = "waiting-\(s.id)"
+        switch s.status {
+        case .waiting where d.bool(forKey: Prefs.notifyWaiting):
+            if let q = s.question {
+                notifier.post(title: L("\(name) hat eine Frage", "\(name) has a question"), subtitle: subtitle, body: q, sessionId: s.id, replacing: id)
+            } else {
+                notifier.post(title: L("\(name) braucht dich", "\(name) needs you"), subtitle: subtitle,
+                              body: s.waitingReason ?? L("Wartet auf deine Freigabe.", "Waiting for your approval."), sessionId: s.id, replacing: id)
+            }
+        case .done where d.bool(forKey: Prefs.notifyDone):
+            notifier.post(title: L("\(name) ist fertig", "\(name) is done"), subtitle: subtitle,
+                          body: s.lastText.isEmpty ? L("Wartet auf deine nächste Eingabe.", "Waiting for your next message.") : s.lastText,
+                          sessionId: s.id, replacing: id)
+        case .error where d.bool(forKey: Prefs.notifyError):
+            notifier.post(title: L("\(name): Fehler", "\(name): Error"), subtitle: subtitle,
+                          body: L("Die Sitzung ist auf einen Fehler gelaufen.", "The session ran into an error."), sessionId: s.id, replacing: id)
+        default: break
+        }
     }
 
     /// Kontext-Warnung (einmal je Sitzung ab 85 %, nach dem Zusammenfassen wieder scharf) und „Hängt?“-Hinweis

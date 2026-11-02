@@ -19,8 +19,6 @@ final class SessionMonitor: ObservableObject {
         didSet { stats.exclude(Set(remote.map(\.id))); visibleCache = nil }
     }
     @Published private(set) var hooksSeen = false
-    /// Wird bei jedem Statuswechsel einer Hauptsitzung aufgerufen (für Mitteilungen).
-    var onTransition: ((AgentSession, AgentStatus) -> Void)?
     /// Nach jeder Auswertung mit der ganzen Liste (Kontext-/Hängt-Hinweise).
     var onUpdate: (([AgentSession]) -> Void)?
     /// Tagesstatistik (eigene Queue); AppStore hängt `publish` an den StatsStore.
@@ -42,17 +40,8 @@ final class SessionMonitor: ObservableObject {
 
     func rescan() { core.fullScan() }
 
-    private var previous: [String: AgentStatus] = [:]
-
     private func apply(_ list: [AgentSession], hooks: Bool) {
         if hooksSeen != hooks { hooksSeen = hooks }
-        let first = previous.isEmpty && sessions.isEmpty
-        var next: [String: AgentStatus] = [:]
-        for s in list {
-            if let old = previous[s.id], old != s.status, !first { onTransition?(s, old) }
-            next[s.id] = s.status
-        }
-        previous = next      // verschwundene Sitzungen vergessen
         visibleCache = nil
         if list != sessions { sessions = list }
         onUpdate?(list)
@@ -181,8 +170,11 @@ private final class MonitorCore: @unchecked Sendable {
     private var files: [String: FileState] = [:]          // Pfad → Zustand
     private var hooks: [String: HookState] = [:]          // session_id → letzter Hook
     private var hookOffset: UInt64 = 0
-    private var registryEntries: [pid_t: (stamp: Date, sid: String, bridged: Bool)] = [:]   // ~/.claude/sessions: pid → Sitzung (auch falls iCloud die Datei auslagert)
+    /// ~/.claude/sessions: pid → session, start time (s) and start folder; kept if iCloud evicts the file
+    private var registryEntries: [pid_t: (stamp: Date, sid: String, bridged: Bool, started: Double, cwd: String?)] = [:]
     private var procCache: (time: Date, registered: Set<pid_t>, unregistered: [Date])?
+    /// Terminal of a registered Claude process (pid → app, tty), looked up once per process
+    private var terminals: [pid_t: (started: Double, bundle: String?, tty: String?)] = [:]
     private var tickItem: DispatchWorkItem?
     private var busy = true                                   // aktive Sitzungen → kurzer Takt
     private var desktopMeta: [String: (title: String, open: Bool)] = [:]
@@ -658,7 +650,7 @@ private final class MonitorCore: @unchecked Sendable {
     private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date], bridged: Set<String>) {
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return ([], false, [], []) }
-        var seen: [pid_t: (stamp: Date, sid: String, bridged: Bool)] = [:]
+        var seen: [pid_t: (stamp: Date, sid: String, bridged: Bool, started: Double, cwd: String?)] = [:]
         var pids = Set<pid_t>(), complete = true
         for f in items where f.pathExtension == "json" {
             guard let pid = pid_t(f.deletingPathExtension().lastPathComponent) else { continue }
@@ -668,7 +660,7 @@ private final class MonitorCore: @unchecked Sendable {
             if let old = registryEntries[pid], old.stamp == stamp { seen[pid] = old; continue }
             if isLocal(f), let d = try? Data(contentsOf: f),
                let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let sid = j["sessionId"] as? String {
-                seen[pid] = (stamp, sid, (j["bridgeSessionId"] as? String)?.isEmpty == false)
+                seen[pid] = (stamp, sid, (j["bridgeSessionId"] as? String)?.isEmpty == false, (j["startedAt"] as? Double ?? 0) / 1000, j["cwd"] as? String)
             } else if let old = registryEntries[pid] {
                 // iCloud hat die Datei ausgelagert – letzte bekannte Sitzung nehmen, im Hintergrund nachladen
                 seen[pid] = old
@@ -679,6 +671,7 @@ private final class MonitorCore: @unchecked Sendable {
             }
         }
         registryEntries = seen
+        terminals = terminals.filter { seen[$0.key] != nil }
         let bridged = Set(seen.values.filter(\.bridged).map(\.sid))
         // Prozessliste (alle PIDs, Pfade, Eltern) ist teuer: nur alle 15 s oder wenn sich die Anmeldungen ändern
         let now = Date()
@@ -738,6 +731,18 @@ private final class MonitorCore: @unchecked Sendable {
             }
             return true
         }
+    }
+
+    /// App and tty of a registered Claude process. The pid is only trusted if the process started when the
+    /// registration says (a shared ~/.claude can hold another Mac's pids, and pids get reused).
+    private func terminal(_ pid: pid_t) -> (bundle: String?, tty: String?)? {
+        guard let started = registryEntries[pid]?.started, started > 0 else { return nil }
+        // Cache per pid and start time: a reused pid with a new registration is looked up again
+        if let t = terminals[pid], t.started == started { return (t.bundle, t.tty) }
+        guard let start = TerminalProcess.startTime(of: pid), abs(start.timeIntervalSince1970 - started) < 30 else { return nil }
+        let t = (started: started, bundle: TerminalProcess.hostApp(of: pid), tty: TerminalProcess.tty(of: pid))
+        terminals[pid] = t
+        return (t.bundle, t.tty)
     }
 
     private func childCount(_ pid: pid_t) -> Int {
@@ -806,6 +811,13 @@ private final class MonitorCore: @unchecked Sendable {
         }
         if ProcessInfo.processInfo.environment["AGENTBAR_DEBUG"] != nil {
             FileHandle.standardError.write("registry ids=\(registry.ids.count) complete=\(registry.complete) unregistered=\(registry.unregistered) keep=\(String(describing: unregisteredKeep))\n".data(using: .utf8)!)
+        }
+        var registeredPid: [String: pid_t] = [:]
+        var launchDir: [String: String] = [:]
+        // Several registrations for one session (a stale file after a crash, --resume twice): the newest wins
+        for (pid, e) in registryEntries.sorted(by: { $0.value.started < $1.value.started }) {
+            registeredPid[e.sid] = pid
+            if let c = e.cwd { launchDir[e.sid] = c }
         }
         for (sid, st) in mains {
             let h = hooks[sid]
@@ -881,6 +893,8 @@ private final class MonitorCore: @unchecked Sendable {
                 if title == nil, !meta.title.isEmpty { title = meta.title }
             }
             var tokens = st.tokens
+            // Without hooks the terminal comes from the process tree (only for terminal sessions)
+            let fallback = source == .cli && (h?.bundle == nil || h?.tty == nil) ? registeredPid[sid].flatMap(terminal) : nil
             for a in subs[sid] ?? [] { for (m, t) in a.tokens { tokens[m, default: TokenTally()] = tokens[m, default: TokenTally()] + t } }
 
             out.append(AgentSession(
@@ -888,11 +902,12 @@ private final class MonitorCore: @unchecked Sendable {
                 cwd: st.chosenProject() ?? st.cwd ?? h?.cwd ?? decodeProjectDir(st.projectDir),
                 title: title, model: st.model, permissionMode: st.mode, status: status, activity: activity, tool: tool,
                 lastText: st.lastText, lastActivity: max(st.lastEvent, h?.time ?? .distantPast),
-                tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty, usesHooks: hooksActive,
+                tokens: tokens, subagents: helpers, hostBundle: h?.bundle, tty: h?.tty ?? fallback?.tty, usesHooks: hooksActive,
                 contextUsed: st.contextUsed,
                 contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || Self.millionByDefault(st.model)
                                                     || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0,
-                question: status == .waiting ? st.question : nil, remoteControl: registry.bridged.contains(sid)))
+                question: status == .waiting ? st.question : nil, remoteControl: registry.bridged.contains(sid),
+                terminalBundle: h?.bundle == nil ? fallback?.bundle : nil, launchDir: launchDir[sid] ?? h?.cwd))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0

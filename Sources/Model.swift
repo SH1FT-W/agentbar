@@ -149,6 +149,13 @@ struct AgentSession: Identifiable, Equatable {
     var deviceIsLaptop = false
     var question: String? = nil   // Fragetext, solange die Sitzung auf eine Antwort (AskUserQuestion) wartet
     var remoteControl = false     // per Remote Control mit claude.ai/der Claude-App auf dem Handy verbunden
+    /// Terminal app found in the process tree when no hook reported one (hostBundle stays hook-only for runsHere)
+    var terminalBundle: String? = nil
+    /// Folder the Claude process started in (registration or hook) – what a terminal reports as its directory
+    var launchDir: String? = nil
+
+    /// App that shows this session: the hook's report, else the process tree
+    var terminalApp: String? { hostBundle ?? terminalBundle }
 
     var deviceSymbol: String { deviceIsLaptop ? "laptopcomputer" : "desktopcomputer" }
 
@@ -270,6 +277,9 @@ enum Prefs {
     static let notifyQuota = "notifyQuota"
     static let notifyUpdate = "notifyUpdate"
     static let quotaThreshold = "quotaThreshold"
+    static let quotaThreshold2 = "quotaThreshold2"   // second, higher usage warning (both apply to 5 h and 7 days)
+    static let quotaAlerts = "quotaAlerts"           // thresholds already reported per usage window
+    static let notifyDelay = "notifyDelay"           // seconds a session has to wait before "needs you"/"done" notifies
     static let notifyWhenFrontmost = "notifyWhenFrontmost"
     static let showCount = "menuShowCount"
     static let showQuota = "menuShowQuota"
@@ -299,7 +309,7 @@ enum Prefs {
     static func register() {
         UserDefaults.standard.register(defaults: [
             notifyWaiting: true, notifyDone: true, notifyError: true, notifyQuota: true, notifyUpdate: true,
-            quotaThreshold: 80.0, notifyWhenFrontmost: false,
+            quotaThreshold: 80.0, quotaThreshold2: 95.0, notifyDelay: 20.0, notifyWhenFrontmost: false,
             showCount: true, showQuota: false, visibleHours: 2.0,
             officeFloating: true, officeOpacity: 1.0, officeDaylight: true,
             keepAwake: KeepAwakeMode.off.rawValue, quotaEnabled: true, peersEnabled: false,

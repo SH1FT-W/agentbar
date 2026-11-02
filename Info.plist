@@ -32,7 +32,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>AgentBar brings the Terminal window running your Claude agent to the front.</string>
+	<string>AgentBar brings the terminal window (Terminal, iTerm2, Ghostty) running your Claude agent to the front.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_agentbar._tcp</string>

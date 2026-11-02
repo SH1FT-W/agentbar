@@ -131,10 +131,11 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var loading = false
     /// Prognose fürs 5-Stunden-Fenster (Paket A füllt sie), nil = zu wenig Daten.
     @Published private(set) var forecast: QuotaForecast?
-    var onThreshold: ((Double) -> Void)?
+    /// A usage warning threshold was crossed (once per threshold and window, see QuotaAlerts)
+    var onThreshold: ((QuotaAlerts.Alert, QuotaWindow) -> Void)?
 
     private var timer: Timer?
-    private var notifiedWindow: Date?
+    private var alerts = QuotaAlerts(stored: UserDefaults.standard.dictionary(forKey: Prefs.quotaAlerts) ?? [:])
     /// Stützpunkte (Zeit, Prozent) im aktuellen 5-Stunden-Fenster – für die Prognose, über Neustarts gemerkt
     private var points: [(t: Double, p: Double)] = []
     private var pointsWindow: Double = 0
@@ -286,13 +287,13 @@ final class QuotaMonitor: ObservableObject {
     }
 
     private func checkThreshold() {
-        guard let s = session, let reset = s.resetsAt else { return }
-        let limit = UserDefaults.standard.double(forKey: Prefs.quotaThreshold)
-        let window = Date(timeIntervalSince1970: (reset.timeIntervalSince1970 / 60).rounded() * 60)   // Server-Zeit schwankt im Sub-Sekundenbereich
-        if s.percent >= limit, notifiedWindow != window {
-            notifiedWindow = window
-            onThreshold?(s.percent)
+        let d = UserDefaults.standard
+        let thresholds = [d.double(forKey: Prefs.quotaThreshold), d.double(forKey: Prefs.quotaThreshold2)]
+        for (kind, w) in [(QuotaAlerts.Window.fiveHour, session), (.sevenDay, weekly)] {
+            guard let w, let alert = alerts.check(kind, percent: w.percent, resetsAt: w.resetsAt, thresholds: thresholds) else { continue }
+            onThreshold?(alert, w)
         }
+        if !readOnlyRun { d.set(alerts.stored, forKey: Prefs.quotaAlerts) }
     }
 
     private func window(_ any: Any?) -> QuotaWindow? {
@@ -398,10 +399,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         return from < to ? (h >= from && h < to) : (h >= from || h < to)
     }
 
-    func post(title: String, body: String, sessionId: String?, sound: Bool = true) {
+    /// replacing: identifier of an earlier notification this one replaces (one "waiting" banner per session)
+    func post(title: String, subtitle: String? = nil, body: String, sessionId: String?, sound: Bool = true, replacing: String? = nil) {
         guard Bundle.main.bundleIdentifier != nil, !Self.quietNow() else { return }
         let content = UNMutableNotificationContent()
         content.title = title
+        if let subtitle { content.subtitle = subtitle }
         content.body = body
         if sound { content.sound = .default }
         if let sessionId {
@@ -409,7 +412,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             content.threadIdentifier = sessionId
             content.categoryIdentifier = Self.sessionCategory
         }
-        let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        let req = UNNotificationRequest(identifier: replacing ?? UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(req)
     }
 
@@ -502,8 +505,10 @@ enum Focus {
 
     static func open(_ s: AgentSession) {
         guard s.device == nil else { return }   // läuft auf einem anderen Mac
-        if s.hostBundle == "com.apple.Terminal", let tty = s.tty, selectTerminalTab(tty) { return }
-        if let b = s.hostBundle, !b.isEmpty, activate(bundle: b) { return }
+        // Only a running terminal: `tell application id` would launch a closed one
+        if let b = s.terminalApp, !NSRunningApplication.runningApplications(withBundleIdentifier: b).isEmpty,
+           let script = TerminalScripts.focus(bundle: b, tty: s.tty, cwd: s.launchDir ?? s.cwd), run(script) { return }
+        if let b = s.terminalApp, !b.isEmpty, activate(bundle: b) { return }
         if s.source == .desktop || s.source == .cowork, activate(bundle: claudeApp, launch: true) { return }
         if s.source == .xcode, activate(bundle: "com.apple.dt.Xcode") { return }
         if activate(bundle: "com.apple.Terminal") { return }
@@ -532,27 +537,8 @@ enum Focus {
         return true
     }
 
-    /// Holt genau das Terminal-Fenster/den Tab nach vorn, in dem die Sitzung läuft.
-    private static func selectTerminalTab(_ tty: String) -> Bool {
-        let clean = tty.hasPrefix("/dev/") ? tty : "/dev/" + tty
-        // Doppelt abgesichert: schon beim Einlesen geprüft, hier nochmal nur harmlose Zeichen
-        guard clean.range(of: #"^/dev/ttys?[0-9]{1,4}$"#, options: .regularExpression) != nil else { return false }
-        let dev = clean
-        let src = """
-        tell application "Terminal"
-            repeat with w in windows
-                repeat with t in tabs of w
-                    if tty of t is "\(dev)" then
-                        set selected of t to true
-                        set index of w to 1
-                        activate
-                        return true
-                    end if
-                end repeat
-            end repeat
-        end tell
-        return false
-        """
+    /// Runs a focus script from TerminalScripts; true if it found and selected the tab.
+    private static func run(_ src: String) -> Bool {
         var err: NSDictionary?
         let r = NSAppleScript(source: src)?.executeAndReturnError(&err)
         return r?.booleanValue == true

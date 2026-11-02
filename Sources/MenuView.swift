@@ -464,7 +464,7 @@ struct SessionRow: View {
 
     private func hostName(_ s: AgentSession) -> String {
         if let d = s.device { return "\(d) · \(s.source.label)" }
-        guard let b = s.hostBundle, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: b) else { return s.source.label }
+        guard let b = s.terminalApp, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: b) else { return s.source.label }
         return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 
