@@ -38,6 +38,11 @@ struct SelfTest {
         expect(UpdateCore.isNewer("26.11.1", than: "26.10.12"), "26.11.1 > 26.10.12")
         expect(UpdateCore.isNewer("27.1.1", than: "26.12.30"), "27.1.1 > 26.12.30")
         expect(!UpdateCore.isNewer("26.10.11", than: "26.10.11"), "gleiche Version ist nicht neuer")
+        // Tags are the bare version since 26.11; older releases carry "v". Both must be read the same way.
+        expect((try? GitHubRelease(json: ["tag_name": "26.11.1"]))?.version == "26.11.1", "Tag ohne v → 26.11.1")
+        expect((try? GitHubRelease(json: ["tag_name": "v26.10.14"]))?.version == "26.10.14", "alter Tag mit v → 26.10.14")
+        expect((try? GitHubRelease(json: ["tag_name": "26.11.1"])).map { UpdateCore.isNewer($0.version, than: "26.10.14") } == true,
+               "Tag ohne v ist neuer als installierte 26.10.14")
 
         print("Kopplungscode")
         expect(PeerCode.normalize("abcd-efgh-jkmn") == "ABCD-EFGH-JKMN", "Kleinbuchstaben und Bindestriche")
