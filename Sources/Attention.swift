@@ -8,6 +8,8 @@ import Darwin
 ///
 /// Rules:
 /// - A waiting state only notifies after `delay` seconds without interruption (no ping for short pauses).
+///   A permission prompt is more urgent (the agent is blocked) and uses the shorter `approvalDelay` (10 s, never
+///   longer than `delay`); questions, finished answers and errors keep `delay`.
 /// - Once per waiting state: staying in it never notifies again; new content (another question, a new
 ///   answer) is a new state, flicker back to the reported content is not.
 /// - The same state coming back after a short working blip (< `rearm`) counts as the same state.
@@ -24,6 +26,8 @@ struct WaitGate {
         var key: String = ""
         /// Idle sessions neither start nor end a waiting state
         var neutral = false
+        /// Waiting for a permission prompt (not a question or plan review): notifies after `approvalDelay`
+        var approval = false
     }
 
     private struct Entry {
@@ -33,7 +37,11 @@ struct WaitGate {
         var handled = true
         var leftAt: Date?
         var lastNotifiedKey: String?
+        var approval = false
     }
+
+    /// Fixed delay for permission prompts; a shorter general delay (e.g. 0 = immediately) wins.
+    static let approvalDelay: TimeInterval = 10
 
     var delay: TimeInterval = 20
     var rearm: TimeInterval = 10
@@ -60,6 +68,7 @@ struct WaitGate {
                 // without activity, e.g. after the Mac slept) and is dropped instead of firing late
                 e.handled = true
             } else if let k = o.kind {
+                e.approval = k == .waiting && o.approval
                 if e.kind == nil {
                     let blip = e.leftAt.map { now.timeIntervalSince($0) < rearm } ?? false
                     let sameAsBefore = blip && e.lastNotifiedKey == o.key
@@ -87,7 +96,7 @@ struct WaitGate {
                 e.kind = nil
                 e.leftAt = now
             }
-            if e.kind != nil, !e.handled, now.timeIntervalSince(e.since) >= delay {
+            if e.kind != nil, !e.handled, now.timeIntervalSince(e.since) >= wait(e) {
                 e.handled = true
                 e.lastNotifiedKey = e.key
                 due.append(o.id)
@@ -100,8 +109,10 @@ struct WaitGate {
 
     /// When the next pending notification becomes due (for a one-shot timer), nil if nothing is pending.
     var nextDeadline: Date? {
-        entries.values.filter { $0.kind != nil && !$0.handled }.map { $0.since.addingTimeInterval(delay) }.min()
+        entries.values.filter { $0.kind != nil && !$0.handled }.map { $0.since.addingTimeInterval(wait($0)) }.min()
     }
+
+    private func wait(_ e: Entry) -> TimeInterval { e.approval ? min(delay, Self.approvalDelay) : delay }
 }
 
 // MARK: - Usage warnings (5-hour and 7-day window)

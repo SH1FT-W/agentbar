@@ -123,8 +123,8 @@ struct SettingsView: View {
                         ForEach([0.0, 10, 20, 30, 60, 120], id: \.self) { Text(delayText($0)).tag($0) }
                     } label: {
                         SettingLabel(L("Erst melden nach", "Notify after"), "timer", .gray,
-                                     note: L("Kurze Pausen bleiben still, jeder Wartezustand meldet sich nur einmal.",
-                                             "Short pauses stay quiet; each waiting state notifies only once."))
+                                     note: L("Freigaben spätestens nach 10 s. Kurze Pausen bleiben still, jeder Wartezustand meldet sich nur einmal.",
+                                             "Permission prompts after 10 s at most. Short pauses stay quiet; each waiting state notifies only once."))
                     }
                 }
                 Toggle(isOn: $notifyContext) {

@@ -210,6 +210,11 @@ struct AgentSession: Identifiable, Equatable {
         }
     }
 
+    /// Waits for a permission prompt (not a question or plan review): notifies sooner than other waiting states.
+    var waitsForApproval: Bool {
+        status == .waiting && (question ?? "").isEmpty && tool != "AskUserQuestion" && tool != "ExitPlanMode"
+    }
+
     /// Läuft auf diesem Mac: ein Hook hat sie hier gemeldet (hooks.log liegt lokal, nicht im geteilten ~/.claude).
     var runsHere: Bool { device == nil && hostBundle != nil }
 }

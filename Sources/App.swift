@@ -206,8 +206,8 @@ final class AppStore: ObservableObject {
 
     private func title(_ s: AgentSession) -> String { s.device.map { "\(s.displayName) · \($0)" } ?? s.displayName }
 
-    /// Waiting sessions ("needs you", question, done, error): notify only after the set delay and once per
-    /// waiting state (WaitGate). Runs on every monitor/peer update and on a one-shot timer for the next deadline.
+    /// Waiting sessions ("needs you", question, done, error): notify only after the set delay (permission prompts
+    /// after at most WaitGate.approvalDelay) and once per waiting state (WaitGate). Runs on every monitor/peer update and on a one-shot timer for the next deadline.
     private func checkWaits() {
         let d = UserDefaults.standard
         gate.delay = max(0, d.double(forKey: Prefs.notifyDelay))
@@ -231,7 +231,7 @@ final class AppStore: ObservableObject {
         switch s.status {
         case .working: return .init(id: s.id, kind: nil)
         case .idle: return .init(id: s.id, kind: nil, neutral: true)
-        case .waiting: return .init(id: s.id, kind: .waiting, key: s.question ?? s.waitingReason ?? "")
+        case .waiting: return .init(id: s.id, kind: .waiting, key: s.question ?? s.waitingReason ?? "", approval: s.waitsForApproval)
         case .done: return .init(id: s.id, kind: .done, key: String(s.lastText.prefix(300)))
         case .error: return .init(id: s.id, kind: .error, key: "error")
         }

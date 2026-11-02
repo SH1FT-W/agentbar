@@ -275,6 +275,27 @@ struct SelfTest {
             _ = g.update([O(id: "h", kind: nil)], now: at(0))
             _ = g.update([O(id: "h", kind: .done, key: "x")], now: at(1))
             expect(g.update([O(id: "h", kind: nil, neutral: true)], now: at(400)).isEmpty && g.nextDeadline == nil, "veraltete Meldung bei Pause verworfen, kein Timer")
+            // Permission prompts notify after 10 s, questions and "done" keep the set delay
+            g = WaitGate(delay: 20)
+            _ = g.update([O(id: "p", kind: nil), O(id: "q", kind: nil)], now: at(0))
+            _ = g.update([O(id: "p", kind: .waiting, key: "Bash", approval: true), O(id: "q", kind: .waiting, key: "Frage")], now: at(1))
+            expect(g.nextDeadline == at(11), "Freigabe: Frist = Beginn + 10 s")
+            expect(g.update([O(id: "p", kind: .waiting, key: "Bash", approval: true), O(id: "q", kind: .waiting, key: "Frage")], now: at(11)) == ["p"],
+                   "Freigabe nach 10 s → Mitteilung, Frage noch nicht")
+            expect(g.update([O(id: "p", kind: .waiting, key: "Bash", approval: true), O(id: "q", kind: .waiting, key: "Frage")], now: at(21)) == ["q"],
+                   "Frage erst nach 20 s")
+            g = WaitGate(delay: 20)
+            _ = g.update([O(id: "p", kind: nil)], now: at(0))
+            _ = g.update([O(id: "p", kind: .waiting, key: "Bash", approval: true)], now: at(1))
+            _ = g.update([O(id: "p", kind: nil)], now: at(8))
+            expect(g.update([O(id: "p", kind: nil)], now: at(30)).isEmpty && g.nextDeadline == nil, "langsames Werkzeug unter 10 s → keine Freigabe-Mitteilung")
+            g = WaitGate(delay: 0)
+            _ = g.update([O(id: "p", kind: nil)], now: at(0))
+            expect(g.update([O(id: "p", kind: .waiting, key: "Bash", approval: true)], now: at(1)) == ["p"], "Verzögerung 0 gilt auch für Freigaben")
+            g = WaitGate(delay: 20)
+            _ = g.update([O(id: "p", kind: nil)], now: at(0))
+            _ = g.update([O(id: "p", kind: .done, key: "fertig", approval: true)], now: at(1))
+            expect(g.update([O(id: "p", kind: .done, key: "fertig", approval: true)], now: at(11)).isEmpty, "Freigabe-Frist nur beim Warten, nicht bei fertig")
         }
 
         print("Kontingent-Warnung")
