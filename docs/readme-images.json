@@ -33,7 +33,8 @@
       "bar": "AgentBar › Office",
       "left": 600,
       "top": 96
-    }
+    },
+    "layout": "center"
   },
   "titleVariants": {
     "de": {
