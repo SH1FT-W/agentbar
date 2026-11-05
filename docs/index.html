@@ -152,7 +152,7 @@ section.tint { background: var(--bg-2); }
 .menus .shot { border-radius: 22px; }
 
 /* Funktions-Kacheln */
-.feats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: clamp(40px, 5vw, 64px); }
+.feats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: clamp(40px, 5vw, 64px); }
 .tile { background: var(--card); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow); min-width: 0; }
 .tile h3 { margin-bottom: 8px; font-size: 19px; }
 .tile p { color: var(--ink-2); font-size: 15.5px; }
@@ -294,7 +294,7 @@ footer .fine { flex-basis: 100%; }
       <a class="btn ghost" href="https://github.com/SH1FT-W/agentbar"><span class="en">View on GitHub</span><span class="de">Auf GitHub ansehen</span></a>
     </div>
     <p class="meta reveal d3">
-      <span class="pill"><i></i><span id="agentbar-version">Version 26.10.11</span></span>
+      <span class="pill"><i></i><span id="agentbar-version">Version 26.10.14</span></span>
       <span class="en">macOS 14 or later &middot; Apple Silicon &middot; Free and open source &middot; English and German</span><span class="de">macOS 14 oder neuer &middot; Apple Silicon &middot; Kostenlos und Open Source &middot; Deutsch und Englisch</span>
     </p>
     <div class="hero-shot reveal d3">
@@ -314,12 +314,12 @@ footer .fine { flex-basis: 100%; }
 <section id="new" class="tint">
   <div class="wrap">
     <div class="head center reveal">
-      <p class="eyebrow"><span class="en">Just arrived</span><span class="de">Gerade neu</span></p>
+      <p class="eyebrow"><span class="en">New in 26.10</span><span class="de">Neu in 26.10</span></p>
       <h2><span class="en">A livelier office.</span><span class="de">Ein lebendigeres Büro.</span></h2>
-      <p class="lead"><span class="en">The latest releases gave the team a coffee bar, four seasons outside the window, a few holidays to dress up for and some moments you only catch now and then.</span><span class="de">Die letzten Releases haben dem Team eine Kaffeebar gebracht, vier Jahreszeiten vor dem Fenster, ein paar Feiertage zum Verkleiden und Momente, die man nur ab und zu erwischt.</span></p>
+      <p class="lead"><span class="en">A coffee bar, seasons and Halloween costumes in the office, and a phone symbol for sessions you drive with Remote Control. Every change is in the <a href="https://github.com/SH1FT-W/agentbar/releases">releases</a>.</span><span class="de">Eine Kaffeebar, Jahreszeiten und Halloween-Kostüme im Büro, dazu ein Handy-Symbol für Sitzungen, die du per Remote Control steuerst. Jede Änderung steht in den <a href="https://github.com/SH1FT-W/agentbar/releases">Releases</a>.</span></p>
     </div>
     <div class="bento">
-      <div class="b s8 reveal">
+      <div class="b s4 reveal">
         <div class="txt">
           <span class="k"><span class="en">Office</span><span class="de">Büro</span></span>
           <h3><span class="en">Coffee bar</span><span class="de">Kaffeebar</span></h3>
@@ -341,7 +341,7 @@ footer .fine { flex-basis: 100%; }
           <img class="de" src="screenshots/de/office-spring.jpg" width="1600" height="960" loading="lazy" alt="Spring outside the office window: trees in pink blossom, German interface.">
         </div>
       </div>
-      <div class="b s4 reveal">
+      <div class="b s4 reveal d2">
         <div class="txt">
           <span class="k"><span class="en">Holiday</span><span class="de">Feiertag</span></span>
           <h3>Halloween</h3>
@@ -352,33 +352,7 @@ footer .fine { flex-basis: 100%; }
           <img class="de" src="screenshots/de/office-halloween.jpg" width="1600" height="960" loading="lazy" alt="Halloween in the office: pumpkins, paper bats and characters in costume, German interface.">
         </div>
       </div>
-      <div class="b s4 reveal d1">
-        <div class="txt">
-          <span class="k"><span class="en">Holiday</span><span class="de">Feiertag</span></span>
-          <h3><span class="en">Easter and Valentine's Day</span><span class="de">Ostern und Valentinstag</span></h3>
-          <p><span class="en">An egg tree, hidden eggs and bunny ears at Easter. Hearts in February. Advent, Christmas and New Year's Eve were already there.</span><span class="de">Ein Eierbaum, versteckte Eier und Hasenohren zu Ostern. Herzen im Februar. Advent, Weihnachten und Silvester gab es schon.</span></p>
-        </div>
-        <div class="pic">
-          <img class="en" src="screenshots/en/office-easter.jpg" width="1600" height="960" loading="lazy" alt="Easter in the office: bunny ears on the characters and painted eggs hidden around the room.">
-          <img class="de" src="screenshots/de/office-easter.jpg" width="1600" height="960" loading="lazy" alt="Easter in the office: bunny ears on the characters and painted eggs hidden around the room, German interface.">
-        </div>
-      </div>
-      <div class="b s4 reveal d2">
-        <div class="txt">
-          <span class="k"><span class="en">Now and then</span><span class="de">Ab und zu</span></span>
-          <h3><span class="en">Rare moments</span><span class="de">Seltene Momente</span></h3>
-          <p><span class="en">Some things only happen once in a while. Keep an eye on the window.</span><span class="de">Manches passiert nur hin und wieder. Behalt das Fenster im Blick.</span></p>
-          <div class="chips">
-            <span class="chip"><span class="en">Shooting star</span><span class="de">Sternschnuppe</span></span>
-            <span class="chip"><span class="en">Flock of birds</span><span class="de">Vogelschwarm</span></span>
-            <span class="chip"><span class="en">Rainbow in light rain</span><span class="de">Regenbogen bei Nieselregen</span></span>
-            <span class="chip"><span class="en">Snowman when snow settles</span><span class="de">Schneemann, wenn Schnee liegt</span></span>
-            <span class="chip"><span class="en">Pizza on Friday lunchtime</span><span class="de">Pizza am Freitagmittag</span></span>
-          </div>
-        </div>
-      </div>
     </div>
-    <p class="cap reveal"><span class="en">Versions now count year.month.number: 26.10.11 is the 11th release of October 2026. The update check sees it as newer than 2.3.1, so nothing changes for you.</span><span class="de">Versionen zählen jetzt Jahr.Monat.Nummer: 26.10.11 ist das 11. Release im Oktober 2026. Die Update-Prüfung sieht es als neuer als 2.3.1 an, für dich ändert sich nichts.</span></p>
   </div>
 </section>
 
@@ -424,25 +398,15 @@ footer .fine { flex-basis: 100%; }
         <h3><span class="en">Today and 7 days</span><span class="de">Heute und 7 Tage</span></h3>
         <p><span class="en">Tokens, API-equivalent cost and sessions per day, a 7-day chart and your top projects today. Computed locally from Claude Code's logs.</span><span class="de">Tokens, API-Gegenwert und Sitzungen pro Tag, ein 7-Tage-Diagramm und deine Top-Projekte von heute. Lokal aus den Protokollen von Claude Code berechnet.</span></p>
       </div>
-      <div class="tile reveal d3">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="6" rx="3"/><path d="M3 12h11" stroke-width="4" opacity=".5"/></svg></div>
-        <h3><span class="en">Context at a glance</span><span class="de">Kontext auf einen Blick</span></h3>
-        <p><span class="en">Every row shows tokens and a small context bar. It turns orange when the window is almost full, and the character in the office looks tired too.</span><span class="de">Jede Zeile zeigt Tokens und einen kleinen Kontext-Balken. Er wird orange, wenn das Fenster fast voll ist, und die Figur im Büro sieht dann auch müde aus.</span></p>
-      </div>
       <div class="tile reveal">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></div>
         <h3><span class="en">Jump right in</span><span class="de">Direkt hinspringen</span></h3>
-        <p><span class="en">Click a figure in the office or press Return in the menu, and the exact Terminal tab a session runs in comes to the front.</span><span class="de">Klick auf eine Figur im Büro oder drück Return im Menü, und genau der Terminal-Tab der Sitzung kommt nach vorn.</span></p>
+        <p><span class="en">Click a figure in the office or press Return in the menu, and the exact tab a session runs in comes to the front: Terminal and iTerm2 by tty, Ghostty by folder.</span><span class="de">Klick auf eine Figur im Büro oder drück Return im Menü, und genau der Tab der Sitzung kommt nach vorn: Terminal und iTerm2 per tty, Ghostty per Ordner.</span></p>
       </div>
       <div class="tile reveal d1">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
         <h3><span class="en">Notifications</span><span class="de">Mitteilungen</span></h3>
-        <p><span class="en">When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck. With quiet hours, a one-hour mute and a note when a new AgentBar is out.</span><span class="de">Wenn ein Agent dich braucht (mit seiner Frage), fertig ist, scheitert, der Kontext voll wird oder er hängt. Mit Ruhezeiten, „1 Std. stumm“ und einem Hinweis auf neue AgentBar-Versionen.</span></p>
-      </div>
-      <div class="tile reveal d2">
-        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg></div>
-        <h3><span class="en">Keyboard and VoiceOver</span><span class="de">Tastatur und VoiceOver</span></h3>
-        <p><span class="en">Arrow keys to select, Return to jump, Space to expand, ⌘R to reload. Every row and ring has a proper accessibility label.</span><span class="de">Pfeiltasten wählen, Return springt, Leertaste klappt auf, ⌘R lädt neu. Jede Zeile und jeder Ring hat eine Bedienhilfen-Beschriftung.</span></p>
+        <p><span class="en">When an agent needs you (with its actual question), finishes, fails, runs out of context or seems stuck, once per waiting state and after a delay you choose. Usage warnings at 80 % and 95 %, quiet hours and a one-hour mute.</span><span class="de">Wenn ein Agent dich braucht (mit seiner Frage), fertig ist, scheitert, der Kontext voll wird oder er hängt, einmal je Wartezustand und nach einer Verzögerung deiner Wahl. Kontingent-Warnungen bei 80 % und 95 %, Ruhezeiten und „1 Std. stumm“.</span></p>
       </div>
       <div class="tile reveal d3">
         <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg></div>
@@ -554,14 +518,16 @@ footer .fine { flex-basis: 100%; }
         <p class="note"><span class="en">Only the first launch needs the Gatekeeper step. Later updates arrive through the built-in update window and are verified with an Ed25519 signature, bundle ID, version and code signature.</span><span class="de">Nur der erste Start braucht den Gatekeeper-Schritt. Spätere Updates kommen über das eingebaute Update-Fenster und werden per Ed25519-Signatur, Bundle-ID, Version und Code-Signatur geprüft.</span></p>
       </div>
       <div class="panel reveal d1">
-        <h3><span class="en">What you need</span><span class="de">Was du brauchst</span></h3>
-        <p class="muted"><span class="en">Everything else is optional and off until you turn it on.</span><span class="de">Alles andere ist optional und aus, bis du es einschaltest.</span></p>
+        <h3><span class="en">What needs what</span><span class="de">Was braucht was</span></h3>
+        <p class="muted"><span class="en">You need macOS 14 or later on Apple Silicon and Claude Code. The rest:</span><span class="de">Du brauchst macOS 14 oder neuer auf Apple Silicon und Claude Code. Der Rest:</span></p>
         <ul class="req">
-          <li><span class="name">macOS 14+ <span class="muted"><span class="en">on Apple Silicon</span><span class="de">auf Apple Silicon</span></span></span><span class="tag"><span class="en">Required</span><span class="de">Nötig</span></span></li>
-          <li><span class="name"><a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> <span class="muted"><span class="en">AgentBar reads its local session logs</span><span class="de">AgentBar liest dessen lokale Protokolle</span></span></span><span class="tag"><span class="en">Required</span><span class="de">Nötig</span></span></li>
-          <li><span class="name"><span class="en">Claude Code hooks</span><span class="de">Claude-Code-Hooks</span> <span class="muted"><span class="en">for precise detection</span><span class="de">für die präzise Erkennung</span></span></span><span class="tag opt">Optional</span></li>
-          <li><span class="name"><span class="en">A weather location</span><span class="de">Ein Wetter-Ort</span> <span class="muted"><span class="en">for the real weather in the office</span><span class="de">für echtes Wetter im Büro</span></span></span><span class="tag opt">Optional</span></li>
-          <li><span class="name"><span class="en">Other Macs</span><span class="de">Andere Macs</span> <span class="muted"><span class="en">paired with a code</span><span class="de">per Code gekoppelt</span></span></span><span class="tag opt">Optional</span></li>
+          <li><span class="name"><span class="en">Sessions with status, project and context</span><span class="de">Sitzungen mit Status, Projekt und Kontext</span> <span class="muted"><span class="en">from Claude Code's local logs</span><span class="de">aus den lokalen Protokollen von Claude Code</span></span></span><span class="tag"><span class="en">Built in</span><span class="de">Dabei</span></span></li>
+          <li><span class="name"><span class="en">Tokens, cost, 7 days</span><span class="de">Tokens, Kosten, 7 Tage</span></span><span class="tag"><span class="en">Built in</span><span class="de">Dabei</span></span></li>
+          <li><span class="name"><span class="en">The office</span><span class="de">Das Büro</span> <span class="muted"><span class="en">with sky and time of day</span><span class="de">mit Himmel und Tageszeit</span></span></span><span class="tag"><span class="en">Built in</span><span class="de">Dabei</span></span></li>
+          <li><span class="name"><span class="en">Status the moment it changes</span><span class="de">Status sofort bei jeder Änderung</span></span><span class="tag opt">Hooks</span></li>
+          <li><span class="name"><span class="en">Usage rings</span><span class="de">Kontingent-Ringe</span></span><span class="tag opt"><span class="en">Keychain</span><span class="de">Schlüsselbund</span></span></li>
+          <li><span class="name"><span class="en">Real weather</span><span class="de">Echtes Wetter</span></span><span class="tag opt"><span class="en">Location</span><span class="de">Ort</span></span></li>
+          <li><span class="name"><span class="en">Other Macs</span><span class="de">Andere Macs</span></span><span class="tag opt"><span class="en">Pairing code</span><span class="de">Kopplungscode</span></span></li>
         </ul>
         <div class="keys">
           <kbd>⌃⌥A</kbd><span><span class="en">Show or hide the office, system-wide</span><span class="de">Büro zeigen oder ausblenden, systemweit</span></span>
@@ -577,7 +543,6 @@ footer .fine { flex-basis: 100%; }
 cd agentbar
 ./build.sh            # build/AgentBar.app
 ./build.sh install    # copies to /Applications and launches</code></pre>
-        <p class="note"><span class="en">Versions count year.month.number: 26.10.11 is the 11th release of October 2026, and the next month starts again at .1. Tags carry a v prefix.</span><span class="de">Versionen zählen Jahr.Monat.Nummer: 26.10.11 ist das 11. Release im Oktober 2026, der nächste Monat beginnt wieder bei .1. Tags tragen ein v davor.</span></p>
       </div>
     </div>
   </div>
