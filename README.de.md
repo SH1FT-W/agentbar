@@ -32,7 +32,7 @@ AgentBar liest nur, was Claude Code auf deinem Mac schreibt. Es beantwortet kein
 | Echtes Wetter hinter der Glasfront | einen Ort |
 | Sitzungen deiner anderen Macs | denselben Kopplungscode auf jedem Mac |
 
-**Neu in 26.10:** eine Kaffeebar, Jahreszeiten, Halloween-Kostüme und seltene Momente im Büro, dazu ein Handy-Symbol für Sitzungen, die du per Remote Control steuerst. Jede Änderung steht in den [Releases](https://github.com/SH1FT-W/agentbar/releases).
+**Neu in 26.11:** ruhigere und nützlichere Mitteilungen: Freigaben nach spätestens 10 Sekunden, alles andere einmal je Wartezustand nach der Verzögerung, die du wählst, ein Klick öffnet den richtigen Tab, und Kontingent-Warnungen bei 80 % und 95 %. Jede Änderung steht in den [Releases](https://github.com/SH1FT-W/agentbar/releases).
 
 <a id="installieren"></a>
 ## Installieren
