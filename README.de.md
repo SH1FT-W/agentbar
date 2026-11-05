@@ -78,8 +78,8 @@ Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar dein Terminal-Progr
 
 <div align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/menu-live-dark.png" />
-  <img src="docs/screenshots/de/menu-live-light.png" width="330" alt="Das AgentBar-Menü: eine Liste der Claude-Sitzungen mit Status und Projekt, Kontingent-Ringe, Tokens und Kosten von heute, ein 7-Tage-Diagramm und Top-Projekte." />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/de/office-night.jpg" />
+  <img src="docs/screenshots/de/office-day.jpg" alt="Das AgentBar-Büro: eine Figur pro Claude-Code-Sitzung am eigenen Schreibtisch, der Himmel draußen folgt der Tageszeit." />
 </picture>
 </div>
 
@@ -101,7 +101,7 @@ Ein Klick auf eine Figur oder Return auf einer Zeile holt genau den richtigen Ta
 Der Himmel folgt deiner Uhrzeit; mit einem Ort gibt es Wolken, Regen an der Scheibe, Nebel, Schnee auf den Hügeln und den echten Sonnenauf- und -untergang. Die Bäume wechseln mit den Jahreszeiten (auf der Südhalbkugel versetzt). Das Büro schmückt sich zu Valentinstag, Ostern, Halloween, Advent, Weihnachten und Silvester, und das Team kleidet sich passend zum Anlass und zum Wetter. Jede Figur wählt täglich ihren Look und behält ihn für die Sitzung. Subagenten kreisen als leuchtende Kugeln um ihre Figur, der Saugroboter wird mit der CPU-Last schneller und fährt abends in seine Station, und wer gerade fertig ist, stellt sich manchmal an der Siebträgermaschine an. Ab und zu: eine Sternschnuppe, ein Vogelschwarm, ein Regenbogen, ein Schneemann, Pizza am Freitagmittag.
 
 <p align="center">
-<img src="docs/screenshots/de/office-night.jpg" width="49%" alt="Das Büro bei Nacht: warme Schreibtischlampen, dunkler Sternenhimmel hinter der Glasfront, der Saugroboter in seiner Ladestation." />
+<img src="docs/screenshots/de/office-rain.jpg" width="49%" alt="Regen läuft an der Glasfront des Büros herunter." />
 <img src="docs/screenshots/de/office-lounge-full.jpg" width="49%" alt="Sitzungen in der Pause sitzen zusammen auf dem Sofa in der Lounge, die anderen arbeiten weiter." />
 <img src="docs/screenshots/de/office-snow.jpg" width="49%" alt="Schnee auf den Hügeln draußen, drinnen tragen die Figuren Schals." />
 <img src="docs/screenshots/de/office-coffee.jpg" width="49%" alt="Zwei Figuren stehen an der Siebträgermaschine hinter dem Sofa an, die anderen tippen weiter." />

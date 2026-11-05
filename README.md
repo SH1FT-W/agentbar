@@ -78,8 +78,8 @@ The first time you jump to a session, macOS asks whether AgentBar may control yo
 
 <div align="center">
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/menu-live-dark.png" />
-  <img src="docs/screenshots/en/menu-live-light.png" width="330" alt="The AgentBar dropdown: a list of Claude sessions with status and project, usage rings, today's tokens and cost, a 7-day chart and top projects." />
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/en/office-night.jpg" />
+  <img src="docs/screenshots/en/office-day.jpg" alt="The AgentBar office: a character per Claude Code session working at its own desk, the sky outside following the time of day." />
 </picture>
 </div>
 
@@ -101,7 +101,7 @@ Click a character or press Return on a row and the exact tab comes to the front:
 The sky follows your local time; with a location you get clouds, rain on the glass, fog, snow on the hills and the real sunrise and sunset. The trees change with the seasons (flipped for the southern hemisphere). The office decorates itself for Valentine's Day, Easter, Halloween, Advent, Christmas and New Year's Eve, and the team dresses for the occasion and the weather. Each character picks its own look for the day and keeps it for the session. Subagents orbit their character as glowing spheres, the robot vacuum speeds up with your CPU load and docks in the evening, and agents that just finished sometimes queue at the espresso machine. Now and then: a shooting star, a flock of birds, a rainbow, a snowman, pizza on Friday lunchtime.
 
 <p align="center">
-<img src="docs/screenshots/en/office-night.jpg" width="49%" alt="The office at night: warm desk lamps, a dark sky with stars behind the glass, the robot vacuum docked at its charging station." />
+<img src="docs/screenshots/en/office-rain.jpg" width="49%" alt="Rain running down the glass front of the office." />
 <img src="docs/screenshots/en/office-lounge-full.jpg" width="49%" alt="Idle sessions sitting together on the sofa in the lounge while others keep working at their desks." />
 <img src="docs/screenshots/en/office-snow.jpg" width="49%" alt="Snow settling on the hills outside, characters wearing scarves inside." />
 <img src="docs/screenshots/en/office-coffee.jpg" width="49%" alt="Two characters queue at the espresso machine behind the sofa while the others keep typing." />
