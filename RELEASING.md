@@ -25,4 +25,4 @@ Both need a clean working tree. After a pull, build, run the tests and compare t
 
 - `./build.sh test` is green (the release script runs it as well).
 - The office and menu screenshots in `docs/` still match the app.
-- The "What's new" table in `README.md` and `README.de.md` mentions the release.
+- The "New in …" line in `README.md` and `README.de.md` mentions the release.
