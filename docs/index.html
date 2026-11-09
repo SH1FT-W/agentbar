@@ -13,43 +13,40 @@
 <meta property="og:description" content="Your Claude Code agents in the macOS menu bar, with a tiny animated office where they actually work.">
 <meta property="og:image" content="https://sh1ft-w.github.io/agentbar/images/readme-title-social.png">
 <link rel="icon" href="icon.png">
-<!-- Shared SH1FT-W design (tokens, glass navigation, light/dark, DE/EN, reveal) -->
-<link rel="stylesheet" href="https://sh1ft-w.github.io/theme/v1/theme.css">
-<script src="https://sh1ft-w.github.io/theme/v1/theme.js"></script>
+<!-- Shared SH1FT-W design, version 2 (tokens, Archivo, navigation, light/dark, DE/EN, the lanes) -->
+<link rel="stylesheet" href="https://sh1ft-w.github.io/theme/v2/theme.css">
+<script src="https://sh1ft-w.github.io/theme/v2/theme.js"></script>
 <style>
 /* AgentBar-Palette: Systemschrift, Apple-Blau als Akzent; Dunkel folgt dem System oder dem Schalter oben rechts */
 :root {
   --accent: var(--ac);
   --bg: #fbfbfd; --bg-2: #f3f3f6; --card: #ffffff; --card-2: #f5f5f7;
   --ink: #1d1d1f; --ink-2: #55555b; --ink-3: rgba(29,29,31,0.5);
-  --ac: #0071e3; --ac-fill: #0a7cf0; --ac-tint: rgba(0,113,227,0.1); --ac-glow: rgba(0,113,227,0.32); --on-ac: #ffffff;
+  --ac: #0071e3; --ac-fill: #0a7cf0; --ac-tint: rgba(0,113,227,0.1); --on-ac: #ffffff;
   --sun: #d9960a; --sun-tint: rgba(255,196,64,0.16);
   --line: rgba(0,0,0,0.08); --chip: rgba(0,0,0,0.05);
   --glass: rgba(255,255,255,0.68); --glass-line: rgba(255,255,255,0.7);
   --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 32px -14px rgba(0,0,0,0.18);
   --shadow-lg: 0 2px 6px rgba(0,0,0,0.04), 0 48px 100px -36px rgba(0,0,0,0.35);
   --radius: 26px; --radius-lg: 34px; --gutter: clamp(16px, 5vw, 48px); --max: 1180px;
-  --blob-1: rgba(41,151,255,0.28); --blob-2: rgba(255,196,64,0.34); --blob-3: rgba(120,208,160,0.3);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg: #000000; --bg-2: #0d0d10; --card: #18181b; --card-2: #202024;
   --ink: #f5f5f7; --ink-2: rgba(235,235,245,0.72); --ink-3: rgba(235,235,245,0.5);
-  --ac: #2997ff; --ac-fill: #2997ff; --ac-tint: rgba(41,151,255,0.14); --ac-glow: rgba(41,151,255,0.3); --on-ac: #ffffff;
+  --ac: #2997ff; --ac-fill: #2997ff; --ac-tint: rgba(41,151,255,0.14); --on-ac: #ffffff;
   --sun: #ffc83d; --sun-tint: rgba(255,200,61,0.14);
   --line: rgba(255,255,255,0.1); --chip: rgba(255,255,255,0.07);
   --glass: rgba(28,28,30,0.66); --glass-line: rgba(255,255,255,0.09);
   --shadow: 0 14px 34px -16px rgba(0,0,0,0.7); --shadow-lg: 0 48px 100px -36px rgba(0,0,0,0.85);
-  --blob-1: rgba(41,151,255,0.22); --blob-2: rgba(255,196,64,0.12); --blob-3: rgba(120,208,160,0.12);
 } }
 :root[data-theme="dark"] {
   --bg: #000000; --bg-2: #0d0d10; --card: #18181b; --card-2: #202024;
   --ink: #f5f5f7; --ink-2: rgba(235,235,245,0.72); --ink-3: rgba(235,235,245,0.5);
-  --ac: #2997ff; --ac-fill: #2997ff; --ac-tint: rgba(41,151,255,0.14); --ac-glow: rgba(41,151,255,0.3); --on-ac: #ffffff;
+  --ac: #2997ff; --ac-fill: #2997ff; --ac-tint: rgba(41,151,255,0.14); --on-ac: #ffffff;
   --sun: #ffc83d; --sun-tint: rgba(255,200,61,0.14);
   --line: rgba(255,255,255,0.1); --chip: rgba(255,255,255,0.07);
   --glass: rgba(28,28,30,0.66); --glass-line: rgba(255,255,255,0.09);
   --shadow: 0 14px 34px -16px rgba(0,0,0,0.7); --shadow-lg: 0 48px 100px -36px rgba(0,0,0,0.85);
-  --blob-1: rgba(41,151,255,0.22); --blob-2: rgba(255,196,64,0.12); --blob-3: rgba(120,208,160,0.12);
 }
 
 a { color: var(--ac); text-decoration: none; }
@@ -70,19 +67,17 @@ code { font: 500 0.92em/1.4 ui-monospace, "SF Mono", Menlo, monospace; backgroun
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 24px; border-radius: 999px;
   font-family: inherit; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: -0.005em;
   background: var(--ac-fill); color: var(--on-ac); border: 0; cursor: pointer;
-  box-shadow: 0 12px 28px -12px var(--ac-glow); transition: transform .2s ease, filter .2s ease, box-shadow .2s ease;
+  transition: transform .2s ease, filter .2s ease;
 }
-.btn:hover { text-decoration: none; filter: brightness(1.06); transform: translateY(-1px); box-shadow: 0 16px 32px -12px var(--ac-glow); }
+.btn:hover { text-decoration: none; filter: brightness(1.06); transform: translateY(-1px); }
 .btn.ghost { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
 .btn.small { height: 36px; padding: 0 16px; font-size: 14px; }
 .btn svg { width: 16px; height: 16px; }
 
 /* Schrift */
-.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ac); margin: 0 0 18px; }
-.eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ac); box-shadow: 0 0 0 4px var(--ac-tint); }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ac); margin: 0 0 18px; }
 h1, h2, h3 { margin: 0; color: var(--ink); font-weight: 700; }
 h1 { font-size: clamp(46px, 8.4vw, 104px); line-height: 0.98; letter-spacing: -0.045em; }
-h1 em { font-style: normal; color: var(--ac); }
 h2 { font-size: clamp(34px, 5.2vw, 60px); line-height: 1.04; letter-spacing: -0.035em; }
 h3 { font-size: 21px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 600; }
 .lead { font-size: clamp(19px, 2.1vw, 23px); line-height: 1.45; color: var(--ink-2); letter-spacing: -0.012em; margin: 24px 0 0; }
@@ -101,23 +96,13 @@ section.tint { background: var(--bg-2); }
 .shot img { width: 100%; }
 .cap { margin-top: 18px; font-size: 15px; color: var(--ink-3); text-align: center; }
 
-/* Hero mit weichem Farbschleier: Blau der App, Sonne und Grün aus dem Büro */
-.hero { padding: clamp(64px, 10vw, 120px) 0 clamp(64px, 9vw, 112px); text-align: center; }
-.hero .glow { position: absolute; inset: -30% -10% auto; height: 90%; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(42% 38% at 22% 28%, var(--blob-1), transparent 70%),
-    radial-gradient(36% 34% at 78% 22%, var(--blob-2), transparent 70%),
-    radial-gradient(50% 40% at 50% 70%, var(--blob-3), transparent 70%);
-  filter: blur(48px); opacity: .75; }
-.hero .wrap { position: relative; z-index: 1; }
-.hero .icon { width: 112px; height: 112px; margin: 0 auto 26px; filter: drop-shadow(0 14px 30px rgba(0,0,0,.16)); }
+/* Hero */
 .hero .lead { max-width: 640px; margin-left: auto; margin-right: auto; }
 .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 36px; }
 .meta { margin-top: 22px; font-size: 14px; color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center; align-items: center; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--ink-2); font-size: 13px; }
 .pill i { width: 7px; height: 7px; border-radius: 50%; background: #30d158; display: inline-block; }
 .hero-shot { margin-top: clamp(48px, 7vw, 88px); }
-.hero-shot .shot { box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 80px 160px -60px var(--ac-glow), var(--shadow-lg); }
 
 /* Laufband mit Zuständen und Büro-Momenten */
 .marquee { margin-top: clamp(40px, 6vw, 72px); overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
@@ -133,7 +118,7 @@ section.tint { background: var(--bg-2); }
 .bento { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
 .b { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; display: flex; flex-direction: column; position: relative; min-width: 0; }
 .b .txt { padding: 26px 28px 28px; }
-.b .txt .k { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sun); background: var(--sun-tint); padding: 4px 10px; border-radius: 999px; margin-bottom: 14px; }
+.b .txt .k { display: inline-block; font-size: 12px; font-weight: 600; color: var(--sun); background: var(--sun-tint); padding: 4px 10px; border-radius: 999px; margin-bottom: 14px; }
 .b h3 { margin-bottom: 8px; }
 .b p { color: var(--ink-2); font-size: 16px; }
 .b .pic { background: var(--card-2); padding: 0; flex: 1; display: flex; align-items: flex-end; }
@@ -156,7 +141,7 @@ section.tint { background: var(--bg-2); }
 .tile { background: var(--card); border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow); min-width: 0; }
 .tile h3 { margin-bottom: 8px; font-size: 19px; }
 .tile p { color: var(--ink-2); font-size: 15.5px; }
-.tile .k { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ac); margin-bottom: 14px; }
+.tile .k { font-size: 13px; font-weight: 600; color: var(--ac); margin-bottom: 14px; }
 .tile .ico { width: 46px; height: 46px; border-radius: 15px; background: var(--ac-tint); color: var(--ac); display: grid; place-items: center; margin-bottom: 18px; }
 .tile .ico svg { width: 23px; height: 23px; }
 .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 16px; }
@@ -194,7 +179,7 @@ section.tint { background: var(--bg-2); }
 .req li { display: flex; gap: 14px; align-items: baseline; padding: 15px 0; border-top: 1px solid var(--line); font-size: 16px; }
 .req li:first-child { border-top: 0; padding-top: 6px; }
 .req .name { color: var(--ink); font-weight: 600; flex: 1; }
-.tag { flex: none; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px; background: var(--ac-tint); color: var(--ac); }
+.tag { flex: none; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--ac-tint); color: var(--ac); }
 .tag.opt { background: var(--chip); color: var(--ink-3); }
 .note { margin-top: 20px; font-size: 14px; color: var(--ink-3); }
 .manual { grid-column: 1 / -1; }
@@ -235,11 +220,9 @@ footer .fine { flex-basis: 100%; }
 }
 @media (max-width: 640px) {
   body { font-size: 16px; }
-  :root { --radius: 22px; --radius-lg: 26px; }
   .nav { padding-left: 12px; }
   .nav .iconbtn { margin-left: auto; }
   .nav .btn { display: none; }
-  .hero .icon { width: 88px; height: 88px; }
   .b.s4, .b.s6, .b.s8 { grid-column: span 12; }
   .feats, .duo { grid-template-columns: 1fr; }
   .pops { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px var(--gutter) 24px; margin: 0 calc(-1 * var(--gutter)); scrollbar-width: none; }
@@ -254,9 +237,47 @@ footer .fine { flex-basis: 100%; }
   .servers li { grid-template-columns: 1fr; gap: 2px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .marquee .track { animation: none; flex-wrap: wrap; width: auto; justify-content: center; }
+  .marquee .track { animation: none; flex-wrap: wrap; width: auto; }
   .marquee { -webkit-mask-image: none; mask-image: none; }
 }
+
+/* ---- theme v2 ---- */
+:root { --font: "Archivo", -apple-system, BlinkMacSystemFont, system-ui, sans-serif; --display: var(--font); --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --accent-ink: var(--ac); --on-accent: var(--on-ac); --lane-a: #0071e3; --lane-b: #5ab0ff; --radius: 20px; --radius-lg: 28px; --max: 1200px; }
+body { font-family: var(--font); }
+h1, h2, h3 { font-family: var(--display); }
+h1 { font-size: clamp(34px, 4.3vw, 62px); line-height: 1.02; font-weight: 800; font-stretch: 118%; font-style: italic; letter-spacing: -0.025em; }
+h2 { font-size: clamp(30px, 3.8vw, 48px); line-height: 1.08; font-weight: 750; font-stretch: 112%; letter-spacing: -0.02em; }
+.split h2 { font-size: clamp(28px, 3.4vw, 44px); }
+h3 { font-stretch: 106%; letter-spacing: -0.01em; }
+h1 em, h2 em { color: inherit; font-style: inherit; }
+.center { text-align: left; } .center .lead { margin-left: 0; margin-right: 0; }
+.head { max-width: 50em; }
+.eyebrow { font-size: 16px; font-weight: 650; margin-bottom: 12px; }
+.cap { text-align: left; }
+.btn { border-radius: 12px; }
+.btn.ghost { background: var(--chip); box-shadow: none; }
+.pill { box-shadow: none; background: var(--chip); border-radius: 8px; }
+.shot { box-shadow: none; }
+.shot::after { box-shadow: inset 0 0 0 1px var(--line); }
+.b, .tile, .panel, .card, .servers, .fact, .whenmap { box-shadow: none; border: 1px solid var(--line); }
+.chip { box-shadow: inset 0 0 0 1px var(--line); border-radius: 8px; }
+.copy { box-shadow: none; border: 1px solid var(--line); border-radius: 8px; }
+.b .txt .k, .tag { font-size: 13px; }
+.b .txt .k, .tag { border-radius: 6px; }
+.tile .ico { border-radius: 10px; }
+.credits { text-align: left; }
+.credits p:not(.eyebrow) { margin: 0; }
+.credits .narrow { max-width: var(--max); }
+.hero { text-align: left; padding: clamp(48px, 7vw, 96px) 0 clamp(56px, 7vw, 96px); overflow: hidden; }
+.hero-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(24px, 4vw, 64px); align-items: center; }
+.hero .mark { width: 64px; height: 64px; margin-bottom: 26px; }
+.hero .lead { margin-left: 0; max-width: 34em; }
+.cta, .meta { justify-content: flex-start; }
+.hero .s-lanes { margin-right: calc(-1 * var(--gutter) - 14vw); }
+.s-track b { color: #fff; font: italic 800 clamp(18px, 2.3vw, 32px)/1 var(--font); font-stretch: 116%; letter-spacing: -0.015em; white-space: nowrap; }
+@media (max-width: 900px) { .hero-top { grid-template-columns: 1fr; } .hero .s-lanes { margin: 8px calc(-1 * var(--gutter) - 8vw) 0 28px; } .s-track b { font-size: clamp(16px, 4.3vw, 28px); } }
+.hero-shot { margin-top: clamp(40px, 6vw, 72px); }
 </style>
 </head>
 <body>
@@ -283,20 +304,27 @@ footer .fine { flex-basis: 100%; }
 </div>
 
 <section class="hero" id="top">
-  <div class="glow" aria-hidden="true"></div>
-  <div class="wrap">
-    <img class="icon reveal" src="icon.png" width="256" height="256" alt="AgentBar app icon">
-    <p class="eyebrow reveal"><span class="en">For Claude Code on the Mac</span><span class="de">Für Claude Code auf dem Mac</span></p>
-    <h1 class="reveal d1"><span class="en">Your agents.<br>In the <em>menu bar</em>.</span><span class="de">Deine Agenten.<br>In der <em>Menüleiste</em>.</span></h1>
-    <p class="lead reveal d2"><span class="en">AgentBar shows what every Claude Code session is doing, <strong>quiet until one needs you</strong>. And it comes with a tiny office where your agents actually work.</span><span class="de">AgentBar zeigt, was jede Claude-Code-Sitzung gerade tut, <strong>ruhig, bis eine dich braucht</strong>. Dazu ein kleines Büro, in dem deine Agenten wirklich arbeiten.</span></p>
-    <div class="cta reveal d3">
-      <a class="btn" href="https://github.com/SH1FT-W/agentbar/releases/latest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="en">Download for Mac</span><span class="de">Für Mac laden</span></a>
-      <a class="btn ghost" href="https://github.com/SH1FT-W/agentbar"><span class="en">View on GitHub</span><span class="de">Auf GitHub ansehen</span></a>
+  <div class="wrap hero-top">
+    <div>
+      <img class="mark" src="icon.png" width="64" height="64" alt="AgentBar app icon">
+      <h1><span class="en">Your agents.<br>In the menu bar.</span><span class="de">Deine Agenten.<br>In der Menüleiste.</span></h1>
+      <p class="lead reveal d2"><span class="en">AgentBar shows what every Claude Code session is doing, <strong>quiet until one needs you</strong>. And it comes with a tiny office where your agents actually work.</span><span class="de">AgentBar zeigt, was jede Claude-Code-Sitzung gerade tut, <strong>ruhig, bis eine dich braucht</strong>. Dazu ein kleines Büro, in dem deine Agenten wirklich arbeiten.</span></p>
+      <div class="cta reveal d3">
+        <a class="btn" href="https://github.com/SH1FT-W/agentbar/releases/latest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span class="en">Download for Mac</span><span class="de">Für Mac laden</span></a>
+        <a class="btn ghost" href="https://github.com/SH1FT-W/agentbar"><span class="en">View on GitHub</span><span class="de">Auf GitHub ansehen</span></a>
+      </div>
+      <p class="meta reveal d3">
+        <span class="pill"><i></i><span id="agentbar-version">Version 26.10.14</span></span>
+        <span class="en">macOS 14 or later &middot; Apple Silicon &middot; Free and open source &middot; English and German</span><span class="de">macOS 14 oder neuer &middot; Apple Silicon &middot; Kostenlos und Open Source &middot; Deutsch und Englisch</span>
+      </p>
     </div>
-    <p class="meta reveal d3">
-      <span class="pill"><i></i><span id="agentbar-version">Version 26.10.14</span></span>
-      <span class="en">macOS 14 or later &middot; Apple Silicon &middot; Free and open source &middot; English and German</span><span class="de">macOS 14 oder neuer &middot; Apple Silicon &middot; Kostenlos und Open Source &middot; Deutsch und Englisch</span>
-    </p>
+    <div class="s-lanes" aria-hidden="true">
+      <div class="s-lane"><div class="s-track"><b><span class="en">A tiny animated office</span><span class="de">Ein kleines animiertes Büro</span></b></div></div>
+      <div class="s-lane"><div class="s-track"><b><span class="en">Quiet until one needs you</span><span class="de">Ruhig, bis einer dich braucht</span></b></div></div>
+      <div class="s-lane"><div class="s-track"><b><span class="en">macOS 14 or newer</span><span class="de">macOS 14 oder neuer</span></b></div></div>
+    </div>
+  </div>
+  <div class="wrap">
     <div class="hero-shot reveal d3">
       <div class="shot lg">
         <img class="en" src="screenshots/en/office-day.jpg" width="1600" height="960" fetchpriority="high" alt="The AgentBar office by day: six Claude sessions as characters at their desks behind a glass front, one raising a hand, usage rings on the wall display.">

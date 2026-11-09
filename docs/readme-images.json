@@ -1,5 +1,5 @@
 {
-  "$comment": "Content of the README pictures (English README.md and German README.de.md). Render with sh1ft-w.github.io/theme/v1/readme-images (node render.mjs <this repo>).",
+  "$comment": "Content of the README title. Render with sh1ft-w.github.io/theme/v2/readme-images (node render.mjs <this repo>): banner 1280 x 440 light and dark, social preview 1280 x 640. Used fields: title.name, title.line, title.lanes, title.logo, colors.*.bg/ink/ink2, colors.light.accent. The other fields are from the v1 title and no longer read.",
   "title": {
     "name": "AgentBar",
     "eyebrow": "For Claude Code on the Mac",
@@ -34,7 +34,13 @@
       "left": 600,
       "top": 96
     },
-    "layout": "center"
+    "layout": "center",
+    "line": "Your Claude Code agents in the menu bar.",
+    "lanes": [
+      "A tiny animated office",
+      "Quiet until one needs you",
+      "macOS 14 or newer"
+    ]
   },
   "titleVariants": {
     "de": {
@@ -57,7 +63,13 @@
         "light": "docs/screenshots/de/office-day.jpg",
         "dark": "docs/screenshots/de/office-night.jpg",
         "bar": "AgentBar › Büro"
-      }
+      },
+      "line": "Deine Claude-Code-Agenten in der Menüleiste.",
+      "lanes": [
+        "Ein kleines animiertes Büro",
+        "Ruhig, bis einer dich braucht",
+        "macOS 14 oder neuer"
+      ]
     }
   },
   "colors": {

@@ -2,14 +2,14 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-title-de-dark.webp" />
-  <img src="docs/images/readme-title-de-light.webp" alt="AgentBar: Deine Agenten. In der Menüleiste." />
+  <img src="docs/images/readme-title-de-light.webp" alt="AgentBar: Deine Claude-Code-Agenten in der Menüleiste. Ein kleines animiertes Büro. Ruhig, bis einer dich braucht. macOS 14 oder neuer." />
 </picture>
 
 [![Version](https://img.shields.io/badge/dynamic/xml?url=https%3A%2F%2Fraw.githubusercontent.com%2FSH1FT-W%2Fagentbar%2Fmain%2FInfo.plist&query=%2F%2Fkey%5B.%3D%27CFBundleShortVersionString%27%5D%2Ffollowing-sibling%3A%3Astring%5B1%5D&label=version&style=flat-square&color=2997ff&labelColor=1d1d1f)](https://github.com/SH1FT-W/agentbar/releases/latest)
-[![macOS](https://img.shields.io/badge/macOS-14%2B%20Apple%20Silicon-2997ff?style=flat-square&labelColor=1d1d1f&logo=apple&logoColor=white)](#einrichten)
+[![macOS](https://img.shields.io/badge/macOS-14%2B%20Apple%20Silicon-2997ff?style=flat-square&labelColor=1d1d1f&logo=apple&logoColor=white)](#loslegen)
 [![Laden](https://img.shields.io/badge/laden-AgentBar.zip-2997ff?style=flat-square&labelColor=1d1d1f)](https://github.com/SH1FT-W/agentbar/releases/latest)
 
-<a href="https://sh1ft-w.github.io/agentbar"><b>Website</b></a>&emsp;<a href="#installieren">Installieren</a>&emsp;<a href="#einrichten">Einrichten</a>&emsp;<a href="#menue-und-buero">Menü und Büro</a>&emsp;<a href="https://github.com/SH1FT-W/agentbar/releases">Releases</a>&emsp;<a href="README.md">English</a>
+<a href="https://sh1ft-w.github.io/agentbar"><b>Website</b></a>&emsp;<a href="#loslegen">Loslegen</a>&emsp;<a href="#menue-und-buero">Menü und Büro</a>&emsp;<a href="#deine-daten">Deine Daten</a>&emsp;<a href="https://github.com/SH1FT-W/agentbar/releases">Releases</a>&emsp;<a href="README.md">English</a>
 
 </div>
 
@@ -19,7 +19,7 @@ AgentBar sitzt in der Menüleiste deines Macs und zeigt, was jede [Claude-Code](
 
 AgentBar liest nur, was Claude Code auf deinem Mac schreibt. Es beantwortet keine Rückfragen und gibt nichts für dich frei; es holt den richtigen Terminal-Tab nach vorn, damit du es tun kannst.
 
-## Was braucht was
+## Was du bekommst
 
 | | Braucht |
 |:--|:--|
@@ -34,16 +34,25 @@ AgentBar liest nur, was Claude Code auf deinem Mac schreibt. Es beantwortet kein
 
 **Neu in 26.11:** ruhigere und nützlichere Mitteilungen: Freigaben nach spätestens 10 Sekunden, alles andere einmal je Wartezustand nach der Verzögerung, die du wählst, ein Klick öffnet den richtigen Tab, und Kontingent-Warnungen bei 80 % und 95 %. Jede Änderung steht in den [Releases](https://github.com/SH1FT-W/agentbar/releases).
 
-<a id="installieren"></a>
-## Installieren
+<a id="loslegen"></a><a id="installieren"></a><a id="einrichten"></a>
+## Loslegen
 
 [![AgentBar laden](https://img.shields.io/badge/Laden-AgentBar.zip-2997ff?style=for-the-badge&labelColor=1d1d1f&logo=apple&logoColor=white)](https://github.com/SH1FT-W/agentbar/releases/latest)
 
-`AgentBar.zip` entpacken und `AgentBar.app` in den Ordner **Programme** ziehen. AgentBar ist nicht von Apple notarisiert (dafür braucht es einen kostenpflichtigen Entwickler-Account), deshalb blockiert macOS den ersten Start einmal: **Systemeinstellungen > Datenschutz & Sicherheit** öffnen, zu *„AgentBar“ wurde blockiert* scrollen und **Trotzdem öffnen** klicken, oder im Terminal
+Du brauchst macOS 14 oder neuer auf Apple Silicon (gebaut und getestet auf macOS 27) und Claude Code. Es gibt kein Konto und kein Dock-Symbol.
 
-```sh
-xattr -dr com.apple.quarantine /Applications/AgentBar.app
-```
+1. **Installieren.** `AgentBar.zip` entpacken und `AgentBar.app` in den Ordner **Programme** ziehen. AgentBar ist nicht von Apple notarisiert (dafür braucht es einen kostenpflichtigen Entwickler-Account), deshalb blockiert macOS den ersten Start einmal: **Systemeinstellungen > Datenschutz & Sicherheit** öffnen, zu *„AgentBar“ wurde blockiert* scrollen und **Trotzdem öffnen** klicken, oder im Terminal
+
+   ```sh
+   xattr -dr com.apple.quarantine /Applications/AgentBar.app
+   ```
+
+2. **Starten.** Clawd erscheint in der Menüleiste: Augen zu, wenn alles ruht, Augen auf beim Arbeiten, winkend, wenn eine Sitzung dich braucht. Mitteilungen erlauben, wenn macOS fragt.
+3. **Präzise Erkennung einschalten.** Im Menü bei *Präzise Erkennung* auf **Einrichten** klicken. AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (Sicherung in `settings.json.agentbar-backup`). Das gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen wieder entfernen.
+4. **Schlüsselbund erlauben.** Für die Kontingent-Ringe liest AgentBar den Login von Claude Code (`Claude Code-credentials`) über das `security`-Werkzeug. Erlauben, falls macOS fragt.
+5. **Was du sonst willst.** Einen Ort unter **Einstellungen > Büro** für echtes Wetter, **Beim Anmelden starten** unter **Einstellungen > Allgemein** und **Andere Macs** mit demselben Kopplungscode auf jedem Mac.
+
+Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar dein Terminal-Programm steuern darf. AgentBar folgt der Sprache deines Macs, Deutsch oder Englisch.
 
 Spätere Updates kommen über das eingebaute Update-Fenster und werden per Ed25519-Signatur (Schlüssel fest in der App), Bundle-ID, Version und Code-Signatur geprüft.
 
@@ -60,18 +69,6 @@ cd agentbar
 ```
 
 </details>
-
-<a id="einrichten"></a>
-## Einrichten
-
-Du brauchst macOS 14 oder neuer auf Apple Silicon (gebaut und getestet auf macOS 27) und Claude Code. Es gibt kein Konto und kein Dock-Symbol.
-
-1. **Starten.** Clawd erscheint in der Menüleiste: Augen zu, wenn alles ruht, Augen auf beim Arbeiten, winkend, wenn eine Sitzung dich braucht. Mitteilungen erlauben, wenn macOS fragt.
-2. **Präzise Erkennung einschalten.** Im Menü bei *Präzise Erkennung* auf **Einrichten** klicken. AgentBar trägt kleine Hook-Befehle in `~/.claude/settings.json` ein (Sicherung in `settings.json.agentbar-backup`). Das gilt für danach gestartete Claude-Sitzungen und lässt sich in den Einstellungen wieder entfernen.
-3. **Schlüsselbund erlauben.** Für die Kontingent-Ringe liest AgentBar den Login von Claude Code (`Claude Code-credentials`) über das `security`-Werkzeug. Erlauben, falls macOS fragt.
-4. **Was du sonst willst.** Einen Ort unter **Einstellungen > Büro** für echtes Wetter, **Beim Anmelden starten** unter **Einstellungen > Allgemein** und **Andere Macs** mit demselben Kopplungscode auf jedem Mac.
-
-Beim ersten Sprung zu einer Sitzung fragt macOS, ob AgentBar dein Terminal-Programm steuern darf. AgentBar folgt der Sprache deines Macs, Deutsch oder Englisch.
 
 <a id="menue-und-buero"></a>
 ## Menü und Büro
@@ -109,6 +106,7 @@ Der Himmel folgt deiner Uhrzeit; mit einem Ort gibt es Wolken, Regen an der Sche
 
 </details>
 
+<a id="deine-daten"></a>
 ## Deine Daten
 
 - **Nur lokale Dateien.** AgentBar liest die Sitzungsprotokolle von Claude Code (`~/.claude/projects`), die Metadaten der Claude-App und das eigene Hook-Log. Keine Analyse, keine Telemetrie.
@@ -155,3 +153,11 @@ AGENTBAR_LANG=en      # oder =de, um eine Sprache zu testen
 [MIT](LICENSE). AgentBar wurde von [so-agentbar](https://github.com/sotthang/so-agentbar) von sotthang inspiriert und ist eine eigenständige Neuentwicklung mit anderem Design und Funktionsumfang.
 
 <sub>AgentBar ist ein unabhängiges Open-Source-Projekt, nicht verbunden mit Anthropic oder Apple. Claude ist eine Marke von Anthropic.</sub>
+
+<br/>
+
+<div align="center">
+<a href="https://sh1ft-w.github.io"><img src="https://sh1ft-w.github.io/readme/footer.png" width="640" alt="Alle SH1FT-W-Projekte"></a>
+<br/>
+<sub>Mehr Open Source für Home Assistant und den Mac auf <a href="https://sh1ft-w.github.io">sh1ft-w.github.io</a></sub>
+</div>
