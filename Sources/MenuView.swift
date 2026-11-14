@@ -263,7 +263,9 @@ struct EmptyAgents: View {
         VStack(spacing: 8) {
             ZStack {
                 Circle().fill(Color.primary.opacity(0.07)).frame(width: 36, height: 36)
-                Image(systemName: "sparkles").font(.system(size: 15, weight: .medium)).foregroundStyle(.secondary)
+                Image(nsImage: MenuBarIcon.make(waiting: false, working: false))   // Clawd asleep: nothing running
+                    .renderingMode(.template).resizable().interpolation(.high)
+                    .frame(width: 20, height: 20).foregroundStyle(.secondary)
             }
             VStack(spacing: 2) {
                 Text(L("Keine Sitzungen", "No sessions")).font(.system(size: 12, weight: .medium))

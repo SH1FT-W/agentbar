@@ -47,7 +47,7 @@ struct Snap {
             let view = Canvas { ctx, size in scene.draw(&ctx) }.frame(width: 1000, height: 600)
             let r = ImageRenderer(content: view); r.scale = 2
             if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
-                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") || name.hasPrefix("festive-") || name.hasPrefix("coffee-") || name.hasPrefix("season-") ? "build/\(name).png" : "build/office-\(name).png"))
+                try! rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: name.hasPrefix("weather-") || name.hasPrefix("festive-") || name.hasPrefix("coffee-") || name.hasPrefix("season-") || name.hasPrefix("labels-") ? "build/\(name).png" : "build/office-\(name).png"))
             }
         }
         // ./build.sh snapshot --festive → build/festive-*.png (Advent bis Neujahr)
@@ -114,6 +114,34 @@ struct Snap {
             }
             render("coffee-night", cal.date(bySettingHour: 22, minute: 0, second: 0, of: now)!, t, dark: true, sessions: fin)
             print("Kaffeebilder in build/ (\(n))")
+            return
+        }
+        // ./build.sh snapshot --labels → build/labels-*.png: name tags of walking figures passing seated ones, and a full sofa
+        if CommandLine.arguments.contains("--labels") {
+            let date = cal.date(bySettingHour: 11, minute: 0, second: 0, of: now)!
+            let t0 = date.timeIntervalSinceReferenceDate
+            let m = model
+            var work = demo
+            for i in work.indices { work[i].status = .working }
+            _ = m.actors(for: work, now: t0)
+            _ = m.actors(for: work, now: t0 + 30)
+            // Three go on a break at once: they walk past the desks to the sofa
+            var brk = work
+            for i in [1, 3, 7] { brk[i].status = .idle; brk[i].lastActivity = date }
+            var t = t0 + 31
+            var n = 0
+            while t < t0 + 40 && n < 4 {
+                t += 0.25
+                let (acts, _) = m.actors(for: brk, now: t)
+                let walkers = acts.filter { if case .walking = $0.pose { return true }; return false }
+                let near = walkers.contains { w in acts.contains { o in
+                    if case .walking = o.pose { return false }
+                    return o.id != w.id && abs(o.point.x - w.point.x) < 40 && o.point.y < w.point.y && w.point.y - o.point.y < 90 } }
+                if near { n += 1; render("labels-walk\(n)", date, t, dark: false, sessions: brk); t += 0.75 }
+            }
+            render("labels-sofa", date, t0 + 120, dark: false, sessions: brk)
+            render("labels-sofa-dark", date, t0 + 121, dark: true, sessions: brk)
+            print("Label images in build/ (\(n) walking)")
             return
         }
         // ./build.sh snapshot --seasons → build/season-*.png: Bäume und Wiese übers Jahr, dazu Halloween, Valentinstag, Ostern

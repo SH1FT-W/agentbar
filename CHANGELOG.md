@@ -4,6 +4,11 @@ Release notes for each version are on the [GitHub releases page](https://github.
 
 ## Unreleased
 
+### Changed
+- Office: a walking figure's name tag turns faint while it covers the face of someone seated behind it.
+- Office: the middle sofa tag sits one row lower, so all three sofa tags show readable names instead of a few letters.
+- Settings header and the empty menu show Clawd instead of a generic sparkles symbol.
+
 ## 26.11.2
 
 ### Changed

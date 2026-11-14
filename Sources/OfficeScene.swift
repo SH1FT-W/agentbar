@@ -1699,6 +1699,17 @@ struct OfficeScene {
         }
     }
 
+    /// Does a tag centred at p (about 120 pt wide) overlap the face of another figure that is not walking?
+    private func coversFace(of a: Actor, at p: CGPoint, height h: CGFloat) -> Bool {
+        let tagRect = CGRect(x: p.x - 60, y: p.y - h / 2, width: 120, height: h)
+        return actors.contains { o in
+            guard o.id != a.id, !o.leaving else { return false }
+            if case .walking = o.pose { return false }
+            let s = o.scale, top = headTop(o)
+            return tagRect.intersects(CGRect(x: o.point.x - 24 * s, y: top + 4 * s, width: 48 * s, height: 50 * s))
+        }
+    }
+
     private func drawLabels(_ ctx: inout GraphicsContext, _ a: Actor) {
         let s = a.scale
         let st = a.session.status
@@ -1722,9 +1733,12 @@ struct OfficeScene {
             if a.place == .stand(0) || a.place == .stand(1) { maxWidth = 110 }
             if a.place == .stand(0) { nameX -= 10 }
         case .sofa:
-            // Sofaplätze liegen nur 76 pt auseinander: alle Schilder auf einer Linie, schmal genug, dass sie sich nicht berühren
-            nameY = 516
-            maxWidth = 72
+            // Sofa seats are only 76 pt apart: the middle tag sits one row lower, so every tag gets room for a readable
+            // name. The outer ones are nudged inwards (coffee corner tag on the left, window edge on the right).
+            let seat: Int = { if case .sofa(let j) = a.place { return j }; return 0 }()
+            nameY = seat == 1 ? 538 : 516
+            maxWidth = seat == 1 ? 140 : 132
+            nameX += seat == 0 ? 4 : seat == 2 ? -4 : 0
         default: nameY = a.point.y + 22 * s
         }
         let icon: String, tint: Color
@@ -1749,7 +1763,11 @@ struct OfficeScene {
             g.scaleBy(x: 1, y: h / w)
             g.fill(circle(.zero, w / 2), with: glow(.zero, w / 2, st == .waiting ? rgb(0xFF9500) : tint, 0.35 * (1 - k)))
         }
-        tag(&ctx, a.session.label.count > 21 ? a.session.label.prefix(20) + "…" : a.session.label, icon: icon, tint: hover ? .white : tint,
+        // A walking figure's tag floats above its head, right where seated figures behind it have their faces:
+        // while it covers one, it is drawn faint, so the face stays visible and the name is still there.
+        var tagCtx = ctx
+        if walking && !hover && coversFace(of: a, at: P(nameX, nameY), height: size + 10) { tagCtx.opacity = 0.4 }
+        tag(&tagCtx, a.session.label.count > 21 ? a.session.label.prefix(20) + "…" : a.session.label, icon: icon, tint: hover ? .white : tint,
             at: P(nameX, nameY), size: size, fill: fill, text: text,
             device: a.session.device == nil ? nil : a.session.deviceSymbol,
             warning: a.session.contextWarning ? (hover || st == .waiting ? Color.white : rgb(0xFF9F0A)) : nil, maxWidth: maxWidth)

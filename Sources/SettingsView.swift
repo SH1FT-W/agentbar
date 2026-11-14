@@ -72,10 +72,12 @@ struct SettingsView: View {
         Form {
             Section {
                 HStack(spacing: 10) {
-                    // Eigenes Plättchen statt App-Symbol – wie die Kopf-Symbole der Systemeinstellungen
+                    // Own tile instead of the app icon, like the header icons in System Settings: Clawd from the menu bar
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.accentColor.gradient)
-                        Image(systemName: "sparkles").font(.system(size: 17, weight: .medium)).foregroundStyle(.white)
+                        Image(nsImage: MenuBarIcon.make(waiting: false, working: true))
+                            .renderingMode(.template).resizable().interpolation(.high)
+                            .frame(width: 24, height: 24).foregroundStyle(.white)
                     }
                     .frame(width: 34, height: 34)
                     .accessibilityHidden(true)
