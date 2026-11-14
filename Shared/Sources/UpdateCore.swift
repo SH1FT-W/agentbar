@@ -255,11 +255,18 @@ enum ReleaseNotes {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Release notes as attributed text: inline Markdown (bold, code) with line breaks kept and
-    /// list dashes turned into bullets, because inline Markdown knows no lists.
+    /// Release notes as attributed text: inline Markdown (bold, code) with line breaks kept, list dashes turned
+    /// into bullets and headings into bold lines, because inline Markdown knows neither lists nor headings.
     static func markdown(_ s: String) -> AttributedString {
         let s = s.split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.hasPrefix("- ") || $0.hasPrefix("* ") ? "•  " + $0.dropFirst(2) : String($0) }.joined(separator: "\n")
+            .map { line -> String in
+                if line.hasPrefix("- ") || line.hasPrefix("* ") { return "•  " + line.dropFirst(2) }
+                if line.hasPrefix("#") {
+                    let title = line.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces)
+                    return title.isEmpty ? "" : "**\(title)**"
+                }
+                return String(line)
+            }.joined(separator: "\n")
         return (try? AttributedString(markdown: s, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(s)
     }
 }

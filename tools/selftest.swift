@@ -3,6 +3,13 @@
 import Foundation
 import Combine
 
+/// Tiny lock-protected box for the watcher thread in the file test.
+final class Locked<T>: @unchecked Sendable {
+    private let lock = NSLock(); private var v: T
+    init(_ v: T) { self.v = v }
+    var value: T { get { lock.lock(); defer { lock.unlock() }; return v } set { lock.lock(); v = newValue; lock.unlock() } }
+}
+
 @main
 struct SelfTest {
     nonisolated(unsafe) static var failures = 0
@@ -56,6 +63,21 @@ struct SelfTest {
         let code = PeerCode.generate()
         expect(code.count == 14 && PeerCode.normalize(code) == code, "generate() liefert gültigen Code (\(code))")
         expect(PeerCode.generate() != code, "zwei Codes sind verschieden")
+
+        print("Release-Notizen")
+        let rn = String(ReleaseNotes.markdown("## What's new\n- **Calmer** notes\n\nInstall: `x`").characters)
+        expect(rn == "What's new\n•  Calmer notes\n\nInstall: x", "Überschrift, Liste, fett und Code ohne Markdown-Zeichen (\(rn.debugDescription))")
+
+        print("Andere Macs: Wiedereinspielen")
+        var rg = ReplayGuard()
+        expect(rg.accept(from: "A", sent: 1000), "erste Nachricht")
+        expect(!rg.accept(from: "A", sent: 1000) && !rg.accept(from: "A", sent: 990), "gleiche oder ältere Nachricht → abgelehnt")
+        expect(rg.accept(from: "B", sent: 990), "anderer Mac zählt getrennt")
+        // Peer was quiet for 35 s and got dropped from the list: a recorded frame must still be old
+        rg.prune(now: 1040)
+        expect(!rg.accept(from: "A", sent: 995), "nach Verstummen bleibt die Marke (innerhalb 2 Min.)")
+        rg.prune(now: 1200)
+        expect(rg.newest.isEmpty, "Marken nach Ablauf des Frische-Fensters aufgeräumt")
 
         print("Deko-Kalender: Advent und Weihnachten")
         expect(cal.component(.day, from: Festive.firstAdvent(year: 2026, cal: cal)) == 29
@@ -171,6 +193,12 @@ struct SelfTest {
         expect(frac.map { abs($0.timeIntervalSince1970 - 1_792_231_200.25) < 0.001 } == true, "mit Bruchteilen")
         expect(parseISO8601("2026-10-17T12:00:00+02:00") == plain, "Zeitzonen-Offset")
         expect(parseISO8601("gestern") == nil && parseISO8601("") == nil, "Unsinn → nil")
+        expect(parseISO8601("2026-11-14T15:00:00.123456+00:00").map { abs($0.timeIntervalSince1970 - 1794668400.123456) < 0.001 } == true,
+               "Mikrosekunden mit Offset (Kontingent-Antwort)")
+        // Runs on every JSONL line: ISO8601DateFormatter needed ~1 ms per call, which cost about a fifth of the CPU
+        let parseStart = Date()
+        for _ in 0..<5000 { _ = parseISO8601("2026-10-17T10:00:00.250Z"); _ = parseISO8601("2026-10-17T10:00:00Z") }
+        expect(Date().timeIntervalSince(parseStart) < 0.5, "10 000 Zeitstempel in unter 0,5 s")
 
         print("Wach halten")
         var applied: [(KeepAwakeMode, Bool)] = []
@@ -351,6 +379,53 @@ struct SelfTest {
         expect(TerminalScripts.focus(bundle: "com.example.other", tty: "ttys1", cwd: "/x") == nil, "unbekanntes Terminal → nur aktivieren")
         expect(TerminalProcess.parent(of: getpid()) == getppid(), "Elternprozess per sysctl")
         expect(TerminalProcess.tty(of: -5) == nil && TerminalProcess.hostApp(of: 0) == nil, "ungültige PID → nil")
+
+        print("Geteiltes ~/.claude: eigene Sitzung bleibt eigene")
+        func sess(_ id: String, bundle: String? = nil, verified: Bool = false, device: String? = nil) -> AgentSession {
+            var x = AgentSession(id: id, source: .cli, cwd: "/x", title: nil, model: "m", permissionMode: "", status: .working,
+                                 activity: "", tool: "", lastText: "", lastActivity: Date(), tokens: [:], subagents: [],
+                                 hostBundle: bundle, tty: nil, usesHooks: false, verifiedLocal: verified)
+            x.device = device
+            return x
+        }
+        // Other Mac (no hooks) mirrors our session and reports it back as its own
+        let mirror = sess("a", device: "Mac B")
+        expect(sess("a", verified: true).runsHere, "lokal nachgewiesener Prozess → läuft hier (ohne Hooks)")
+        expect(!sess("a").runsHere, "ohne Hook und ohne Prozess → nicht nachgewiesen")
+        expect(SessionMonitor.statsExclusions(local: [sess("a", verified: true)], remote: [mirror]).isEmpty,
+               "eigene Sitzung wird trotz Spiegel des anderen Macs gezählt")
+        expect(SessionMonitor.statsExclusions(local: [sess("a")], remote: [mirror]) == ["a"],
+               "fremde Sitzung (nur Spiegel hier) zählt der andere Mac")
+        expect(SessionMonitor.statsExclusions(local: [sess("a", bundle: "com.apple.Terminal")], remote: [mirror]).isEmpty,
+               "Hook-Meldung hier → eigene Sitzung")
+
+        print("settings.json privat schreiben")
+        do {
+            let dir = FileManager.default.temporaryDirectory.appendingPathComponent("agentbar-selftest-\(getpid())")
+            try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let target = dir.appendingPathComponent("settings.json")
+            // Watch the folder while writing: no file may ever be readable by group or others
+            let wide = Locked(false), stop = Locked(false)
+            let watcher = Thread {
+                while !stop.value {
+                    for name in (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? [] {
+                        var st = stat()
+                        if stat(dir.appendingPathComponent(name).path, &st) == 0, st.st_mode & 0o077 != 0 { wide.value = true }
+                    }
+                }
+            }
+            watcher.start()
+            let big = Data(count: 20_000_000)
+            for _ in 0..<5 { try Hooks.writePrivately(big, to: target, perms: 0o600) }
+            stop.value = true
+            Thread.sleep(forTimeInterval: 0.05)
+            expect(!wide.value, "Datei ist nie für andere lesbar, auch nicht beim Schreiben")
+            try Hooks.writePrivately(Data("{}".utf8), to: target, perms: 0o600)
+            let mode = (try FileManager.default.attributesOfItem(atPath: target.path)[.posixPermissions] as? NSNumber)?.intValue
+            expect(mode == 0o600 && (try? String(contentsOf: target, encoding: .utf8)) == "{}", "Inhalt und Rechte 600")
+            expect((try FileManager.default.contentsOfDirectory(atPath: dir.path)) == ["settings.json"], "keine Hilfsdatei übrig")
+        } catch { expect(false, "writePrivately: \(error)") }
 
         print("Sprache: \(Lang.isGerman ? "Deutsch" : "Englisch")")
         print(failures == 0 ? "\nAlle Tests bestanden." : "\n\(failures) Test(s) fehlgeschlagen.")

@@ -20,6 +20,8 @@ final class Updater: ObservableObject {
     /// Öffentlicher Teil des Release-Schlüssels (Shared/tools/release-key.swift). Der private Teil liegt nie im Repo.
     static let publicKey = "TBkvdyuhlknBwhMjJ0a6/oQVPp6ZOATnqaHcHm62P8M="
     private var release: Release?
+    /// The last failure happened while installing (not while checking): "Try Again" then installs again.
+    private(set) var installFailed = false
     private var timer: Timer?
     /// Meldet eine neu gefundene Version (je Version nur einmal, auch über Neustarts hinweg).
     var onFound: ((String) -> Void)?
@@ -50,6 +52,7 @@ final class Updater: ObservableObject {
         if case .installing = state { return }
         if case .available = state, silent { return }
         state = .checking
+        installFailed = false
         do {
             let (data, http) = try await UpdateCore.fetchLatestRelease(repo: Self.repo, userAgent: userAgent)
             switch http?.statusCode ?? 0 {
@@ -119,6 +122,7 @@ final class Updater: ObservableObject {
         } catch {
             try? FileManager.default.removeItem(at: work)
             let msg = (error as? UpdateError)?.text ?? error.localizedDescription
+            installFailed = true
             state = .failed(L("Update fehlgeschlagen", "Update failed") + ": \(msg)")
         }
     }

@@ -98,7 +98,7 @@ struct SnapMenu {
             live(menu(nil), "build/menu-empty-\(name).png", dark)
             // Einstellungen
             store.hooksInstalled = true
-            liveWindow(AnyView(SettingsView(height: 1800).environmentObject(store)), "build/settings-\(name).png", dark)
+            liveWindow(AnyView(SettingsView(height: 2600).environmentObject(store)), "build/settings-\(name).png", dark)
             if CommandLine.arguments.contains("--flat") {
                 keep = { store.monitor.inject(demo) }
                 shot(menu("1"), "build/menu-flat-\(name).png", dark)

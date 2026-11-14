@@ -35,14 +35,15 @@ enum Hooks {
         // Nur bei wirklich fehlender Datei leer anfangen – jeder Lesefehler (z. B. iCloud offline) bricht ab,
         // sonst würden alle anderen Einstellungen überschrieben.
         if fm.fileExists(atPath: url.path) {
+            // Date before content: a change by Claude Code in between then shows up as a newer date below
+            let attrs = try fm.attributesOfItem(atPath: url.path)
+            perms = attrs[.posixPermissions]
+            stamp = attrs[.modificationDate] as? Date
             let d = try Data(contentsOf: url)
             guard let j = try JSONSerialization.jsonObject(with: d) as? [String: Any] else {
                 throw NSError(domain: "AgentBar", code: 1, userInfo: [NSLocalizedDescriptionKey: L("settings.json ist kein JSON-Objekt", "settings.json is not a JSON object")])
             }
             root = j
-            let attrs = try fm.attributesOfItem(atPath: url.path)
-            perms = attrs[.posixPermissions]
-            stamp = attrs[.modificationDate] as? Date
             // Sicherung nur einmal: das ist der Stand vor AgentBar
             let backup = url.deletingLastPathComponent().appendingPathComponent("settings.json.agentbar-backup")
             if !fm.fileExists(atPath: backup.path) {
@@ -98,12 +99,27 @@ enum Hooks {
         return out
     }
 
-    /// Atomar ersetzen, ohne dass die Datei kurz für andere lesbar ist (settings.json kann Schlüssel enthalten):
-    /// Hilfsdatei gleich mit den richtigen Rechten anlegen, dann per rename() austauschen.
-    private static func writePrivately(_ data: Data, to url: URL, perms: Int16) throws {
+    /// Replace atomically without the file ever being readable by others (settings.json can hold keys): the
+    /// temporary file is created with owner-only rights before any byte is written, then swapped in with rename().
+    /// (FileManager.createFile writes first and sets the rights afterwards.)
+    static func writePrivately(_ data: Data, to url: URL, perms: Int16) throws {
         let tmp = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).agentbar-tmp")
         try? FileManager.default.removeItem(at: tmp)
-        guard FileManager.default.createFile(atPath: tmp.path, contents: data, attributes: [.posixPermissions: perms]) else {
+        let fd = open(tmp.path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+        guard fd >= 0 else { throw CocoaError(.fileWriteUnknown) }
+        let written = data.withUnsafeBytes { buf -> Bool in
+            var off = 0
+            while off < buf.count {
+                let n = write(fd, buf.baseAddress! + off, buf.count - off)
+                if n < 0 { if errno == EINTR { continue }; return false }
+                off += n
+            }
+            return true
+        }
+        // Keep the original file's rights (never wider than needed is the caller's choice), flush, close
+        let ok = written && fchmod(fd, mode_t(perms) & 0o777) == 0 && fsync(fd) == 0
+        guard close(fd) == 0, ok else {
+            try? FileManager.default.removeItem(at: tmp)
             throw CocoaError(.fileWriteUnknown)
         }
         guard rename(tmp.path, url.path) == 0 else {

@@ -244,7 +244,7 @@ struct UpdateAvailableItem: View {
             }
             if showNotes {
                 ScrollView {
-                    Text(notes).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(ReleaseNotes.markdown(notes)).font(.system(size: 11)).foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -319,6 +319,14 @@ struct SessionRow: View {
     var selected = false
     var onHover: (Bool) -> Void = { _ in }
 
+    private func subtitleLine(_ subtitle: String, _ s: AgentSession, helpers: Text?) -> some View {
+        HStack(spacing: 0) {
+            Text(subtitle).lineLimit(1).truncationMode(.tail)
+                .foregroundStyle(s.status == .waiting || s.status == .error ? s.status.color : Color.secondary)
+            if let helpers { helpers.foregroundStyle(.secondary).fixedSize() }
+        }
+    }
+
     private func titleLine(_ s: AgentSession, project: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 5) {
             Text(s.displayName).font(.system(size: 13)).lineLimit(1)
@@ -344,15 +352,15 @@ struct SessionRow: View {
                             titleLine(s, project: s.title != nil && s.displayName != s.project)
                             titleLine(s, project: false)
                         }
-                        HStack(spacing: 0) {
-                            Text(subtitle).lineLimit(1).truncationMode(.tail)
-                                .foregroundStyle(s.status == .waiting || s.status == .error ? s.status.color : Color.secondary)
-                            // Not when the subtitle already says "Waiting for N helpers"
-                            if !s.subagents.isEmpty, !(s.status == .working && s.tool == "Agent" && s.workingHelpers > 0) {
-                                Text(" · \(helperText)").foregroundStyle(.secondary).fixedSize()
-                            }
+                        // Not when the subtitle already says "Waiting for N helpers"
+                        let helpers = !s.subagents.isEmpty && !(s.status == .working && s.tool == "Agent" && s.workingHelpers > 0)
+                        // When the line is tight the helper count shrinks to an icon, so the activity (file name) stays whole
+                        ViewThatFits(in: .horizontal) {
+                            subtitleLine(subtitle, s, helpers: helpers ? Text(" · \(helperText)") : nil)
+                            subtitleLine(subtitle, s, helpers: helpers ? Text(" · ") + Text(Image(systemName: "person.2.fill")) + Text(" \(helperCount)") : nil)
                         }
                         .font(.system(size: 11))
+                        .accessibilityElement(children: .combine)
                     }
                     Spacer(minLength: 4)
                     meter
@@ -385,8 +393,10 @@ struct SessionRow: View {
         }
     }
 
+    private var helperCount: Int { session.workingHelpers > 0 ? session.workingHelpers : session.subagents.count }
+
     private var helperText: String {
-        let n = session.workingHelpers > 0 ? session.workingHelpers : session.subagents.count
+        let n = helperCount
         return n == 1 ? L("1 Helfer", "1 helper") : L("\(n) Helfer", "\(n) helpers")
     }
 

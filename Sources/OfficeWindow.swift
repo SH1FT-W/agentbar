@@ -20,11 +20,6 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
     func show() {
         guard let store else { return }
         if window == nil {
-            let root = OfficeView(model: model, load: load, visibility: visibility, weather: weather)
-                .environmentObject(store.monitor)
-                .environmentObject(store.quota)
-                .environmentObject(store.stats)
-            let host = NSHostingView(rootView: root)
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 900, height: 540),
                              styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                              backing: .buffered, defer: false)
@@ -34,13 +29,19 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
             w.isMovableByWindowBackground = true
             w.contentAspectRatio = NSSize(width: OfficeScene.size.width, height: OfficeScene.size.height)
             w.minSize = NSSize(width: 480, height: 288)
-            w.contentView = host
             w.isReleasedWhenClosed = false
             w.delegate = self
             w.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             if !w.setFrameUsingName("AgentBarOffice") { w.center() }
             w.setFrameAutosaveName("AgentBarOffice")
             window = w
+        }
+        // The view is built on every open and dropped on close (see close())
+        if let w = window, w.contentView == nil {
+            w.contentView = NSHostingView(rootView: OfficeView(model: model, load: load, visibility: visibility, weather: weather)
+                .environmentObject(store.monitor)
+                .environmentObject(store.quota)
+                .environmentObject(store.stats))
         }
         applyPrefs()
         load.start()
@@ -52,6 +53,9 @@ final class OfficeWindowController: NSObject, NSWindowDelegate {
 
     func close() {
         window?.orderOut(nil)
+        // A hidden hosting view still re-renders the whole scene whenever sessions, quota or stats change, and keeps
+        // its layers. Office state that matters (desks, walks) lives in OfficeModel and survives this.
+        window?.contentView = nil
         load.stop()
         weather.stop()
         UserDefaults.standard.set(false, forKey: "officeWasOpen")

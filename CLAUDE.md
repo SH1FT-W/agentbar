@@ -23,6 +23,7 @@ Release-Ablauf, Labels, Fehler beheben): `~/.claude/CLAUDE.md`, hier nur das Rep
 - Ohne Xcode: swiftc gegen das macOS-26.5-SDK der Command Line Tools (SDK 27 scheitert am SwiftUI-Macro-Plugin).
 - `./build.sh` → `build/AgentBar.app`, `./build.sh install` → nach `/Applications` und neu starten.
 - `./build.sh test` = Selbsttests (`tools/selftest.swift`), läuft auch in `.github/workflows/build.yml`.
+- `./build.sh peertest` = Sync-Test (drei PeerHubs, Flooder mit offenen Verbindungen), braucht Bonjour, nicht in CI.
 - Optik: `./build.sh snapshot` / `build/snapshot --festive|--weather|--coffee|--seasons|--moments` (Fake-Datum/-Wetter
   per `AGENTBAR_FAKE_DATE` / `AGENTBAR_FAKE_WEATHER`); Glas ist offscreen nicht sichtbar (`snapshot_menu --flat`).
 - Diagnose: `AgentBar --dump` (`AGENTBAR_DEBUG=1`).

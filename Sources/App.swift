@@ -17,7 +17,7 @@ struct AgentBarApp: App {
                 .environmentObject(delegate.store.updater)
                 .environmentObject(delegate.store.stats)
         } label: {
-            MenuBarLabel().environmentObject(delegate.store.monitor).environmentObject(delegate.store.quota)
+            MenuBarLabel(state: delegate.store.menuBar)
         }
         .menuBarExtraStyle(.window)
     }
@@ -80,6 +80,7 @@ final class AppStore: ObservableObject {
     let updater = Updater()
     let peers = PeerHub()
     let stats = StatsStore()
+    let menuBar = MenuBarState()
     private var peerWatch: AnyCancellable?
     lazy var office = OfficeWindowController(store: self)
     private let updatePrompt = UpdatePromptController()
@@ -101,6 +102,7 @@ final class AppStore: ObservableObject {
     private var observers: [NSObjectProtocol] = []
 
     init() {
+        menuBar.follow(monitor, quota)
         monitor.onUpdate = { [weak self] list in
             self?.checkHints(list)
             self?.checkWaits()
@@ -303,19 +305,46 @@ final class AppStore: ObservableObject {
 
 // MARK: - Menüleiste
 
+/// What the menu bar shows. The label used to observe the whole monitor and quota, so every session event
+/// redrew the status item; this publishes only when the counts or the shown percentage change.
+@MainActor
+final class MenuBarState: ObservableObject {
+    @Published private(set) var waiting = 0
+    @Published private(set) var working = 0
+    @Published private(set) var quotaPercent: Int?
+    private var watch: AnyCancellable?
+
+    func follow(_ monitor: SessionMonitor, _ quota: QuotaMonitor) {
+        let defaults = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification).map { _ in () }
+        // objectWillChange fires before the change: read the new values on the next main-queue turn
+        watch = Publishers.Merge3(monitor.objectWillChange.map { _ in () }, quota.objectWillChange.map { _ in () }, defaults)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak monitor, weak quota] in
+                guard let self, let monitor, let quota else { return }
+                MainActor.assumeIsolated { self.set(monitor.waitingCount, monitor.workingCount, quota.shownSession.map { Int($0.percent.rounded()) }) }
+            }
+        set(monitor.waitingCount, monitor.workingCount, quota.shownSession.map { Int($0.percent.rounded()) })
+    }
+
+    private func set(_ waiting: Int, _ working: Int, _ quota: Int?) {
+        if self.waiting != waiting { self.waiting = waiting }
+        if self.working != working { self.working = working }
+        if quotaPercent != quota { quotaPercent = quota }
+    }
+}
+
 struct MenuBarLabel: View {
-    @EnvironmentObject var monitor: SessionMonitor
-    @EnvironmentObject var quota: QuotaMonitor
+    @ObservedObject var state: MenuBarState
     @AppStorage(Prefs.showCount) private var showCount = true
     @AppStorage(Prefs.showQuota) private var showQuota = false
 
     var body: some View {
-        let waiting = monitor.waitingCount, working = monitor.workingCount
+        let waiting = state.waiting, working = state.working
         HStack(spacing: 3) {
             Image(nsImage: MenuBarIcon.make(waiting: waiting > 0, working: working > 0))
             // Zahl zeigt, wer dich braucht – sonst, wie viele arbeiten
             if showCount, waiting + working > 0 { Text("\(waiting > 0 ? waiting : working)").monospacedDigit() }
-            if showQuota, let s = quota.shownSession { Text(percentText(Int(s.percent.rounded()))).monospacedDigit() }
+            if showQuota, let p = state.quotaPercent { Text(percentText(p)).monospacedDigit() }
         }
         // VoiceOver: das Symbol allein verrät den Zustand nicht
         .accessibilityElement(children: .ignore)
