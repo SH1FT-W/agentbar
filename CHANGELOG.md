@@ -4,6 +4,8 @@ Release notes for each version are on the [GitHub releases page](https://github.
 
 ## Unreleased
 
+## 26.11.2
+
 ### Changed
 - Much lighter while agents work: timestamps are parsed about a thousand times faster, the stats file is saved every 2 minutes instead of every 20 seconds, the session list is read at most every 2 seconds, the closed Office no longer redraws in the background, and the menu bar icon only redraws when its numbers change.
 - Settings: both menu bar options are in the *Menu Bar* section; greyed out usage options say they need *Fetch usage*; *Fetch usage* mentions the keychain prompt; the fixed shortcut says it is fixed.

@@ -32,7 +32,7 @@ AgentBar only reads what Claude Code writes on your Mac. It cannot answer prompt
 | Real weather behind the office window | a location |
 | Sessions from your other Macs | the same pairing code on every Mac |
 
-**New in 26.11:** calmer, more useful notifications: permission prompts after 10 seconds at most, everything else once per waiting state after the delay you choose, a click opens the right tab, and usage warnings at 80 % and 95 %. Every change is in the [releases](https://github.com/SH1FT-W/agentbar/releases).
+**New in 26.11:** calmer, more useful notifications: permission prompts after 10 seconds at most, everything else once per waiting state after the delay you choose, a click opens the right tab, and usage warnings at 80 % and 95 %. 26.11.2 is much lighter on the CPU while agents work and makes the sync between Macs sturdier. Every change is in the [releases](https://github.com/SH1FT-W/agentbar/releases).
 
 <a id="get-started"></a><a id="install"></a><a id="set-up"></a>
 ## Get started
