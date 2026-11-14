@@ -4,6 +4,21 @@ Release notes for each version are on the [GitHub releases page](https://github.
 
 ## Unreleased
 
+### Changed
+- Much lighter while agents work: timestamps are parsed about a thousand times faster, the stats file is saved every 2 minutes instead of every 20 seconds, the session list is read at most every 2 seconds, the closed Office no longer redraws in the background, and the menu bar icon only redraws when its numbers change.
+- Settings: both menu bar options are in the *Menu Bar* section; greyed out usage options say they need *Fetch usage*; *Fetch usage* mentions the keychain prompt; the fixed shortcut says it is fixed.
+- A new pairing code asks first, because your other Macs lose the connection until they get it. Copying the code shows a check mark.
+- Session rows keep the file name whole when the line is tight; the helper count shrinks to an icon.
+- In the Office, waiting name tags stay orange under the pointer, and the tooltip explains the orange battery (context almost full).
+- *Try Again* after a failed update installs again instead of only checking.
+
+### Fixed
+- With ~/.claude shared between Macs, a Mac could drop the tokens of its own sessions from the stats when the other Mac reported them too. Sessions whose process runs on this Mac now always count here.
+- Writing ~/.claude/settings.json (hooks) never leaves the file readable by other users, not even for a moment, and a change Claude Code makes at the same time is no longer overwritten.
+- Other Macs: idle connections from the local network can no longer block the sync, and recorded messages are not accepted again after a Mac went quiet.
+- Release notes in the menu and in Settings no longer show raw Markdown.
+- German texts: "Sek." used consistently, "Edits OK"; VoiceOver reads the Office shortcut in German.
+
 ## 26.11.1
 
 ### Added
