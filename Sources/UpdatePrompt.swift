@@ -75,7 +75,7 @@ struct UpdatePromptView: View {
             HStack {
                 Spacer()
                 Button(L("Schließen", "Close"), action: dismiss).keyboardShortcut(.cancelAction)
-                Button(L("Erneut versuchen", "Try Again")) { Task { await updater.check() } }
+                Button(L("Erneut versuchen", "Try Again")) { Task { updater.installFailed ? await updater.install() : await updater.check() } }
                     .keyboardShortcut(.defaultAction)
             }
             .controlSize(.large)

@@ -519,6 +519,10 @@ struct OfficeView: View {
         if !s.activity.isEmpty { t += ": \(s.activity)" }
         t += "\n\(s.cwd.replacingOccurrences(of: NSHomeDirectory(), with: "~"))"
         if !s.model.isEmpty { t += " · \(shortModel(s.model))" }
+        // The orange battery on the name tag
+        if s.contextWarning, let f = s.contextFill {
+            t += "\n" + L("Kontext \(Int(f * 100)) % voll – wird bald zusammengefasst", "Context \(Int(f * 100))% full – will be compacted soon")
+        }
         if let d = s.device { t += "\n" + L("Läuft auf \(d)", "Running on \(d)") }
         else { t += "\n" + L("Klicken, um zur Sitzung zu springen", "Click to go to the session") }
         return t

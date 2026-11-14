@@ -63,6 +63,8 @@ struct SettingsView: View {
     @State private var codeInvalid = false
     @State private var notificationsDenied = false
     @State private var copied = false
+    @State private var codeCopied = false
+    @State private var confirmNewCode = false
     /// Feste Höhe nur für Snapshots (ganzes Formular auf einem Bild); nil = Fenster bestimmt die Höhe.
     var height: CGFloat? = nil
 
@@ -102,7 +104,8 @@ struct SettingsView: View {
                     }
                     KeyCap(text: "⌃⌥A")
                 } label: {
-                    SettingLabel(L("Büro ein- und ausblenden", "Show or hide Office"), "keyboard", .gray)
+                    SettingLabel(L("Büro ein- und ausblenden", "Show or hide Office"), "keyboard", .gray,
+                                 note: L("Tastenkürzel, fest eingestellt.", "Keyboard shortcut, fixed."))
                 }
             }
 
@@ -135,7 +138,10 @@ struct SettingsView: View {
                     SettingLabel(L("Agent hängt vielleicht", "Agent may be stuck"), "hourglass", .yellow,
                                  note: L("Arbeitet seit 10 Minuten ohne neues Lebenszeichen.", "Working for 10 minutes without any new activity."))
                 }
-                Toggle(isOn: $notifyQuota) { SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink) }
+                Toggle(isOn: $notifyQuota) {
+                    SettingLabel(L("Kontingent wird knapp", "Usage running low"), "gauge.with.needle.fill", .pink,
+                                 note: quotaEnabled ? nil : L("Braucht „Kontingent abrufen“.", "Needs “Fetch usage”."))
+                }
                     .disabled(!quotaEnabled)
                 if notifyQuota, quotaEnabled {
                     // The second warning always lies above the first
@@ -146,8 +152,8 @@ struct SettingsView: View {
                 }
                 Toggle(isOn: $notifyUpdate) { SettingLabel(L("Neue AgentBar-Version", "New AgentBar version"), "arrow.down.app.fill", .blue) }
                 Toggle(isOn: $whenFront) {
-                    SettingLabel(L("Auch im Vordergrund", "Even when in front"), "macwindow", .gray,
-                                 note: L("Auch melden, wenn die Sitzung gerade sichtbar ist.", "Also notify when the session is visible."))
+                    SettingLabel(L("Auch wenn die Sitzung vorne ist", "Even when the session is in front"), "macwindow", .gray,
+                                 note: L("Sonst bleibt es still, solange ihr Terminal im Vordergrund ist.", "Otherwise it stays quiet while its terminal is in front."))
                 }
                 Toggle(isOn: $quietHours) {
                     SettingLabel(L("Ruhezeiten", "Quiet hours"), "moon.fill", .indigo,
@@ -168,16 +174,20 @@ struct SettingsView: View {
 
             Section(L("Menüleiste", "Menu Bar")) {
                 Toggle(isOn: $showCount) { SettingLabel(L("Anzahl aktiver Agenten", "Number of active agents"), "number", .blue) }
+                Toggle(isOn: $showQuota) {
+                    SettingLabel(L("5-Stunden-Kontingent", "5-hour usage"), "percent", .blue,
+                                 note: quotaEnabled ? nil : L("Braucht „Kontingent abrufen“.", "Needs “Fetch usage”."))
+                }
+                    .disabled(!quotaEnabled)
             }
 
             Section(L("Kontingent", "Usage")) {
                 Toggle(isOn: $quotaEnabled) {
                     SettingLabel(L("Kontingent abrufen", "Fetch usage"), "chart.pie.fill", .pink,
-                                 note: L("Liest dein Nutzungs-Kontingent bei Anthropic.", "Reads your usage limits from Anthropic."))
+                                 note: L("Liest dein Nutzungs-Kontingent bei Anthropic. Dafür nutzt AgentBar die Anmeldung von Claude Code aus dem Schlüsselbund; macOS fragt beim ersten Mal nach.",
+                                         "Reads your usage limits from Anthropic, using Claude Code’s sign-in from the keychain; macOS asks the first time."))
                 }
                 .onChange(of: quotaEnabled) { _, on in if on { Task { await store.quota.refresh() } } }
-                Toggle(isOn: $showQuota) { SettingLabel(L("5-Stunden-Kontingent in der Menüleiste", "5-hour usage in the menu bar"), "percent", .blue) }
-                    .disabled(!quotaEnabled)
             }
 
             Section {
@@ -222,11 +232,21 @@ struct SettingsView: View {
                     LabeledContent {
                         HStack(spacing: 8) {
                             Text(peerCode).font(.system(size: 12, design: .monospaced)).textSelection(.enabled)
-                            Button { copy(peerCode) } label: { Image(systemName: "doc.on.doc") }
-                                .help(L("Kopieren", "Copy")).accessibilityLabel(L("Kopieren", "Copy"))
-                            Button { peerCode = PeerCode.generate(); store.peers.configure() } label: { Image(systemName: "arrow.clockwise") }
+                            Button {
+                                copy(peerCode)
+                                codeCopied = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { codeCopied = false }
+                            } label: { Image(systemName: codeCopied ? "checkmark" : "doc.on.doc").foregroundStyle(codeCopied ? Color.green : Color.primary) }
+                                .help(L("Kopieren", "Copy")).accessibilityLabel(codeCopied ? L("Kopiert", "Copied") : L("Kopieren", "Copy"))
+                            Button { confirmNewCode = true } label: { Image(systemName: "arrow.clockwise") }
                                 .help(L("Neuen Code erzeugen – alle anderen Macs brauchen ihn dann auch", "New code – all other Macs need it too"))
                                 .accessibilityLabel(L("Neuen Code erzeugen", "New code"))
+                                .confirmationDialog(L("Neuen Kopplungscode erzeugen?", "Create a new pairing code?"), isPresented: $confirmNewCode) {
+                                    Button(L("Neuer Code", "New Code"), role: .destructive) { peerCode = PeerCode.generate(); store.peers.configure() }
+                                } message: {
+                                    Text(L("Deine anderen Macs verlieren die Verbindung, bis du dort den neuen Code eingibst.",
+                                           "Your other Macs lose the connection until you enter the new code there."))
+                                }
                         }
                         .buttonStyle(.borderless)
                     } label: {

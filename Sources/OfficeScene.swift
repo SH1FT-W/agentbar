@@ -1736,7 +1736,8 @@ struct OfficeScene {
         case .idle: icon = a.pose == .napping || a.pose == .sofa(sleep: true) ? "moon.zzz.fill" : "cup.and.saucer.fill"; tint = rgb(0x8E8E93)
         }
         let hover = hovered == a.id
-        let fill: Color = hover ? .accentColor : st == .waiting ? rgb(0xFF9500) : (dark ? rgb(0x2C2C2E, 0.92) : rgb(0xFFFFFF, 0.94))
+        // Waiting stays orange under the pointer too: the colour is the status, hover only adds the tooltip
+        let fill: Color = st == .waiting ? rgb(0xFF9500) : hover ? .accentColor : (dark ? rgb(0x2C2C2E, 0.92) : rgb(0xFFFFFF, 0.94))
         let text: Color = hover || st == .waiting ? .white : ink
         let size: CGFloat = s < 0.9 ? 9 : 10.5
         // Statuswechsel: kurzer, weicher Lichtring um das Schild
