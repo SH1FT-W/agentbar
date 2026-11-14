@@ -244,7 +244,7 @@ struct UpdateAvailableItem: View {
             }
             if showNotes {
                 ScrollView {
-                    Text(notes).font(.system(size: 11)).foregroundStyle(.secondary)
+                    Text(ReleaseNotes.markdown(notes)).font(.system(size: 11)).foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)

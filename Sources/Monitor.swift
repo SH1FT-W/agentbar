@@ -1054,6 +1054,6 @@ func describeTool(_ name: String, _ input: [String: Any]) -> String {
 
 #if SNAPSHOT
 extension SessionMonitor {
-    func inject(_ list: [AgentSession]) { sessions = list }
+    func inject(_ list: [AgentSession]) { visibleCache = nil; sessions = list }
 }
 #endif

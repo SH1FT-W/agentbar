@@ -123,7 +123,7 @@ struct SettingsView: View {
                         ForEach([0.0, 10, 20, 30, 60, 120], id: \.self) { Text(delayText($0)).tag($0) }
                     } label: {
                         SettingLabel(L("Erst melden nach", "Notify after"), "timer", .gray,
-                                     note: L("Freigaben spätestens nach 10 s. Kurze Pausen bleiben still, jeder Wartezustand meldet sich nur einmal.",
+                                     note: L("Freigaben spätestens nach 10 Sek. Kurze Pausen bleiben still, jeder Wartezustand meldet sich nur einmal.",
                                              "Permission prompts after 10 s at most. Short pauses stay quiet; each waiting state notifies only once."))
                     }
                 }
@@ -462,7 +462,7 @@ private struct VersionRow: View {
         }
         if case .available(_, let notes) = updater.state, !notes.isEmpty {
             DisclosureGroup(L("Was ist neu?", "What’s New?"), isExpanded: $showNotes) {
-                Text(notes).font(.system(size: 12)).foregroundStyle(.secondary)
+                Text(ReleaseNotes.markdown(notes)).font(.system(size: 12)).foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -507,6 +507,6 @@ private struct KeyCap: View {
             .padding(.horizontal, 7).padding(.vertical, 2)
             .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color.primary.opacity(0.07)))
             .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(Color.primary.opacity(0.12)))
-            .accessibilityLabel("Control-Option-A")
+            .accessibilityLabel(L("Control-Wahl-A", "Control-Option-A"))
     }
 }

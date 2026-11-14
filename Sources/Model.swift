@@ -108,7 +108,7 @@ func shortModel(_ model: String) -> String {
 func modeLabel(_ mode: String) -> String? {
     switch mode {
     case "auto": return "Auto"
-    case "acceptEdits": return L("Edits ok", "Edits OK")
+    case "acceptEdits": return "Edits OK"
     case "plan": return "Plan"
     case "bypassPermissions": return L("Ohne Rückfrage", "No prompts")
     default: return nil

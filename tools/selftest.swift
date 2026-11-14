@@ -64,6 +64,10 @@ struct SelfTest {
         expect(code.count == 14 && PeerCode.normalize(code) == code, "generate() liefert gültigen Code (\(code))")
         expect(PeerCode.generate() != code, "zwei Codes sind verschieden")
 
+        print("Release-Notizen")
+        let rn = String(ReleaseNotes.markdown("## What's new\n- **Calmer** notes\n\nInstall: `x`").characters)
+        expect(rn == "What's new\n•  Calmer notes\n\nInstall: x", "Überschrift, Liste, fett und Code ohne Markdown-Zeichen (\(rn.debugDescription))")
+
         print("Andere Macs: Wiedereinspielen")
         var rg = ReplayGuard()
         expect(rg.accept(from: "A", sent: 1000), "erste Nachricht")
