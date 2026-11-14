@@ -4,6 +4,8 @@ Release notes for each version are on the [GitHub releases page](https://github.
 
 ## Unreleased
 
+## 26.11.3
+
 ### Changed
 - Office: a walking figure's name tag turns faint while it covers the face of someone seated behind it.
 - Office: the middle sofa tag sits one row lower, so all three sofa tags show readable names instead of a few letters.
