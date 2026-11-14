@@ -16,7 +16,7 @@ final class SessionMonitor: ObservableObject {
     @Published fileprivate(set) var sessions: [AgentSession] = []
     /// Sitzungen anderer Macs (über PeerHub) – nur zur Anzeige.
     @Published var remote: [AgentSession] = [] {
-        didSet { stats.exclude(Set(remote.map(\.id))); visibleCache = nil }
+        didSet { updateExclusions(); visibleCache = nil }
     }
     @Published private(set) var hooksSeen = false
     /// Nach jeder Auswertung mit der ganzen Liste (Kontext-/Hängt-Hinweise).
@@ -43,8 +43,22 @@ final class SessionMonitor: ObservableObject {
     private func apply(_ list: [AgentSession], hooks: Bool) {
         if hooksSeen != hooks { hooksSeen = hooks }
         visibleCache = nil
-        if list != sessions { sessions = list }
+        if list != sessions { sessions = list; updateExclusions() }
         onUpdate?(list)
+    }
+
+    /// Tokens of sessions another Mac reports are counted there. A session that verifiably runs here stays ours,
+    /// even if a Mac sharing ~/.claude reports its mirror of it (otherwise nobody would count it).
+    nonisolated static func statsExclusions(local: [AgentSession], remote: [AgentSession]) -> Set<String> {
+        Set(remote.map(\.id)).subtracting(local.filter(\.runsHere).map(\.id))
+    }
+
+    private var excludedIds: Set<String> = []
+    private func updateExclusions() {
+        let ids = Self.statsExclusions(local: sessions, remote: remote)
+        guard ids != excludedIds else { return }
+        excludedIds = ids
+        stats.exclude(ids)
     }
 
     /// Eigene und fremde Sitzungen. Liegt ~/.claude in einer geteilten Cloud, kann eine fremde Sitzung auch
@@ -292,6 +306,7 @@ private final class MonitorCore: @unchecked Sendable {
 
     private func fullScan(sync: Bool) {
         lastFullScan = Date()
+        registryCache = nil
         refreshRoots()
         loadDesktopMeta()
         let fm = FileManager.default
@@ -648,6 +663,17 @@ private final class MonitorCore: @unchecked Sendable {
     /// löscht die Datei beim Beenden. `complete` nur, wenn jede Datei lesbar ist; `unregistered` = Startzeiten
     /// lokaler claude-Prozesse ohne Anmeldung (ältere Versionen). `bridged` = Sitzungen mit Remote Control (`bridgeSessionId`).
     private func sessionRegistry() -> (ids: Set<String>, complete: Bool, unregistered: [Date], bridged: Set<String>) {
+        // emit() runs up to 4 times a second while sessions write; listing and stat-ing ~/.claude/sessions each time
+        // was about an eighth of the CPU. A start or end shows up at most 2 s later.
+        let now = Date()
+        if let c = registryCache, now.timeIntervalSince(c.time) < 2 { return c.result }
+        let result = readSessionRegistry(now)
+        registryCache = (now, result)
+        return result
+    }
+    private var registryCache: (time: Date, result: (ids: Set<String>, complete: Bool, unregistered: [Date], bridged: Set<String>))?
+
+    private func readSessionRegistry(_ now: Date) -> (ids: Set<String>, complete: Bool, unregistered: [Date], bridged: Set<String>) {
         let fm = FileManager.default
         guard let items = try? fm.contentsOfDirectory(at: Paths.claudeSessions, includingPropertiesForKeys: [.contentModificationDateKey]) else { return ([], false, [], []) }
         var seen: [pid_t: (stamp: Date, sid: String, bridged: Bool, started: Double, cwd: String?)] = [:]
@@ -674,7 +700,6 @@ private final class MonitorCore: @unchecked Sendable {
         terminals = terminals.filter { seen[$0.key] != nil }
         let bridged = Set(seen.values.filter(\.bridged).map(\.sid))
         // Prozessliste (alle PIDs, Pfade, Eltern) ist teuer: nur alle 15 s oder wenn sich die Anmeldungen ändern
-        let now = Date()
         if let c = procCache, c.registered == pids, now.timeIntervalSince(c.time) < 15 {
             return (Set(seen.values.map(\.sid)), complete, c.unregistered, bridged)
         }
@@ -894,7 +919,9 @@ private final class MonitorCore: @unchecked Sendable {
             }
             var tokens = st.tokens
             // Without hooks the terminal comes from the process tree (only for terminal sessions)
-            let fallback = source == .cli && (h?.bundle == nil || h?.tty == nil) ? registeredPid[sid].flatMap(terminal) : nil
+            // terminal() also proves that the registered process runs on this Mac (start time matches)
+            let proc = registeredPid[sid].flatMap(terminal)
+            let fallback = source == .cli && (h?.bundle == nil || h?.tty == nil) ? proc : nil
             for a in subs[sid] ?? [] { for (m, t) in a.tokens { tokens[m, default: TokenTally()] = tokens[m, default: TokenTally()] + t } }
 
             out.append(AgentSession(
@@ -907,7 +934,8 @@ private final class MonitorCore: @unchecked Sendable {
                 contextWindow: st.contextMax > 0 ? (st.contextMax > 200_000 || Self.millionByDefault(st.model)
                                                     || millionFamily.map { st.model.contains($0) } == true ? 1_000_000 : 200_000) : 0,
                 question: status == .waiting ? st.question : nil, remoteControl: registry.bridged.contains(sid),
-                terminalBundle: h?.bundle == nil ? fallback?.bundle : nil, launchDir: launchDir[sid] ?? h?.cwd))
+                terminalBundle: h?.bundle == nil ? fallback?.bundle : nil, launchDir: launchDir[sid] ?? h?.cwd,
+                verifiedLocal: proc != nil))
         }
         out.sort { a, b in
             let ra = a.status == .idle ? 1 : 0, rb = b.status == .idle ? 1 : 0
@@ -959,14 +987,13 @@ private final class MonitorCore: @unchecked Sendable {
 
 // MARK: - Hilfsfunktionen
 
-private let isoFrac: ISO8601DateFormatter = {
-    let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]; return f
-}()
-private let isoPlain = ISO8601DateFormatter()
+private let isoFrac = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+private let isoPlain = Date.ISO8601FormatStyle()
 
-/// ISO-8601-Zeitstempel mit oder ohne Sekundenbruchteile ("2026-10-17T12:00:00.123Z", "2026-10-17T12:00:00Z").
-/// Gemeinsam für Sitzungsprotokolle, Statistik und Kontingent-Antwort; ISO8601DateFormatter ist thread-sicher.
-func parseISO8601(_ s: String) -> Date? { isoFrac.date(from: s) ?? isoPlain.date(from: s) }
+/// ISO 8601 timestamp with or without fractional seconds ("2026-10-17T12:00:00.123Z", "2026-10-17T12:00:00Z").
+/// Shared by session logs, stats and the quota response. FormatStyle instead of ISO8601DateFormatter: the old
+/// formatter took about 1 ms per call on macOS 26 (every JSONL line, twice), FormatStyle under 1 µs.
+func parseISO8601(_ s: String) -> Date? { (try? isoFrac.parse(s)) ?? (try? isoPlain.parse(s)) }
 
 /// "-Users-name-projekt" → "/Users/name/projekt" (verlustbehaftet, nur Notlösung ohne cwd)
 private func decodeProjectDir(_ dir: String) -> String { dir.replacingOccurrences(of: "-", with: "/") }

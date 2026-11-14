@@ -1,8 +1,10 @@
 # Changelog
 
-Release notes for each version are on the [GitHub releases page](https://github.com/SH1FT-W/agentbar/releases). This file lists what is not released yet.
+Release notes for each version are on the [GitHub releases page](https://github.com/SH1FT-W/agentbar/releases). Changes not released yet are listed under *Unreleased*.
 
 ## Unreleased
+
+## 26.11.1
 
 ### Added
 - "Agent is waiting" notifications wait for a delay you choose (20 seconds by default, or immediately; permission prompts after 10 seconds at most, since the agent is blocked) and notify only once per waiting state, so short pauses and status flicker stay quiet.

@@ -149,10 +149,13 @@ struct AgentSession: Identifiable, Equatable {
     var deviceIsLaptop = false
     var question: String? = nil   // Fragetext, solange die Sitzung auf eine Antwort (AskUserQuestion) wartet
     var remoteControl = false     // per Remote Control mit claude.ai/der Claude-App auf dem Handy verbunden
-    /// Terminal app found in the process tree when no hook reported one (hostBundle stays hook-only for runsHere)
+    /// Terminal app found in the process tree when no hook reported one
     var terminalBundle: String? = nil
     /// Folder the Claude process started in (registration or hook) – what a terminal reports as its directory
     var launchDir: String? = nil
+    /// The registered Claude process runs on this Mac (pid alive with the registered start time). Proof without hooks
+    /// that a session in a shared ~/.claude is ours and not another Mac's mirror.
+    var verifiedLocal = false
 
     /// App that shows this session: the hook's report, else the process tree
     var terminalApp: String? { hostBundle ?? terminalBundle }
@@ -215,8 +218,9 @@ struct AgentSession: Identifiable, Equatable {
         status == .waiting && (question ?? "").isEmpty && tool != "AskUserQuestion" && tool != "ExitPlanMode"
     }
 
-    /// Läuft auf diesem Mac: ein Hook hat sie hier gemeldet (hooks.log liegt lokal, nicht im geteilten ~/.claude).
-    var runsHere: Bool { device == nil && hostBundle != nil }
+    /// Runs on this Mac: a hook reported it here (hooks.log is local, not in the shared ~/.claude), or its
+    /// registered process was found here.
+    var runsHere: Bool { device == nil && (hostBundle != nil || verifiedLocal) }
 }
 
 // MARK: - Statistik & Prognose (2.0)

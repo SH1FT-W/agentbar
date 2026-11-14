@@ -199,7 +199,9 @@ final class StatsCollector: @unchecked Sendable {
     private func saveSoon() {
         guard !saveScheduled, !readOnlyRun else { return }
         saveScheduled = true
-        queue.asyncAfter(deadline: .now() + 20) { [self] in
+        // Days and read offsets are saved together, so a crash between saves only means reading those lines again
+        // (nothing counted twice or lost). Every 2 minutes instead of 20 s: stats.json is ~1 MB and fully re-encoded.
+        queue.asyncAfter(deadline: .now() + 120) { [self] in
             saveScheduled = false
             save()
         }
@@ -213,10 +215,20 @@ final class StatsCollector: @unchecked Sendable {
         let keys = Set(keep.map(\.day))
         days = days.filter { keys.contains($0.key) }
         daySessions = daySessions.filter { keys.contains($0.key) }
+        // Read positions of files from before the stats window that are gone or untouched since: ingest() would not
+        // take them up again anyway (created before the window), they only made stats.json grow over time.
+        let cutoff = Date().addingTimeInterval(-Double(Self.keepDays) * 86400)
+        files = files.filter { path, p in
+            p.born >= cutoff.timeIntervalSince1970 || (mtimeOrNil(path).map { $0 > cutoff } ?? false)
+        }
         let out = Saved(days: keep, sessions: daySessions.mapValues { Array($0) }, files: files)
         guard let data = try? JSONEncoder().encode(out) else { return }
         try? data.write(to: Self.url, options: .atomic)
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.url.path)
+    }
+
+    private func mtimeOrNil(_ path: String) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
     }
 
     private func load() {
