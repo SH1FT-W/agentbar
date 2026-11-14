@@ -149,7 +149,8 @@ final class PeerHub: ObservableObject {
     /// Unveränderte Liste nur alle 15 s erneut schicken (Lebenszeichen für den 35-s-Cutoff der Gegenseite).
     static let keepalive: TimeInterval = 15
     static let maxLinks = 8
-    static let maxUntrusted = 3                          // noch nicht bestätigte Verbindungen (gegen Blockieren ohne Code)
+    static let maxUntrusted = 3                          // incoming links that have not proven the code yet
+    private var replay = ReplayGuard()
     private let name = Host.current().localizedName ?? "Mac"
     private let laptop = PeerHub.hasBattery()
 
@@ -275,6 +276,7 @@ final class PeerHub: ObservableObject {
         browser?.cancel(); browser = nil
         for l in links.values { l.cancel() }
         links = [:]; outgoing = [:]; lastResults = []
+        // replay is kept on purpose: after a restart (wake) a recorded frame must still count as old
         code = nil; sealKey = nil; groupTag = nil
         skewReported = []
         if !peers.isEmpty { peers = [:]; publish() }
@@ -292,8 +294,17 @@ final class PeerHub: ObservableObject {
     }
 
     private func adopt(_ c: NWConnection, peer: String?) {
-        // Obergrenze gegen Fluten im lokalen Netz
-        guard links.count < Self.maxLinks, links.values.filter({ !$0.isTrusted }).count < Self.maxUntrusted else { c.cancel(); return }
+        // Limits against flooding from the local network. Only incoming links that have not proven the code count
+        // as untrusted (our own outgoing ones are not blocked by them). At the limit the oldest one is dropped
+        // instead of the new one: a real peer proves the code within milliseconds, idle sockets cannot lock it out.
+        if peer == nil {
+            let waiting = links.filter { !$0.value.isTrusted && !$0.value.isOutgoing }
+            if waiting.count >= Self.maxUntrusted, let oldest = waiting.min(by: { $0.value.opened < $1.value.opened }) {
+                oldest.value.cancel()
+                links[oldest.key] = nil
+            }
+        }
+        guard links.count < Self.maxLinks else { c.cancel(); return }
         // Eingehende Verbindungen schicken erst, wenn die Gegenseite den Code bewiesen hat
         let link = PeerLink(c, speaksFirst: peer != nil)
         let key = ObjectIdentifier(link)
@@ -312,6 +323,9 @@ final class PeerHub: ObservableObject {
     private func housekeeping(group: String) {
         // Weg ist, wer 35 s nichts geschickt hat; Verbindungen neu aufbauen, falls eine abgebrochen ist
         let cutoff = Date().addingTimeInterval(-35)
+        // A trusted link without a fresh frame for that long is dead or replayed: close it, real peers reconnect
+        for (key, l) in links where l.isTrusted && l.lastFresh < cutoff { l.cancel(); links[key] = nil }
+        replay.prune(now: Date().timeIntervalSince1970)
         let before = peers.count
         peers = peers.filter { $0.value.lastSeen > cutoff }
         if peers.count != before { publish() }
@@ -357,7 +371,7 @@ final class PeerHub: ObservableObject {
                         "The clock on “\(name)” is off by more than 2 min – check Date & Time.")
             NSLog("AgentBar: peer clock off by \(Int(now - env.sent)) s, messages ignored")
         }
-        guard abs(now - env.sent) < 120, env.sent > (peers[env.from]?.lastSent ?? 0) else { return .stale }
+        guard abs(now - env.sent) < 120, replay.accept(from: env.from, sent: env.sent) else { return .stale }
         let name = String(env.name.prefix(40))
         let list = env.sessions.prefix(40).compactMap { AgentSession($0, device: name, laptop: env.laptop) }
         let changed = peers[env.from]?.sessions != list || peers[env.from]?.name != name
@@ -380,6 +394,22 @@ final class PeerHub: ObservableObject {
     }
 }
 
+/// Newest send time seen per peer, kept after the peer goes quiet and across restarts: otherwise a recorded
+/// frame (younger than the 120 s freshness window) would be accepted again once the peer was dropped.
+struct ReplayGuard {
+    private(set) var newest: [String: Double] = [:]
+    static let window: Double = 120
+
+    mutating func accept(from: String, sent: Double) -> Bool {
+        guard sent > (newest[from] ?? 0) else { return false }
+        newest[from] = sent
+        return true
+    }
+
+    /// Entries older than the window can go: frames that old are rejected as stale anyway.
+    mutating func prune(now: Double) { newest = newest.filter { now - $0.value < Self.window + 10 } }
+}
+
 /// Outcome of one received frame.
 private enum PeerMessage { case invalid, stale, fresh }
 
@@ -391,6 +421,10 @@ private final class PeerLink {
     private var trusted = false               // erste gültige Nachricht empfangen
     private let speaksFirst: Bool             // nur wer die Verbindung aufbaut, sendet sofort
     var isTrusted: Bool { trusted }
+    var isOutgoing: Bool { speaksFirst }
+    let opened = Date()
+    /// Last frame that was fresh (not stale or replayed)
+    private(set) var lastFresh = Date()
     var canSend: Bool { ready && (speaksFirst || trusted) }
     /// Zuletzt geschickte Sitzungsliste (ohne Umschlag) und wann, damit Unverändertes nicht alle 5 s rausgeht
     var lastPayload: Data?
@@ -463,6 +497,7 @@ private final class PeerLink {
                 // Nicht entschlüsselbar → sofort schließen
                 let result = self.onMessage?(data) ?? .invalid
                 guard result != .invalid else { self.close(); return }
+                if result == .fresh { self.lastFresh = Date() }
                 if result == .fresh, !self.trusted {
                     self.trusted = true
                     if !self.speaksFirst { self.onReady?() }   // jetzt antworten

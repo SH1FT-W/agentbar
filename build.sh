@@ -4,6 +4,7 @@
 #   ./build.sh install    → zusätzlich nach /Applications und neu starten
 #   ./build.sh test       → Selbsttests (tools/selftest.swift), baut keine App
 #   ./build.sh snapshot   → Dropdown + Büro als PNG nach build/ (ohne Menüleiste)
+#   ./build.sh peertest   → Sync-Test mit drei PeerHubs und offenen Fremdverbindungen (lokales Netz, nicht in CI)
 #   ./build.sh release next ["Was ist neu"]
 #                         → Version setzen, bauen, committen, taggen, pushen und als GitHub-Release
 #                           (AgentBar.zip + .sha256 + .sig) in SH1FT-W/agentbar veröffentlichen; die App holt es per Update-Button
@@ -23,6 +24,7 @@ case "$1" in
     release) release_prepare "$2" ;;
     test) build_test ;;
     snapshot) build_tool snapshot tools/snapshot.swift; build/snapshot "${@:2}"; exit 0 ;;
+    peertest) build_tool peertest tools/peertest.swift; build/peertest; exit $? ;;
 esac
 
 build_app

@@ -64,6 +64,17 @@ struct SelfTest {
         expect(code.count == 14 && PeerCode.normalize(code) == code, "generate() liefert gültigen Code (\(code))")
         expect(PeerCode.generate() != code, "zwei Codes sind verschieden")
 
+        print("Andere Macs: Wiedereinspielen")
+        var rg = ReplayGuard()
+        expect(rg.accept(from: "A", sent: 1000), "erste Nachricht")
+        expect(!rg.accept(from: "A", sent: 1000) && !rg.accept(from: "A", sent: 990), "gleiche oder ältere Nachricht → abgelehnt")
+        expect(rg.accept(from: "B", sent: 990), "anderer Mac zählt getrennt")
+        // Peer was quiet for 35 s and got dropped from the list: a recorded frame must still be old
+        rg.prune(now: 1040)
+        expect(!rg.accept(from: "A", sent: 995), "nach Verstummen bleibt die Marke (innerhalb 2 Min.)")
+        rg.prune(now: 1200)
+        expect(rg.newest.isEmpty, "Marken nach Ablauf des Frische-Fensters aufgeräumt")
+
         print("Deko-Kalender: Advent und Weihnachten")
         expect(cal.component(.day, from: Festive.firstAdvent(year: 2026, cal: cal)) == 29
                && cal.component(.month, from: Festive.firstAdvent(year: 2026, cal: cal)) == 11, "1. Advent 2026 = 29.11.")
