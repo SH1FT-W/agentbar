@@ -18,7 +18,7 @@ The app declares `enum AppConfig: SharedAppConfig` in its own sources (template:
 | File | What it does |
 |:--|:--|
 | `build-common.sh` | Sourced by the app's `build.sh` after setting `APP`, `BUNDLE_ID`, `REPO`, `SIGN_KEY` (and optionally `OUT`, `TEST`). Provides `release_prepare`, `build_test`, `build_tool`, `build_app`, `install_app`, `release_publish`. |
-| `next-version` | Next calendar version `YY.M.N` from the published GitHub releases of the month. |
+| `next-version` | Next calendar version `YY.M.N` from the published GitHub releases of the month (tags with and without the older "v" both count). Tags and release titles are just the version, without "v". |
 | `release-key.swift` | Ed25519 key for signed releases: `release-key <App> generate | public | sign <file>`. The private key stays in `~/Library/Application Support/<App> Release/`. |
 | `fetch-icon.sh` | Downloads the icon compiled by the `App-Icon` workflow into `Resources/`. |
 | `icon.yml` | The `App-Icon` workflow (Icon Composer `.icon` to `Assets.car` + `AppIcon.icns` with `actool`). Copy to `.github/workflows/`. |

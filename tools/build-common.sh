@@ -14,7 +14,7 @@
 #   build_tool NAME FILE      compiles the sources + FILE with -D SNAPSHOT to build/NAME
 #   build_app                 builds build/APP.app: Info.plist, resources, swiftc -O, ad hoc signature
 #   install_app               copies build/APP.app to /Applications and opens it
-#   release_publish [NOTES]   zip, checksum, optional signature, commit, tag, push, GitHub release
+#   release_publish [NOTES]   zip, checksum, optional signature, commit, tag, push, GitHub release (tag = bare version)
 #
 # Sources: Sources/*.swift plus Shared/Sources/*.swift (this repository as a git subtree).
 # SDK: prefers a macOS 26 SDK of the Command Line Tools (SDK 27 needs the SwiftUI macro plugin that
@@ -40,7 +40,11 @@ release_prepare() {
     [[ "$VERSION" =~ '^[0-9]+(\.[0-9]+)+$' ]] || { echo "Usage: ./build.sh release next [\"What's new\"]"; exit 1; }
     [[ "$VERSION" == "$next" || -n "$ALLOW_VERSION" ]] || { echo "Next calendar version is $next (YY.M.N), not $VERSION. On purpose: ALLOW_VERSION=1 ./build.sh release ..."; exit 1; }
     [[ -z "$(git status --porcelain)" ]] || { echo "Commit everything first, the working tree is not clean."; exit 1; }
-    git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null && { echo "Tag v$VERSION exists already."; exit 1; }
+    # Tags are the bare version; older releases were tagged "vYY.M.N", so both spellings count as taken
+    local t
+    for t in "$VERSION" "v$VERSION"; do
+        git rev-parse -q --verify "refs/tags/$t" >/dev/null && { echo "Tag $t exists already."; exit 1; }
+    done
     ./build.sh test || { echo "Self tests failed, no release."; exit 1; }
     local build=$(( $(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" Info.plist) + 1 ))
     /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" -c "Set :CFBundleVersion $build" Info.plist
@@ -99,15 +103,16 @@ release_publish() {
         build/release-key "$APP" sign "$OUT/$APP.zip" > "$OUT/$APP.zip.sig"
         assets+=("$OUT/$APP.zip.sig")
     fi
+    # Tag and release title are the bare version, without "v" (the updaters of all released versions strip a "v")
     git add Info.plist
-    git commit -q -m "v$VERSION"
-    git tag "v$VERSION"
-    git push -q origin HEAD "v$VERSION"
+    git commit -q -m "$VERSION"
+    git tag "$VERSION"
+    git push -q origin HEAD "$VERSION"
     # Release notes are public: write them in English
     if [[ -n "$notes" ]]; then
-        gh release create "v$VERSION" "${assets[@]}" --repo "$REPO" --title "v$VERSION" --notes "$notes"
+        gh release create "$VERSION" "${assets[@]}" --repo "$REPO" --title "$VERSION" --notes "$notes"
     else
-        gh release create "v$VERSION" "${assets[@]}" --repo "$REPO" --title "v$VERSION" --generate-notes
+        gh release create "$VERSION" "${assets[@]}" --repo "$REPO" --title "$VERSION" --generate-notes
     fi
-    echo "Release v$VERSION published. In the app: Check for Updates."
+    echo "Release $VERSION published. In the app: Check for Updates."
 }
